@@ -1,0 +1,10 @@
+[package]
+name = "undo"
+version = "0.1.0"
+authors = ["evenorog <evenorog@gmail.com>"]
+description = "A undo/redo library."
+documentation = "https://docs.rs/crate/undo"
+repository = "https://github.com/evenorog/undo"
+keywords = ["undo", "redo"]
+
+[dependencies]

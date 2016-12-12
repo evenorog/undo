@@ -1,0 +1,46 @@
+extern crate undo;
+
+use std::rc::Rc;
+use std::cell::RefCell;
+use undo::{UndoCmd, UndoStack};
+
+/// Pops an element from a vector.
+#[derive(Clone)]
+struct PopCmd {
+    vec: Rc<RefCell<Vec<i32>>>,
+    e: Option<i32>,
+}
+
+impl UndoCmd for PopCmd {
+    fn redo(&mut self) {
+        self.e = self.vec.borrow_mut().pop();
+    }
+
+    fn undo(&mut self) {
+        self.vec.borrow_mut().push(self.e.unwrap());
+        self.e = None;
+    }
+}
+
+fn main() {
+    // We need to use Rc<RefCell> since all commands are going to mutate the vec.
+    let vec = Rc::new(RefCell::new(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+    let mut undo_stack = UndoStack::new()
+        .on_clean(|| println!("This is called when the stack changes from dirty to clean!"))
+        .on_dirty(|| println!("This is called when the stack changes from clean to dirty!"));
+
+    assert_eq!(vec.borrow().len(), 10);
+
+    let cmd = PopCmd { vec: vec.clone(), e: None };
+    undo_stack.push(cmd.clone());
+    undo_stack.push(cmd.clone());
+    undo_stack.push(cmd.clone());
+
+    assert_eq!(vec.borrow().len(), 7);
+
+    undo_stack.undo();
+    undo_stack.undo();
+    undo_stack.undo();
+
+    assert_eq!(vec.borrow().len(), 10);
+}
