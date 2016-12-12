@@ -1,4 +1,4 @@
-//! A Undo/Redo library.
+//! A undo/redo library.
 //!
 //! It uses the [Command Pattern](https://en.wikipedia.org/wiki/Command_pattern) where the user
 //! implements the `UndoCmd` trait for each command and then the commands can be used with the
@@ -127,11 +127,12 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
     /// This pops off all `UndoCmd`s that is above the active `UndoCmd` from the `UndoStack`.
     pub fn push(&mut self, mut cmd: T) {
         let is_dirty = self.is_dirty();
+        // Pop off all elements after len from stack.
         self.stack.truncate(self.len);
         cmd.redo();
         self.stack.push(cmd);
         self.len = self.stack.len();
-        // Check if stack went from dirty to clean.
+        // State is always clean after a push, check if it was dirty before.
         if is_dirty {
             if let Some(ref mut f) = self.on_clean {
                 f();
@@ -144,11 +145,11 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
     pub fn redo(&mut self) {
         if self.len < self.stack.len() {
             let is_dirty = self.is_dirty();
-            self.len += 1;
             {
-                let ref mut cmd = self.stack[self.len - 1];
+                let ref mut cmd = self.stack[self.len];
                 cmd.redo();
             }
+            self.len += 1;
             // Check if stack went from dirty to clean.
             if is_dirty == self.is_clean() {
                 if let Some(ref mut f) = self.on_clean {
@@ -161,13 +162,13 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
     /// Calls the `undo()` method for the active `UndoCmd` and sets the previous `UndoCmd` as the
     /// new active `UndoCmd`.
     pub fn undo(&mut self) {
-        if !self.stack.is_empty() {
+        if self.len != 0 {
             let is_clean = self.is_clean();
+            self.len -= 1;
             {
-                let ref mut cmd = self.stack[self.len - 1];
+                let ref mut cmd = self.stack[self.len];
                 cmd.undo();
             }
-            self.len -= 1;
             // Check if stack went from clean to dirty.
             if is_clean == self.is_dirty() {
                 if let Some(ref mut f) = self.on_dirty {
