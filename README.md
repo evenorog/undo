@@ -1,6 +1,9 @@
 # Undo
 A undo/redo library.
 
+[![Build Status](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
+[![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
+
 ```toml
 [dependencies]
 undo = "0.1.0"
