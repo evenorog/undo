@@ -1,9 +1,9 @@
 use fnv::FnvHashMap;
 use {UndoCmd, UndoStack};
 
-pub struct UndoGroup<'a, T: UndoCmd> {
+pub struct UndoGroup<'a, T: UndoCmd + 'a> {
     group: FnvHashMap<usize, UndoStack<'a, T>>,
-    active: Option<usize>,
+    active: Option<&'a mut UndoStack<'a, T>>,
 }
 
 impl<'a, T: UndoCmd> UndoGroup<'a, T> {
@@ -34,17 +34,12 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
         self.group.remove(&id)
     }
 
-    pub fn set_active_undo_stack(&mut self, id: usize) -> Result<(), ()> {
-        if self.group.contains_key(&id) {
-            self.active = Some(id);
-            Ok(())
-        } else {
-            Err(())
-        }
+    pub fn set_active_undo_stack(&'a mut self, id: usize) {
+        self.active = self.group.get_mut(&id);
     }
 
     pub fn is_clean(&self) -> Option<bool> {
-        self.get_active_stack().map(|t| t.is_clean())
+        self.active.as_ref().map(|t| t.is_clean())
     }
 
     pub fn is_dirty(&self) -> Option<bool> {
@@ -52,28 +47,20 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
     }
 
     pub fn push(&mut self, cmd: T) {
-        if let Some(stack) = self.get_mut_active_stack() {
+        if let Some(ref mut stack) = self.active {
             stack.push(cmd);
         }
     }
 
     pub fn redo(&mut self) {
-        if let Some(stack) = self.get_mut_active_stack() {
+        if let Some(ref mut stack) = self.active {
             stack.redo();
         }
     }
 
     pub fn undo(&mut self) {
-        if let Some(stack) = self.get_mut_active_stack() {
+        if let Some(ref mut stack) = self.active {
             stack.undo();
         }
-    }
-
-    fn get_active_stack(&self) -> Option<&UndoStack<'a, T>> {
-        self.active.and_then(move |active| self.group.get(&active))
-    }
-
-    fn get_mut_active_stack(&mut self) -> Option<&mut UndoStack<'a, T>> {
-        self.active.and_then(move |active| self.group.get_mut(&active))
     }
 }
