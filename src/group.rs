@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use {UndoCmd, UndoStack};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Id(u32);
 
 pub struct UndoGroup<'a, T: UndoCmd + 'a> {
@@ -25,20 +25,26 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
     }
 
     pub fn add_undo_stack(&mut self, stack: UndoStack<'a, T>) -> Id {
+        impl Clone for Id {
+            fn clone(&self) -> Self {
+                Id(self.0)
+            }
+        }
+
         let id = match self.group.keys().max() {
             Some(&Id(max)) => Id(max + 1),
             None => Id(0),
         };
-        self.group.insert(id, stack);
+        self.group.insert(id.clone(), stack);
         id
     }
 
-    pub fn remove_undo_stack(&mut self, id: Id) -> Option<UndoStack<'a, T>> {
-        self.group.remove(&id)
+    pub fn remove_undo_stack(&mut self, id: Id) -> UndoStack<'a, T> {
+        self.group.remove(&id).unwrap()
     }
 
-    pub fn set_active_undo_stack(&'a mut self, id: Id) {
-        self.active = self.group.get_mut(&id);
+    pub fn set_active_undo_stack(&'a mut self, id: &Id) {
+        self.active = self.group.get_mut(id);
     }
 
     pub fn is_clean(&self) -> Option<bool> {
