@@ -68,7 +68,7 @@ pub trait UndoCmd {
 /// you want to automatically enable or disable undo or redo buttons based on there are any
 /// more actions that can be undone or redone.
 ///
-/// Note: An empty `UndoStack` is clean, so the first push will not trigger the clean method.
+/// Note: An empty `UndoStack` is clean, so the first push will not trigger the `on_clean` method.
 pub struct UndoStack<'a, T: UndoCmd> {
     stack: Vec<T>,
     len: usize,
@@ -140,8 +140,8 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
         }
     }
 
-    /// Calls the `redo()` method for the active `UndoCmd` and sets the next `UndoCmd` as the new
-    /// active `UndoCmd`.
+    /// Calls the `redo` method for the active `UndoCmd` and sets the next `UndoCmd` as the new
+    /// active `UndoCmd`. Calling this method when the state is clean does nothing.
     pub fn redo(&mut self) {
         if self.len < self.stack.len() {
             let is_dirty = self.is_dirty();
@@ -151,7 +151,7 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
             }
             self.len += 1;
             // Check if stack went from dirty to clean.
-            if is_dirty == self.is_clean() {
+            if is_dirty && self.is_clean() {
                 if let Some(ref mut f) = self.on_clean {
                     f();
                 }
@@ -159,7 +159,7 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
         }
     }
 
-    /// Calls the `undo()` method for the active `UndoCmd` and sets the previous `UndoCmd` as the
+    /// Calls the `undo` method for the active `UndoCmd` and sets the previous `UndoCmd` as the
     /// new active `UndoCmd`.
     pub fn undo(&mut self) {
         if self.len != 0 {
@@ -170,7 +170,7 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
                 cmd.undo();
             }
             // Check if stack went from clean to dirty.
-            if is_clean == self.is_dirty() {
+            if is_clean && self.is_dirty() {
                 if let Some(ref mut f) = self.on_dirty {
                     f();
                 }
