@@ -2,8 +2,8 @@
 name = "undo"
 version = "0.1.0"
 authors = ["evenorog <evenorog@gmail.com>"]
-description = "A undo/redo library."
-documentation = "https://docs.rs/crate/undo"
+description = "A undo/redo library based on the command pattern."
+documentation = "https://docs.rs/undo"
 repository = "https://github.com/evenorog/undo"
 readme = "README.md"
 license = "MIT"
