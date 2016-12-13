@@ -1,6 +1,10 @@
 # Undo
 A undo/redo library.
 
+It uses the [Command Pattern](https://en.wikipedia.org/wiki/Command_pattern) where the user
+implements the `UndoCmd` trait for each command and then the commands can be used with the
+`UndoStack`.
+
 [![Build Status](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 
@@ -56,3 +60,9 @@ fn main() {
     assert_eq!(vec.borrow().len(), 10);
 }
 ```
+
+## TODO
+- Add UndoCmd merging.
+- Add a container for multiple UndoStacks.
+- Add more examples.
+- ???
