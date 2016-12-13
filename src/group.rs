@@ -24,26 +24,32 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
         }
     }
 
-    pub fn add_undo_stack(&mut self, stack: UndoStack<'a, T>) -> Id {
-        impl Clone for Id {
-            fn clone(&self) -> Self {
-                Id(self.0)
-            }
-        }
-
+    pub fn add_stack(&mut self, stack: UndoStack<'a, T>) -> Id {
         let id = match self.group.keys().max() {
             Some(&Id(max)) => Id(max + 1),
             None => Id(0),
         };
-        self.group.insert(id.clone(), stack);
+        self.group.insert(Id(id.0), stack);
         id
     }
 
-    pub fn remove_undo_stack(&mut self, id: Id) -> UndoStack<'a, T> {
-        self.group.remove(&id).unwrap()
+    pub fn remove_stack(&mut self, id: Id) -> UndoStack<'a, T> {
+        let stack = self.group.remove(&id).unwrap();
+        // Check if it was the active stack that was removed.
+        let is_active = match self.active {
+            Some(ref active) => {
+                *active as *const _ == &stack as *const _
+            },
+            None => return stack,
+        };
+        // If it was, we remove it from the active stack.
+        if is_active {
+            self.active = None;
+        }
+        stack
     }
 
-    pub fn set_active_undo_stack(&'a mut self, id: &Id) {
+    pub fn set_active_stack(&'a mut self, id: &Id) {
         self.active = self.group.get_mut(id);
     }
 
