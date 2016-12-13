@@ -10,3 +10,4 @@ license = "MIT"
 keywords = ["undo", "redo"]
 
 [dependencies]
+fnv = "1.0.5"
