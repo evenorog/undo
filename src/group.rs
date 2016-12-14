@@ -2,11 +2,12 @@ use fnv::FnvHashMap;
 use {UndoCmd, UndoStack};
 
 #[derive(Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct Id(u32);
+pub struct Id(u64);
 
 pub struct UndoGroup<'a, T: UndoCmd + 'a> {
     group: FnvHashMap<Id, UndoStack<'a, T>>,
     active: Option<&'a mut UndoStack<'a, T>>,
+    id: u64,
 }
 
 impl<'a, T: UndoCmd> UndoGroup<'a, T> {
@@ -14,6 +15,7 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
         UndoGroup {
             group: FnvHashMap::default(),
             active: None,
+            id: 0,
         }
     }
 
@@ -21,14 +23,13 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
         UndoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
             active: None,
+            id: 0,
         }
     }
 
     pub fn add_stack(&mut self, stack: UndoStack<'a, T>) -> Id {
-        let id = match self.group.keys().max() {
-            Some(&Id(max)) => Id(max + 1),
-            None => Id(0),
-        };
+        let id = Id(self.id);
+        self.id += 1;
         self.group.insert(Id(id.0), stack);
         id
     }
@@ -51,6 +52,10 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
 
     pub fn set_active_stack(&'a mut self, id: &Id) {
         self.active = self.group.get_mut(id);
+    }
+
+    pub fn clear_active_stack(&mut self) {
+        self.active = None;
     }
 
     pub fn is_clean(&self) -> Option<bool> {
