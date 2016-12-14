@@ -1,11 +1,10 @@
 use fnv::FnvHashMap;
 use {UndoCmd, UndoStack};
 
-#[derive(Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Id(u64);
 
 pub struct UndoGroup<'a, T: UndoCmd + 'a> {
-    group: FnvHashMap<Id, UndoStack<'a, T>>,
+    group: FnvHashMap<u64, UndoStack<'a, T>>,
     active: Option<&'a mut UndoStack<'a, T>>,
     id: u64,
 }
@@ -28,13 +27,13 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
     }
 
     pub fn add_stack(&mut self, stack: UndoStack<'a, T>) -> Id {
-        let id = Id(self.id);
+        let id = self.id;
         self.id += 1;
-        self.group.insert(Id(id.0), stack);
-        id
+        self.group.insert(id, stack);
+        Id(id)
     }
 
-    pub fn remove_stack(&mut self, id: Id) -> UndoStack<'a, T> {
+    pub fn remove_stack(&mut self, Id(id): Id) -> UndoStack<'a, T> {
         let stack = self.group.remove(&id).unwrap();
         // Check if it was the active stack that was removed.
         let is_active = match self.active {
@@ -50,7 +49,7 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
         stack
     }
 
-    pub fn set_active_stack(&'a mut self, id: &Id) {
+    pub fn set_active_stack(&'a mut self, &Id(ref id): &Id) {
         self.active = self.group.get_mut(id);
     }
 
