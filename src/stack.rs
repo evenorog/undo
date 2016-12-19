@@ -39,6 +39,7 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
 
     /// Sets what should happen if the state changes from dirty to clean.
     /// By default the `UndoStack` does nothing when the state changes.
+    ///
     /// Consumes the `UndoStack` so this method should be called when creating the `UndoStack`.
     pub fn on_clean<F: FnMut() + 'a>(mut self, f: F) -> Self {
         self.on_clean = Some(Box::new(f));
@@ -47,24 +48,27 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
 
     /// Sets what should happen if the state changes from clean to dirty.
     /// By default the `UndoStack` does nothing when the state changes.
+    ///
     /// Consumes the `UndoStack` so this method should be called when creating the `UndoStack`.
     pub fn on_dirty<F: FnMut() + 'a>(mut self, f: F) -> Self {
         self.on_dirty = Some(Box::new(f));
         self
     }
 
-    /// Returns true if the state of `UndoStack` is clean.
+    /// Returns true if the state of `UndoStack` is clean, false otherwise.
     pub fn is_clean(&self) -> bool {
         self.len == self.stack.len()
     }
 
-    /// Returns true if the state of `UndoStack` is dirty.
+    /// Returns true if the state of `UndoStack` is dirty, false otherwise.
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
     }
 
-    /// Pushes a `UndoCmd` to the top of the `UndoStack` and executes its `redo()` method.
-    /// This pops off all `UndoCmd`s that is above the active `UndoCmd` from the `UndoStack`.
+    /// Pushes a `UndoCmd` to the top of the `UndoStack` and executes its [`redo`] method.
+    /// This pops off all `UndoCmd`s that is above the active command from the `UndoStack`.
+    ///
+    /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     pub fn push(&mut self, mut cmd: T) {
         let is_dirty = self.is_dirty();
         // Pop off all elements after len from stack.
@@ -80,8 +84,12 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
         }
     }
 
-    /// Calls the `redo` method for the active `UndoCmd` and sets the next `UndoCmd` as the new
-    /// active `UndoCmd`. Calling this method when the state is clean does nothing.
+    /// Calls the [`redo`] method for the active `UndoCmd` and sets the next `UndoCmd` as the new
+    /// active one.
+    ///
+    /// Calling this method when the state is clean does nothing.
+    ///
+    /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     pub fn redo(&mut self) {
         if self.len < self.stack.len() {
             let is_dirty = self.is_dirty();
@@ -99,8 +107,12 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
         }
     }
 
-    /// Calls the `undo` method for the active `UndoCmd` and sets the previous `UndoCmd` as the
-    /// new active `UndoCmd`.
+    /// Calls the [`undo`] method for the active `UndoCmd` and sets the previous `UndoCmd` as the
+    /// new active one.
+    ///
+    /// Calling this method when there are no more commands to undo does nothing.
+    ///
+    /// [`undo`]: trait.UndoCmd.html#tymethod.undo
     pub fn undo(&mut self) {
         if self.len != 0 {
             let is_clean = self.is_clean();

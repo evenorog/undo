@@ -57,7 +57,7 @@ extern crate fnv;
 mod group;
 mod stack;
 
-pub use group::{Id, UndoGroup};
+pub use group::{Uid, UndoGroup};
 pub use stack::UndoStack;
 
 /// Every command needs to implement the `UndoCmd` trait to be able to be used with the `UndoStack`.
