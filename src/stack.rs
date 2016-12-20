@@ -37,6 +37,16 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
         }
     }
 
+    /// Returns the capacity of the `UndoStack`.
+    pub fn capacity(&self) -> usize {
+        self.stack.capacity()
+    }
+
+    /// Returns the number of `UndCmd`s in the `UndoStack`.
+    pub fn len(&self) -> usize {
+        self.stack.len()
+    }
+
     /// Sets what should happen if the state changes from dirty to clean.
     /// By default the `UndoStack` does nothing when the state changes.
     ///

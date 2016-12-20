@@ -30,6 +30,16 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
         }
     }
 
+    /// Returns the capacity of the `UndoGroup`.
+    pub fn capacity(&self) -> usize {
+        self.group.capacity()
+    }
+
+    /// Returns the number of `UndoStack`s in the `UndoGroup`.
+    pub fn len(&self) -> usize {
+        self.group.len()
+    }
+
     /// Adds a `UndoStack` to the group and returns an unique id for this stack.
     pub fn add_stack(&mut self, stack: UndoStack<'a, T>) -> Uid {
         let id = self.id;
