@@ -63,6 +63,5 @@ fn main() {
 
 ## TODO
 - Add UndoCmd merging.
-- Add a container for multiple UndoStacks.
 - Add more examples.
 - ???
