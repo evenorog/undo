@@ -35,9 +35,19 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
         self.group.capacity()
     }
 
+    /// Shrinks the capacity of the `UndoGroup` as much as possible.
+    pub fn shrink_to_fit(&mut self) {
+        self.group.shrink_to_fit()
+    }
+
     /// Returns the number of `UndoStack`s in the `UndoGroup`.
     pub fn len(&self) -> usize {
         self.group.len()
+    }
+
+    /// Returns `true` if the `UndoGroup` contains no `UndoStack`s.
+    pub fn is_empty(&self) -> bool {
+        self.group.is_empty()
     }
 
     /// Adds a `UndoStack` to the group and returns an unique id for this stack.
@@ -70,12 +80,12 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
         stack
     }
 
-    /// Set the `UndoStack` with the specified id as the current active one.
+    /// Sets the `UndoStack` with the specified id as the current active one.
     pub fn set_active_stack(&'a mut self, &Uid(ref id): &Uid) {
         self.active = self.group.get_mut(id);
     }
 
-    /// Clear the current active `UndoStack`.
+    /// Clears the current active `UndoStack`.
     pub fn clear_active_stack(&mut self) {
         self.active = None;
     }

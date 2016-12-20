@@ -64,6 +64,8 @@ pub use stack::UndoStack;
 pub trait UndoCmd {
     /// Executes the desired command.
     fn redo(&mut self);
-    /// Restores the state as it was before `redo` was called.
+    /// Restores the state as it was before [`redo`] was called.
+    ///
+    /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     fn undo(&mut self);
 }

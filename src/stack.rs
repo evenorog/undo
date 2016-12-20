@@ -42,9 +42,19 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
         self.stack.capacity()
     }
 
+    /// Shrinks the capacity of the `UndoStack` as much as possible.
+    pub fn shrink_to_fit(&mut self) {
+        self.stack.shrink_to_fit()
+    }
+
     /// Returns the number of `UndCmd`s in the `UndoStack`.
     pub fn len(&self) -> usize {
         self.stack.len()
+    }
+
+    /// Returns `true` if the `UndoStack` contains no `UndoCmd`s.
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
     }
 
     /// Sets what should happen if the state changes from dirty to clean.
@@ -65,12 +75,12 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
         self
     }
 
-    /// Returns true if the state of `UndoStack` is clean, false otherwise.
+    /// Returns `true` if the state of `UndoStack` is clean.
     pub fn is_clean(&self) -> bool {
         self.len == self.stack.len()
     }
 
-    /// Returns true if the state of `UndoStack` is dirty, false otherwise.
+    /// Returns `true` if the state of `UndoStack` is dirty.
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
     }
