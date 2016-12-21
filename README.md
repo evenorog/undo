@@ -10,7 +10,7 @@ implements the `UndoCmd` trait for each command and then the commands can be use
 
 ```toml
 [dependencies]
-undo = "0.1.0"
+undo = "0.2.0"
 ```
 
 ## Example

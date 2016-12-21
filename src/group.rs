@@ -4,7 +4,7 @@ use {UndoCmd, UndoStack};
 /// A unique id for an `UndoStack`.
 pub struct Uid(u64);
 
-/// A collection of `UndoStack`s that keeps track of which of them is active.
+/// A collection of `UndoStack`s.
 ///
 /// A `UndoGroup` is useful when working with multiple `UndoStack`s and only one of them should
 /// be active at a given time, like a text editor with multiple documents opened.
