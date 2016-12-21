@@ -24,23 +24,21 @@ impl UndoCmd for PopCmd {
 
 fn main() {
     // We need to use Rc<RefCell> since all commands are going to mutate the vec.
-    let vec = Rc::new(RefCell::new(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
-    let mut undo_stack = UndoStack::new()
+    let vec = Rc::new(RefCell::new(vec![1, 2, 3]));
+    let mut stack = UndoStack::new()
         .on_clean(|| println!("This is called when the stack changes from dirty to clean!"))
         .on_dirty(|| println!("This is called when the stack changes from clean to dirty!"));
 
-    assert_eq!(vec.borrow().len(), 10);
-
     let cmd = PopCmd { vec: vec.clone(), e: None };
-    undo_stack.push(cmd.clone());
-    undo_stack.push(cmd.clone());
-    undo_stack.push(cmd.clone());
+    stack.push(cmd.clone());
+    stack.push(cmd.clone());
+    stack.push(cmd.clone());
 
-    assert_eq!(vec.borrow().len(), 7);
+    assert!(vec.borrow().is_empty());
 
-    undo_stack.undo();
-    undo_stack.undo();
-    undo_stack.undo();
+    stack.undo(); // on_dirty is going to be called here.
+    stack.undo();
+    stack.undo();
 
-    assert_eq!(vec.borrow().len(), 10);
+    assert_eq!(vec.borrow().len(), 3);
 }
