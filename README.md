@@ -7,6 +7,7 @@ implements the `UndoCmd` trait for each command and then the commands can be use
 
 [![Build Status](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
+[![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 
 ```toml
 [dependencies]
