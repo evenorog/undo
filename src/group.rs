@@ -8,13 +8,13 @@ pub struct Uid(u64);
 ///
 /// A `UndoGroup` is useful when working with multiple `UndoStack`s and only one of them should
 /// be active at a given time, like a text editor with multiple documents opened.
-pub struct UndoGroup<'a, T: UndoCmd> {
-    group: FnvHashMap<u64, UndoStack<'a, T>>,
+pub struct UndoGroup<'a> {
+    group: FnvHashMap<u64, UndoStack<'a>>,
     active: Option<u64>,
     id: u64,
 }
 
-impl<'a, T: UndoCmd> UndoGroup<'a, T> {
+impl<'a> UndoGroup<'a> {
     /// Creates a new `UndoGroup`.
     pub fn new() -> Self {
         UndoGroup {
@@ -54,7 +54,7 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
     }
 
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.
-    pub fn add_stack(&mut self, stack: UndoStack<'a, T>) -> Uid {
+    pub fn add_stack(&mut self, stack: UndoStack<'a>) -> Uid {
         let id = self.id;
         self.id += 1;
         self.group.insert(id, stack);
@@ -62,7 +62,7 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
     }
 
     /// Removes the `UndoStack` with the specified id.
-    pub fn remove_stack(&mut self, Uid(id): Uid) -> UndoStack<'a, T> {
+    pub fn remove_stack(&mut self, Uid(id): Uid) -> UndoStack<'a> {
         let stack = self.group.remove(&id).unwrap();
         // Check if it was the active stack that was removed.
         if let Some(active) = self.active {
@@ -104,7 +104,9 @@ impl<'a, T: UndoCmd> UndoGroup<'a, T> {
     /// Does nothing if there is no active stack.
     ///
     /// [`push`]: struct.UndoStack.html#method.push
-    pub fn push(&mut self, cmd: T) {
+    pub fn push<T>(&mut self, cmd: T)
+        where T: UndoCmd + 'a,
+    {
         if let Some(ref active) = self.active {
             let ref mut stack = self.group.get_mut(active).unwrap();
             stack.push(cmd);

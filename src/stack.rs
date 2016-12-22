@@ -9,14 +9,14 @@ use UndoCmd;
 /// more actions that can be undone or redone.
 ///
 /// Note: An empty `UndoStack` is clean, so the first push will not trigger the `on_clean` method.
-pub struct UndoStack<'a, T: UndoCmd> {
-    stack: Vec<T>,
+pub struct UndoStack<'a> {
+    stack: Vec<Box<UndoCmd + 'a>>,
     len: usize,
     on_clean: Option<Box<FnMut() + 'a>>,
     on_dirty: Option<Box<FnMut() + 'a>>,
 }
 
-impl<'a, T: UndoCmd> UndoStack<'a, T> {
+impl<'a> UndoStack<'a> {
     /// Creates a new `UndoStack`.
     pub fn new() -> Self {
         UndoStack {
@@ -89,12 +89,14 @@ impl<'a, T: UndoCmd> UndoStack<'a, T> {
     /// This pops off all `UndoCmd`s that is above the active command from the `UndoStack`.
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
-    pub fn push(&mut self, mut cmd: T) {
+    pub fn push<'b, T>(&mut self, mut cmd: T)
+        where T: UndoCmd + 'a,
+    {
         let is_dirty = self.is_dirty();
         // Pop off all elements after len from stack.
         self.stack.truncate(self.len);
         cmd.redo();
-        self.stack.push(cmd);
+        self.stack.push(Box::new(cmd));
         self.len = self.stack.len();
         // State is always clean after a push, check if it was dirty before.
         if is_dirty {
