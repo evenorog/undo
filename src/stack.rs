@@ -89,15 +89,51 @@ impl<'a> UndoStack<'a> {
     /// This pops off all `UndoCmd`s that is above the active command from the `UndoStack`.
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
-    pub fn push<'b, T>(&mut self, mut cmd: T)
+    pub fn push<T>(&mut self, mut cmd: T)
         where T: UndoCmd + 'a,
     {
         let is_dirty = self.is_dirty();
+        let len = self.len;
         // Pop off all elements after len from stack.
-        self.stack.truncate(self.len);
+        self.stack.truncate(len);
         cmd.redo();
-        self.stack.push(Box::new(cmd));
-        self.len = self.stack.len();
+
+        // Check if we should merge the commands.
+        if len > 0 && cmd.id().is_some() && cmd.id() == self.stack[len - 1].id() {
+
+            // MergeCmd is the result of the merging.
+            struct MergeCmd<'a> {
+                cmd1: Box<UndoCmd + 'a>,
+                cmd2: Box<UndoCmd + 'a>,
+            }
+
+            impl<'a> UndoCmd for MergeCmd<'a> {
+                fn redo(&mut self) {
+                    self.cmd1.redo();
+                    self.cmd2.redo();
+                }
+
+                fn undo(&mut self) {
+                    self.cmd2.undo();
+                    self.cmd1.undo();
+                }
+
+                fn id(&self) -> Option<u64> {
+                    self.cmd1.id()
+                }
+            }
+
+            // Merge the command with the one on the top of the stack.
+            let cmd = MergeCmd {
+                cmd1: self.stack.pop().unwrap(),
+                cmd2: Box::new(cmd),
+            };
+            self.stack.push(Box::new(cmd));
+        } else {
+            self.stack.push(Box::new(cmd));
+            self.len += 1;
+        }
+
         // State is always clean after a push, check if it was dirty before.
         if is_dirty {
             if let Some(ref mut f) = self.on_clean {
@@ -189,7 +225,9 @@ mod test {
             .on_dirty(|| b.set(1));
 
         let cmd = PopCmd { vec: vec.clone(), e: None };
+        println!("1");
         undo_stack.push(cmd.clone());
+        println!("2");
         undo_stack.push(cmd.clone());
         undo_stack.push(cmd.clone());
         undo_stack.push(cmd.clone());

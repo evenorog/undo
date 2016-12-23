@@ -69,4 +69,69 @@ pub trait UndoCmd {
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     fn undo(&mut self);
+
+    /// Used for merging of `UndoCmd`s.
+    ///
+    /// When two commands are merged together, undoing and redoing them are done in one step.
+    /// An example where this is useful is a text editor where you might want to undo a whole word
+    /// instead of each character.
+    ///
+    /// Two commands are merged together when a command is pushed on the `UndoStack`, and it has
+    /// the same id as the top command already on the stack. It is normal to have an unique
+    /// id for each implementation of `UndoCmd`, but this is not mandatory.
+    ///
+    /// Default implementation returns `None`, which means the command will never be merged.
+    ///
+    /// # Example
+    /// ```
+    /// use std::rc::Rc;
+    /// use std::cell::RefCell;
+    /// use undo::{UndoCmd, UndoStack};
+    ///
+    /// /// Pops an element from a vector.
+    /// #[derive(Clone)]
+    /// struct PopCmd {
+    ///     vec: Rc<RefCell<Vec<i32>>>,
+    ///     e: Option<i32>,
+    /// }
+    ///
+    /// impl UndoCmd for PopCmd {
+    ///     fn redo(&mut self) {
+    ///         self.e = self.vec.borrow_mut().pop();
+    ///     }
+    ///
+    ///     fn undo(&mut self) {
+    ///         self.vec.borrow_mut().push(self.e.unwrap());
+    ///         self.e = None;
+    ///     }
+    ///
+    ///     fn id(&self) -> Option<u64> {
+    ///         Some(1)
+    ///     }
+    /// }
+    ///
+    /// fn main() {
+    ///     // We need to use Rc<RefCell> since all commands are going to mutate the vec.
+    ///     let vec = Rc::new(RefCell::new(vec![1, 2, 3]));
+    ///     let mut stack = UndoStack::new();
+    ///
+    ///     let cmd = PopCmd { vec: vec.clone(), e: None };
+    ///     stack.push(cmd.clone());
+    ///     stack.push(cmd.clone());
+    ///     stack.push(cmd.clone());
+    ///
+    ///     assert!(vec.borrow().is_empty());
+    ///
+    ///     stack.undo();
+    ///
+    ///     assert_eq!(vec, Rc::new(RefCell::new(vec![1,2,3])));
+    ///
+    ///     stack.redo();
+    ///
+    ///     assert!(vec.borrow().is_empty());
+    /// }
+    /// ```
+    fn id(&self) -> Option<u64> {
+        None
+    }
 }
