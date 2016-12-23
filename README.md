@@ -61,8 +61,3 @@ fn main() {
     assert_eq!(vec.borrow().len(), 10);
 }
 ```
-
-## TODO
-- Add UndoCmd merging.
-- Add more examples.
-- ???

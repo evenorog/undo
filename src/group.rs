@@ -43,16 +43,6 @@ impl<'a> UndoGroup<'a> {
         self.group.shrink_to_fit()
     }
 
-    /// Returns the number of `UndoStack`s in the `UndoGroup`.
-    pub fn len(&self) -> usize {
-        self.group.len()
-    }
-
-    /// Returns `true` if the `UndoGroup` contains no `UndoStack`s.
-    pub fn is_empty(&self) -> bool {
-        self.group.is_empty()
-    }
-
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.
     pub fn add_stack(&mut self, stack: UndoStack<'a>) -> Uid {
         let id = self.id;
@@ -194,7 +184,7 @@ mod test {
         let _ = group.remove_stack(b);
         group.redo();
 
-        assert_eq!(group.len(), 1);
+        assert_eq!(group.group.len(), 1);
         assert_eq!(vec2.borrow().len(), 3);
     }
 }

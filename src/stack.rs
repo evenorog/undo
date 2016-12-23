@@ -47,16 +47,6 @@ impl<'a> UndoStack<'a> {
         self.stack.shrink_to_fit()
     }
 
-    /// Returns the number of `UndCmd`s in the `UndoStack`.
-    pub fn len(&self) -> usize {
-        self.stack.len()
-    }
-
-    /// Returns `true` if the `UndoStack` contains no `UndoCmd`s.
-    pub fn is_empty(&self) -> bool {
-        self.stack.is_empty()
-    }
-
     /// Sets what should happen if the state changes from dirty to clean.
     /// By default the `UndoStack` does nothing when the state changes.
     ///
@@ -87,6 +77,8 @@ impl<'a> UndoStack<'a> {
 
     /// Pushes a `UndoCmd` to the top of the `UndoStack` and executes its [`redo`] method.
     /// This pops off all `UndoCmd`s that is above the active command from the `UndoStack`.
+    ///
+    /// If `cmd`s id is equal to the current top command, the two commands are merged.
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     pub fn push<T>(&mut self, mut cmd: T)
