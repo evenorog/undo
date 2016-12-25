@@ -44,7 +44,7 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.
-    pub fn add_stack(&mut self, stack: UndoStack<'a>) -> Uid {
+    pub fn add(&mut self, stack: UndoStack<'a>) -> Uid {
         let id = self.id;
         self.id += 1;
         self.group.insert(id, stack);
@@ -52,25 +52,24 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Removes the `UndoStack` with the specified id.
-    pub fn remove_stack(&mut self, Uid(id): Uid) -> UndoStack<'a> {
+    pub fn remove(&mut self, Uid(id): Uid) -> UndoStack<'a> {
         let stack = self.group.remove(&id).unwrap();
         // Check if it was the active stack that was removed.
         if let Some(active) = self.active {
             if active == id {
-                // If it was, we set the active stack as None.
-                self.active = None;
+                self.clear_active();
             }
         }
         stack
     }
 
     /// Sets the `UndoStack` with the specified id as the current active one.
-    pub fn set_active_stack(&mut self, &Uid(id): &Uid) {
+    pub fn set_active(&mut self, &Uid(id): &Uid) {
         self.active = Some(id);
     }
 
     /// Clears the current active `UndoStack`.
-    pub fn clear_active_stack(&mut self) {
+    pub fn clear_active(&mut self) {
         self.active = None;
     }
 
@@ -158,30 +157,30 @@ mod test {
 
         let mut group = UndoGroup::new();
 
-        let a = group.add_stack(UndoStack::new());
-        let b = group.add_stack(UndoStack::new());
+        let a = group.add(UndoStack::new());
+        let b = group.add(UndoStack::new());
 
-        group.set_active_stack(&a);
+        group.set_active(&a);
         group.push(PopCmd { vec: vec1.clone(), e: None });
 
         assert_eq!(vec1.borrow().len(), 2);
 
-        group.set_active_stack(&b);
+        group.set_active(&b);
         group.push(PopCmd { vec: vec2.clone(), e: None });
 
         assert_eq!(vec2.borrow().len(), 2);
 
-        group.set_active_stack(&a);
+        group.set_active(&a);
         group.undo();
 
         assert_eq!(vec1.borrow().len(), 3);
 
-        group.set_active_stack(&b);
+        group.set_active(&b);
         group.undo();
 
         assert_eq!(vec2.borrow().len(), 3);
 
-        let _ = group.remove_stack(b);
+        let _ = group.remove(b);
         group.redo();
 
         assert_eq!(group.group.len(), 1);

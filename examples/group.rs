@@ -29,22 +29,22 @@ fn main() {
 
     let mut group = UndoGroup::new();
 
-    let a = group.add_stack(UndoStack::new());
-    let b = group.add_stack(UndoStack::new());
+    let a = group.add(UndoStack::new());
+    let b = group.add(UndoStack::new());
 
-    group.set_active_stack(&a);
+    group.set_active(&a);
     group.push(PopCmd { vec: vec1.clone(), e: None });
     assert_eq!(vec1.borrow().len(), 2);
 
-    group.set_active_stack(&b);
+    group.set_active(&b);
     group.push(PopCmd { vec: vec2.clone(), e: None });
     assert_eq!(vec2.borrow().len(), 2);
 
-    group.set_active_stack(&a);
+    group.set_active(&a);
     group.undo();
     assert_eq!(vec1.borrow().len(), 3);
 
-    group.set_active_stack(&b);
+    group.set_active(&b);
     group.undo();
     assert_eq!(vec2.borrow().len(), 3);
 }
