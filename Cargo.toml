@@ -1,6 +1,6 @@
 [package]
 name = "undo"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "A undo/redo library based on the command pattern."
 documentation = "https://docs.rs/undo"
