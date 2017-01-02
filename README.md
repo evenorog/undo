@@ -5,6 +5,14 @@ It uses the [Command Pattern](https://en.wikipedia.org/wiki/Command_pattern) whe
 implements the `UndoCmd` trait for each command and then the commands can be used with the
 `UndoStack`.
 
+The `UndoStack` has two different states, clean and dirty. The stack is in a clean state when
+there are no more commands that can be redone, otherwise it's in a dirty state. The stack
+can be configured to call a given method when this state changes, using the `on_clean` and
+`on_dirty` methods.
+
+The `UndoStack` also supports easy merging of commands by just implementing the `id` method
+for a given command.
+
 [![Build Status](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)

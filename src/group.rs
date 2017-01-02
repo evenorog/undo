@@ -1,13 +1,35 @@
 use fnv::FnvHashMap;
 use {UndoCmd, UndoStack};
 
-/// A unique id for an `UndoStack`.
+/// An unique id for an `UndoStack`.
+///
+/// This id is returned from the [add] method and consumed when calling the [remove] method in
+/// `UndoGroup`.
+///
+/// [add]: struct.UndoGroup.html#method.add
+/// [remove]: struct.UndoGroup.html#method.remove
 pub struct Uid(u64);
 
 /// A collection of `UndoStack`s.
 ///
-/// A `UndoGroup` is useful when working with multiple `UndoStack`s and only one of them should
-/// be active at a given time, like a text editor with multiple documents opened.
+/// An `UndoGroup` is useful when working with multiple `UndoStack`s and only one of them should
+/// be active at a given time, eg. a text editor with multiple documents opened.
+///
+/// # Panics
+///
+/// The `UndoGroup` uses unique ids to keep track of each stack in the group. These ids are created
+/// by the group when a stack is added, and consumed when the stack is removed. This means that the
+/// id should always be valid as long as only one group is used. However, if the ids of multiple
+/// groups are mixed together it probably will cause the methods to panic. For example trying to
+/// remove a stack using an id for a stack in another group.
+///
+/// ```rust,should_panic
+/// # use undo::{UndoStack, UndoGroup};
+/// let mut group1 = UndoGroup::new();
+/// let mut group2 = UndoGroup::new();
+/// let id = group1.add(UndoStack::new());
+/// let _ = group2.remove(id); // Panics!
+/// ```
 pub struct UndoGroup<'a> {
     group: FnvHashMap<u64, UndoStack<'a>>,
     active: Option<u64>,

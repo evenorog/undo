@@ -1,12 +1,15 @@
 //! A undo/redo library.
 //!
-//! It uses the [Command Pattern](https://en.wikipedia.org/wiki/Command_pattern) where the user
-//! implements the `UndoCmd` trait for each command and then the commands can be used with the
-//! `UndoStack`.
+//! It uses the [Command Pattern] where the user implements the `UndoCmd` trait for each command
+//! and then the commands can be used with the `UndoStack`.
 //!
-//! The `UndoStack` has two different states, the clean state and the dirty state. The `UndoStack`
-//! is in a clean state when there are no more commands that can be redone, otherwise it's in a dirty
-//! state.
+//! The `UndoStack` has two different states, clean and dirty. The stack is in a clean state when
+//! there are no more commands that can be redone, otherwise it's in a dirty state. The stack
+//! can be configured to call a given method when this state changes, using the [on_clean] and
+//! [on_dirty] methods.
+//!
+//! The `UndoStack` also supports easy merging of commands by just implementing the [id] method
+//! for a given command.
 //!
 //! # Example
 //! ```
@@ -51,6 +54,11 @@
 //!
 //! assert_eq!(vec.borrow().len(), 3);
 //! ```
+//!
+//! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
+//! [on_clean]: struct.UndoStack.html#method.on_clean
+//! [on_dirty]: struct.UndoStack.html#method.on_dirty
+//! [id]: trait.UndoCmd.html#method.id
 
 extern crate fnv;
 

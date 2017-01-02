@@ -7,8 +7,6 @@ use UndoCmd;
 /// set methods that should be called for either state change. This is useful for example if
 /// you want to automatically enable or disable undo or redo buttons based on there are any
 /// more actions that can be undone or redone.
-///
-/// Note: An empty `UndoStack` is clean, so the first push will not trigger the `on_clean` method.
 pub struct UndoStack<'a> {
     stack: Vec<Box<UndoCmd + 'a>>,
     len: usize,
@@ -51,6 +49,17 @@ impl<'a> UndoStack<'a> {
     /// By default the `UndoStack` does nothing when the state changes.
     ///
     /// Consumes the `UndoStack` so this method should be called when creating the `UndoStack`.
+    ///
+    /// Note: An empty `UndoStack` is clean, so the first push will not trigger the `on_clean` method.
+    ///
+    /// # Example
+    /// ```
+    /// use undo::UndoStack;
+    ///
+    /// let mut x = 0;
+    /// let stack = UndoStack::new()
+    ///     .on_clean(|| x += 1);
+    /// ```
     pub fn on_clean<F: FnMut() + 'a>(mut self, f: F) -> Self {
         self.on_clean = Some(Box::new(f));
         self
@@ -60,17 +69,26 @@ impl<'a> UndoStack<'a> {
     /// By default the `UndoStack` does nothing when the state changes.
     ///
     /// Consumes the `UndoStack` so this method should be called when creating the `UndoStack`.
+    ///
+    /// # Example
+    /// ```
+    /// use undo::UndoStack;
+    ///
+    /// let mut x = 0;
+    /// let stack = UndoStack::new()
+    ///     .on_dirty(|| x += 1);
+    /// ```
     pub fn on_dirty<F: FnMut() + 'a>(mut self, f: F) -> Self {
         self.on_dirty = Some(Box::new(f));
         self
     }
 
-    /// Returns `true` if the state of `UndoStack` is clean.
+    /// Returns `true` if the state of the stack is clean.
     pub fn is_clean(&self) -> bool {
         self.len == self.stack.len()
     }
 
-    /// Returns `true` if the state of `UndoStack` is dirty.
+    /// Returns `true` if the state of the stack is dirty.
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
     }
