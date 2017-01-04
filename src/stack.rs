@@ -54,13 +54,14 @@ impl<'a> UndoStack<'a> {
     ///
     /// # Example
     /// ```
-    /// use undo::UndoStack;
-    ///
+    /// # use undo::UndoStack;
     /// let mut x = 0;
     /// let stack = UndoStack::new()
     ///     .on_clean(|| x += 1);
     /// ```
-    pub fn on_clean<F: FnMut() + 'a>(mut self, f: F) -> Self {
+    pub fn on_clean<F>(mut self, f: F) -> Self
+        where F: FnMut() + 'a
+    {
         self.on_clean = Some(Box::new(f));
         self
     }
@@ -72,13 +73,14 @@ impl<'a> UndoStack<'a> {
     ///
     /// # Example
     /// ```
-    /// use undo::UndoStack;
-    ///
+    /// # use undo::UndoStack;
     /// let mut x = 0;
     /// let stack = UndoStack::new()
     ///     .on_dirty(|| x += 1);
     /// ```
-    pub fn on_dirty<F: FnMut() + 'a>(mut self, f: F) -> Self {
+    pub fn on_dirty<F>(mut self, f: F) -> Self
+        where F: FnMut() + 'a
+    {
         self.on_dirty = Some(Box::new(f));
         self
     }

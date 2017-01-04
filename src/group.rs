@@ -13,23 +13,8 @@ pub struct Uid(u64);
 /// A collection of `UndoStack`s.
 ///
 /// An `UndoGroup` is useful when working with multiple `UndoStack`s and only one of them should
-/// be active at a given time, eg. a text editor with multiple documents opened.
-///
-/// # Panics
-///
-/// The `UndoGroup` uses unique ids to keep track of each stack in the group. These ids are created
-/// by the group when a stack is added, and consumed when the stack is removed. This means that the
-/// id should always be valid as long as only one group is used. However, if the ids of multiple
-/// groups are mixed together it probably will cause the methods to panic. For example trying to
-/// remove a stack using an id for a stack in another group.
-///
-/// ```rust,should_panic
-/// # use undo::{UndoStack, UndoGroup};
-/// let mut group1 = UndoGroup::new();
-/// let mut group2 = UndoGroup::new();
-/// let id = group1.add(UndoStack::new());
-/// let _ = group2.remove(id); // Panics!
-/// ```
+/// be active at a given time, eg. a text editor with multiple documents opened. However, if only
+/// a single stack is needed, it is easier to just use the `UndoStack` directly.
 pub struct UndoGroup<'a> {
     group: FnvHashMap<u64, UndoStack<'a>>,
     active: Option<u64>,
@@ -73,21 +58,23 @@ impl<'a> UndoGroup<'a> {
         Uid(id)
     }
 
-    /// Removes the `UndoStack` with the specified id.
-    pub fn remove(&mut self, Uid(id): Uid) -> UndoStack<'a> {
-        let stack = self.group.remove(&id).unwrap();
+    /// Removes the `UndoStack` with the specified id and returns the stack.
+    /// Returns `None` if the stack was not found.
+    pub fn remove(&mut self, Uid(id): Uid) -> Option<UndoStack<'a>> {
         // Check if it was the active stack that was removed.
         if let Some(active) = self.active {
             if active == id {
                 self.clear_active();
             }
         }
-        stack
+        self.group.remove(&id)
     }
 
     /// Sets the `UndoStack` with the specified id as the current active one.
     pub fn set_active(&mut self, &Uid(id): &Uid) {
-        self.active = Some(id);
+        if self.group.contains_key(&id) {
+            self.active = Some(id);
+        }
     }
 
     /// Clears the current active `UndoStack`.
@@ -100,7 +87,7 @@ impl<'a> UndoGroup<'a> {
     ///
     /// [`is_clean`]: struct.UndoStack.html#method.is_clean
     pub fn is_clean(&self) -> Option<bool> {
-        self.active.as_ref().and_then(|i| self.group.get(i).map(|t| t.is_clean()))
+        self.active.and_then(|i| self.group.get(&i).map(|t| t.is_clean()))
     }
 
     /// Calls [`is_dirty`] on the active `UndoStack`, if there is one.
