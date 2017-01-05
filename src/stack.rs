@@ -60,7 +60,7 @@ impl<'a> UndoStack<'a> {
     ///     .on_clean(|| x += 1);
     /// ```
     pub fn on_clean<F>(mut self, f: F) -> Self
-        where F: FnMut() + 'a
+        where F: FnMut() + 'a,
     {
         self.on_clean = Some(Box::new(f));
         self
@@ -79,7 +79,7 @@ impl<'a> UndoStack<'a> {
     ///     .on_dirty(|| x += 1);
     /// ```
     pub fn on_dirty<F>(mut self, f: F) -> Self
-        where F: FnMut() + 'a
+        where F: FnMut() + 'a,
     {
         self.on_dirty = Some(Box::new(f));
         self
