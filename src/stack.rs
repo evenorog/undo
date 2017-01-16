@@ -114,8 +114,9 @@ impl<'a> UndoStack<'a> {
         self.stack.truncate(len);
         cmd.redo();
 
-        // Check if we should merge the commands.
-        if len > 0 && cmd.id().is_some() && cmd.id() == self.stack[len - 1].id() {
+        // Check if we should merge cmd with the top command on stack.
+        let id = cmd.id();
+        if len > 0 && id.is_some() && id == unsafe { self.stack.get_unchecked(len - 1).id() } {
 
             // MergeCmd is the result of the merging.
             struct MergeCmd<'a> {
@@ -167,8 +168,8 @@ impl<'a> UndoStack<'a> {
     pub fn redo(&mut self) {
         if self.len < self.stack.len() {
             let is_dirty = self.is_dirty();
-            {
-                let ref mut cmd = self.stack[self.len];
+            unsafe {
+                let ref mut cmd = self.stack.get_unchecked_mut(self.len);
                 cmd.redo();
             }
             self.len += 1;
@@ -188,11 +189,11 @@ impl<'a> UndoStack<'a> {
     ///
     /// [`undo`]: trait.UndoCmd.html#tymethod.undo
     pub fn undo(&mut self) {
-        if self.len != 0 {
+        if self.len > 0 {
             let is_clean = self.is_clean();
             self.len -= 1;
-            {
-                let ref mut cmd = self.stack[self.len];
+            unsafe {
+                let ref mut cmd = self.stack.get_unchecked_mut(self.len);
                 cmd.undo();
             }
             // Check if stack went from clean to dirty.
