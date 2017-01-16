@@ -16,8 +16,11 @@ pub struct Uid(u64);
 /// be active at a given time, eg. a text editor with multiple documents opened. However, if only
 /// a single stack is needed, it is easier to just use the `UndoStack` directly.
 pub struct UndoGroup<'a> {
+    // The stacks in the group.
     group: FnvHashMap<u64, UndoStack<'a>>,
+    // The active stack.
     active: Option<u64>,
+    // Counter for generating new ids.
     id: u64,
 }
 
@@ -47,7 +50,7 @@ impl<'a> UndoGroup<'a> {
 
     /// Shrinks the capacity of the `UndoGroup` as much as possible.
     pub fn shrink_to_fit(&mut self) {
-        self.group.shrink_to_fit()
+        self.group.shrink_to_fit();
     }
 
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.

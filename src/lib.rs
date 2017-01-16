@@ -1,4 +1,4 @@
-//! A undo/redo library.
+//! An undo/redo library.
 //!
 //! It uses the [Command Pattern] where the user implements the `UndoCmd` trait for each command
 //! and then the commands can be used with the `UndoStack`.
@@ -8,8 +8,7 @@
 //! can be configured to call a given method when this state changes, using the [on_clean] and
 //! [on_dirty] methods.
 //!
-//! The `UndoStack` also supports easy merging of commands by just implementing the [id] method
-//! for a given command.
+//! The `UndoStack` also supports automatic merging of commands that has the same [id].
 //!
 //! # Example
 //! ```

@@ -2,7 +2,7 @@
 name = "undo"
 version = "0.3.0"
 authors = ["evenorog <evenorog@gmail.com>"]
-description = "A undo/redo library based on the command pattern."
+description = "An undo/redo library with state awareness and automatic command merging."
 documentation = "https://docs.rs/undo"
 repository = "https://github.com/evenorog/undo"
 readme = "README.md"

@@ -8,9 +8,13 @@ use UndoCmd;
 /// you want to automatically enable or disable undo or redo buttons based on there are any
 /// more actions that can be undone or redone.
 pub struct UndoStack<'a> {
+    // All commands on the stack.
     stack: Vec<Box<UndoCmd + 'a>>,
+    // Current position in the stack.
     len: usize,
+    // Called when the state changes from dirty to clean.
     on_clean: Option<Box<FnMut() + 'a>>,
+    // Called when the state changes from clean to dirty.
     on_dirty: Option<Box<FnMut() + 'a>>,
 }
 
@@ -42,7 +46,7 @@ impl<'a> UndoStack<'a> {
 
     /// Shrinks the capacity of the `UndoStack` as much as possible.
     pub fn shrink_to_fit(&mut self) {
-        self.stack.shrink_to_fit()
+        self.stack.shrink_to_fit();
     }
 
     /// Sets what should happen if the state changes from dirty to clean.
