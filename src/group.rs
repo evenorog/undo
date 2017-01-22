@@ -99,7 +99,7 @@ impl<'a> UndoGroup<'a> {
     ///
     /// [`is_clean`]: struct.UndoStack.html#method.is_clean
     pub fn is_clean(&self) -> Option<bool> {
-        self.active.and_then(|i| self.group.get(&i).map(|t| t.is_clean()))
+        self.active.map(|i| self.group[&i].is_clean())
     }
 
     /// Calls [`is_dirty`] on the active `UndoStack`, if there is one.
@@ -118,7 +118,7 @@ impl<'a> UndoGroup<'a> {
         where T: UndoCmd + 'a,
     {
         if let Some(ref active) = self.active {
-            let ref mut stack = self.group.get_mut(active).unwrap();
+            let stack = self.group.get_mut(active).unwrap();
             stack.push(cmd);
         }
     }
@@ -129,7 +129,7 @@ impl<'a> UndoGroup<'a> {
     /// [`redo`]: struct.UndoStack.html#method.redo
     pub fn redo(&mut self) {
         if let Some(ref active) = self.active {
-            let ref mut stack = self.group.get_mut(active).unwrap();
+            let stack = self.group.get_mut(active).unwrap();
             stack.redo();
         }
     }
@@ -140,7 +140,7 @@ impl<'a> UndoGroup<'a> {
     /// [`undo`]: struct.UndoStack.html#method.undo
     pub fn undo(&mut self) {
         if let Some(ref active) = self.active {
-            let ref mut stack = self.group.get_mut(active).unwrap();
+            let stack = self.group.get_mut(active).unwrap();
             stack.undo();
         }
     }

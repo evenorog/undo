@@ -177,7 +177,7 @@ impl<'a> UndoStack<'a> {
         if self.len < self.stack.len() {
             let is_dirty = self.is_dirty();
             unsafe {
-                let ref mut cmd = self.stack.get_unchecked_mut(self.len);
+                let cmd = self.stack.get_unchecked_mut(self.len);
                 cmd.redo();
             }
             self.len += 1;
@@ -201,7 +201,7 @@ impl<'a> UndoStack<'a> {
             let is_clean = self.is_clean();
             self.len -= 1;
             unsafe {
-                let ref mut cmd = self.stack.get_unchecked_mut(self.len);
+                let cmd = self.stack.get_unchecked_mut(self.len);
                 cmd.undo();
             }
             // Check if stack went from clean to dirty.
