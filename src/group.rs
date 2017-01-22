@@ -48,6 +48,15 @@ impl<'a> UndoGroup<'a> {
         self.group.capacity()
     }
 
+    /// Reserves capacity for at least `additional` more stacks to be inserted in the given group.
+    /// The group may reserve more space to avoid frequent reallocations.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
+    pub fn reserve(&mut self, additional: usize) {
+        self.group.reserve(additional);
+    }
+
     /// Shrinks the capacity of the `UndoGroup` as much as possible.
     pub fn shrink_to_fit(&mut self) {
         self.group.shrink_to_fit();

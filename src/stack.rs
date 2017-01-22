@@ -44,6 +44,15 @@ impl<'a> UndoStack<'a> {
         self.stack.capacity()
     }
 
+    /// Reserves capacity for at least `additional` more commands to be inserted in the given stack.
+    /// The stack may reserve more space to avoid frequent reallocations.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
+    pub fn reserve(&mut self, additional: usize) {
+        self.stack.reserve(additional);
+    }
+
     /// Shrinks the capacity of the `UndoStack` as much as possible.
     pub fn shrink_to_fit(&mut self) {
         self.stack.shrink_to_fit();
@@ -51,8 +60,6 @@ impl<'a> UndoStack<'a> {
 
     /// Sets what should happen if the state changes from dirty to clean.
     /// By default the `UndoStack` does nothing when the state changes.
-    ///
-    /// Consumes the `UndoStack` so this method should be called when creating the `UndoStack`.
     ///
     /// Note: An empty `UndoStack` is clean, so the first push will not trigger the `on_clean` method.
     ///
@@ -72,8 +79,6 @@ impl<'a> UndoStack<'a> {
 
     /// Sets what should happen if the state changes from clean to dirty.
     /// By default the `UndoStack` does nothing when the state changes.
-    ///
-    /// Consumes the `UndoStack` so this method should be called when creating the `UndoStack`.
     ///
     /// # Example
     /// ```
