@@ -147,7 +147,10 @@ impl<'a> UndoStack<'a> {
 
             // Merge the command with the one on the top of the stack.
             let cmd = MergeCmd {
-                cmd1: self.stack.pop().unwrap(),
+                cmd1: unsafe {
+                    self.stack.set_len(len - 1);
+                    ::std::ptr::read(self.stack.get_unchecked(self.stack.len()))
+                },
                 cmd2: Box::new(cmd),
             };
             self.stack.push(Box::new(cmd));
