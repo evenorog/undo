@@ -139,16 +139,19 @@ impl<'a> UndoStack<'a> {
             }
 
             impl<'a> UndoCmd for MergeCmd<'a> {
+                #[inline]
                 fn redo(&mut self) {
                     self.cmd1.redo();
                     self.cmd2.redo();
                 }
 
+                #[inline]
                 fn undo(&mut self) {
                     self.cmd2.undo();
                     self.cmd1.undo();
                 }
 
+                #[inline]
                 fn id(&self) -> Option<u64> {
                     self.cmd1.id()
                 }
