@@ -131,7 +131,7 @@ pub trait UndoCmd {
     ///
     ///     stack.undo();
     ///
-    ///     assert_eq!(vec, Rc::new(RefCell::new(vec![1,2,3])));
+    ///     assert_eq!(vec.borrow().len(), 3);
     ///
     ///     stack.redo();
     ///

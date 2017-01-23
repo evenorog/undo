@@ -66,9 +66,9 @@ impl<'a> UndoStack<'a> {
     /// Sets what should happen if the state changes from dirty to clean.
     /// By default the `UndoStack` does nothing when the state changes.
     ///
-    /// Note: An empty `UndoStack` is clean, so the first push will not trigger the `on_clean` method.
+    /// Note: An empty stack is clean, so the first push will not trigger this method.
     ///
-    /// # Example
+    /// # Examples
     /// ```
     /// # use undo::UndoStack;
     /// let mut x = 0;
@@ -86,7 +86,7 @@ impl<'a> UndoStack<'a> {
     /// Sets what should happen if the state changes from clean to dirty.
     /// By default the `UndoStack` does nothing when the state changes.
     ///
-    /// # Example
+    /// # Examples
     /// ```
     /// # use undo::UndoStack;
     /// let mut x = 0;
@@ -101,13 +101,13 @@ impl<'a> UndoStack<'a> {
         self
     }
 
-    /// Returns `true` if the state of the stack is clean.
+    /// Returns `true` if the state of the stack is clean, `false` otherwise.
     #[inline]
     pub fn is_clean(&self) -> bool {
         self.len == self.stack.len()
     }
 
-    /// Returns `true` if the state of the stack is dirty.
+    /// Returns `true` if the state of the stack is dirty, `false` otherwise.
     #[inline]
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
@@ -157,6 +157,7 @@ impl<'a> UndoStack<'a> {
             // Merge the command with the one on the top of the stack.
             let cmd = MergeCmd {
                 cmd1: unsafe {
+                    // Unchecked pop.
                     self.stack.set_len(len - 1);
                     ::std::ptr::read(self.stack.get_unchecked(self.stack.len()))
                 },
@@ -179,7 +180,7 @@ impl<'a> UndoStack<'a> {
     /// Calls the [`redo`] method for the active `UndoCmd` and sets the next `UndoCmd` as the new
     /// active one.
     ///
-    /// Calling this method when the state is clean does nothing.
+    /// Calling this method when there are no more commands to redo does nothing.
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     pub fn redo(&mut self) {
