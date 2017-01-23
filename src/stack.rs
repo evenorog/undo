@@ -20,6 +20,7 @@ pub struct UndoStack<'a> {
 
 impl<'a> UndoStack<'a> {
     /// Creates a new `UndoStack`.
+    #[inline]
     pub fn new() -> Self {
         UndoStack {
             stack: Vec::new(),
@@ -30,6 +31,7 @@ impl<'a> UndoStack<'a> {
     }
 
     /// Creates a new `UndoStack` with the specified capacity.
+    #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         UndoStack {
             stack: Vec::with_capacity(capacity),
@@ -40,6 +42,7 @@ impl<'a> UndoStack<'a> {
     }
 
     /// Returns the capacity of the `UndoStack`.
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.stack.capacity()
     }
@@ -49,11 +52,13 @@ impl<'a> UndoStack<'a> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
+    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.stack.reserve(additional);
     }
 
     /// Shrinks the capacity of the `UndoStack` as much as possible.
+    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.stack.shrink_to_fit();
     }
@@ -70,6 +75,7 @@ impl<'a> UndoStack<'a> {
     /// let stack = UndoStack::new()
     ///     .on_clean(|| x += 1);
     /// ```
+    #[inline]
     pub fn on_clean<F>(mut self, f: F) -> Self
         where F: FnMut() + 'a,
     {
@@ -87,6 +93,7 @@ impl<'a> UndoStack<'a> {
     /// let stack = UndoStack::new()
     ///     .on_dirty(|| x += 1);
     /// ```
+    #[inline]
     pub fn on_dirty<F>(mut self, f: F) -> Self
         where F: FnMut() + 'a,
     {
@@ -95,11 +102,13 @@ impl<'a> UndoStack<'a> {
     }
 
     /// Returns `true` if the state of the stack is clean.
+    #[inline]
     pub fn is_clean(&self) -> bool {
         self.len == self.stack.len()
     }
 
     /// Returns `true` if the state of the stack is dirty.
+    #[inline]
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
     }

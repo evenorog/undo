@@ -26,6 +26,7 @@ pub struct UndoGroup<'a> {
 
 impl<'a> UndoGroup<'a> {
     /// Creates a new `UndoGroup`.
+    #[inline]
     pub fn new() -> Self {
         UndoGroup {
             group: FnvHashMap::default(),
@@ -35,6 +36,7 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Creates a new `UndoGroup` with the specified capacity.
+    #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         UndoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
@@ -44,6 +46,7 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Returns the capacity of the `UndoGroup`.
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.group.capacity()
     }
@@ -53,16 +56,19 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
+    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.group.reserve(additional);
     }
 
     /// Shrinks the capacity of the `UndoGroup` as much as possible.
+    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.group.shrink_to_fit();
     }
 
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.
+    #[inline]
     pub fn add(&mut self, stack: UndoStack<'a>) -> Uid {
         let id = self.id;
         self.id += 1;
@@ -72,6 +78,7 @@ impl<'a> UndoGroup<'a> {
 
     /// Removes the `UndoStack` with the specified id and returns the stack.
     /// Returns `None` if the stack was not found.
+    #[inline]
     pub fn remove(&mut self, Uid(id): Uid) -> Option<UndoStack<'a>> {
         // Check if it was the active stack that was removed.
         if let Some(active) = self.active {
@@ -83,6 +90,7 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Sets the `UndoStack` with the specified id as the current active one.
+    #[inline]
     pub fn set_active(&mut self, &Uid(id): &Uid) {
         if self.group.contains_key(&id) {
             self.active = Some(id);
@@ -90,6 +98,7 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Clears the current active `UndoStack`.
+    #[inline]
     pub fn clear_active(&mut self) {
         self.active = None;
     }
@@ -98,6 +107,7 @@ impl<'a> UndoGroup<'a> {
     /// Returns `None` if there is no active stack.
     ///
     /// [`is_clean`]: struct.UndoStack.html#method.is_clean
+    #[inline]
     pub fn is_clean(&self) -> Option<bool> {
         self.active.map(|i| self.group[&i].is_clean())
     }
@@ -106,6 +116,7 @@ impl<'a> UndoGroup<'a> {
     /// Returns `None` if there is no active stack.
     ///
     /// [`is_dirty`]: struct.UndoStack.html#method.is_dirty
+    #[inline]
     pub fn is_dirty(&self) -> Option<bool> {
         self.is_clean().map(|t| !t)
     }
@@ -114,6 +125,7 @@ impl<'a> UndoGroup<'a> {
     /// Does nothing if there is no active stack.
     ///
     /// [`push`]: struct.UndoStack.html#method.push
+    #[inline]
     pub fn push<T>(&mut self, cmd: T)
         where T: UndoCmd + 'a,
     {
@@ -127,6 +139,7 @@ impl<'a> UndoGroup<'a> {
     /// Does nothing if there is no active stack.
     ///
     /// [`redo`]: struct.UndoStack.html#method.redo
+    #[inline]
     pub fn redo(&mut self) {
         if let Some(ref active) = self.active {
             let stack = self.group.get_mut(active).unwrap();
@@ -138,6 +151,7 @@ impl<'a> UndoGroup<'a> {
     /// Does nothing if there is no active stack.
     ///
     /// [`undo`]: struct.UndoStack.html#method.undo
+    #[inline]
     pub fn undo(&mut self) {
         if let Some(ref active) = self.active {
             let stack = self.group.get_mut(active).unwrap();
