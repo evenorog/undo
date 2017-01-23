@@ -23,7 +23,8 @@ impl UndoCmd for PopCmd {
 }
 
 fn main() {
-    // We need to use Rc<RefCell> since all commands are going to mutate the vec.
+    // We need to use Rc<RefCell> in safe code since all commands are going to mutate the vec.
+    // unsafe_pop.rs shows how to use raw pointers instead, if performance is important.
     let vec = Rc::new(RefCell::new(vec![1, 2, 3]));
     let mut stack = UndoStack::new()
         .on_clean(|| println!("This is called when the stack changes from dirty to clean!"))
