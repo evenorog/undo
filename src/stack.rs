@@ -70,6 +70,7 @@ impl<'a> UndoStack<'a> {
     ///
     /// # Examples
     /// ```
+    /// # #![allow(unused_variables)]
     /// # use undo::UndoStack;
     /// let mut x = 0;
     /// let stack = UndoStack::new()
@@ -88,6 +89,7 @@ impl<'a> UndoStack<'a> {
     ///
     /// # Examples
     /// ```
+    /// # #![allow(unused_variables)]
     /// # use undo::UndoStack;
     /// let mut x = 0;
     /// let stack = UndoStack::new()
