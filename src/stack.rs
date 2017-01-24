@@ -13,9 +13,9 @@ pub struct UndoStack<'a> {
     // Current position in the stack.
     len: usize,
     // Called when the state changes from dirty to clean.
-    on_clean: Option<Box<FnMut() + 'a>>,
+    on_clean: Box<FnMut() + 'a>,
     // Called when the state changes from clean to dirty.
-    on_dirty: Option<Box<FnMut() + 'a>>,
+    on_dirty: Box<FnMut() + 'a>,
 }
 
 impl<'a> UndoStack<'a> {
@@ -25,8 +25,8 @@ impl<'a> UndoStack<'a> {
         UndoStack {
             stack: Vec::new(),
             len: 0,
-            on_clean: None,
-            on_dirty: None,
+            on_clean: Box::new(|| {}),
+            on_dirty: Box::new(|| {}),
         }
     }
 
@@ -36,8 +36,8 @@ impl<'a> UndoStack<'a> {
         UndoStack {
             stack: Vec::with_capacity(capacity),
             len: 0,
-            on_clean: None,
-            on_dirty: None,
+            on_clean: Box::new(|| {}),
+            on_dirty: Box::new(|| {}),
         }
     }
 
@@ -80,7 +80,7 @@ impl<'a> UndoStack<'a> {
     pub fn on_clean<F>(mut self, f: F) -> Self
         where F: FnMut() + 'a,
     {
-        self.on_clean = Some(Box::new(f));
+        self.on_clean = Box::new(f);
         self
     }
 
@@ -99,7 +99,7 @@ impl<'a> UndoStack<'a> {
     pub fn on_dirty<F>(mut self, f: F) -> Self
         where F: FnMut() + 'a,
     {
-        self.on_dirty = Some(Box::new(f));
+        self.on_dirty = Box::new(f);
         self
     }
 
@@ -176,9 +176,8 @@ impl<'a> UndoStack<'a> {
 
         // State is always clean after a push, check if it was dirty before.
         if is_dirty {
-            if let Some(ref mut f) = self.on_clean {
-                f();
-            }
+            let ref mut f = self.on_clean;
+            f();
         }
     }
 
@@ -198,9 +197,8 @@ impl<'a> UndoStack<'a> {
             self.len += 1;
             // Check if stack went from dirty to clean.
             if is_dirty && self.is_clean() {
-                if let Some(ref mut f) = self.on_clean {
-                    f();
-                }
+                let ref mut f = self.on_clean;
+                f();
             }
         }
     }
@@ -221,9 +219,8 @@ impl<'a> UndoStack<'a> {
             }
             // Check if stack went from clean to dirty.
             if is_clean && self.is_dirty() {
-                if let Some(ref mut f) = self.on_dirty {
-                    f();
-                }
+                let ref mut f = self.on_dirty;
+                f();
             }
         }
     }
