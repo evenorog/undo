@@ -11,12 +11,17 @@ struct PopCmd {
 
 impl UndoCmd for PopCmd {
     fn redo(&mut self) {
-        self.e = unsafe { (*self.vec).pop() };
+        self.e = unsafe {
+            let ref mut vec = *self.vec;
+            vec.pop()
+        }
     }
 
     fn undo(&mut self) {
-        unsafe { (*self.vec).push(self.e.unwrap()) };
-        self.e = None;
+        unsafe {
+            let ref mut vec = *self.vec;
+            vec.push(self.e.unwrap());
+        }
     }
 }
 
@@ -24,7 +29,7 @@ fn main() {
     let mut vec = vec![1, 2, 3];
     let mut stack = UndoStack::new();
 
-    let cmd = PopCmd { vec: &mut vec as *mut _, e: None };
+    let cmd = PopCmd { vec: &mut vec, e: None };
     stack.push(cmd.clone());
     stack.push(cmd.clone());
     stack.push(cmd.clone());

@@ -170,8 +170,8 @@ impl<'a> UndoStack<'a> {
             };
             self.stack.push(Box::new(cmd));
         } else {
-            self.stack.push(Box::new(cmd));
             self.len += 1;
+            self.stack.push(Box::new(cmd));
         }
 
         // State is always clean after a push, check if it was dirty before.
@@ -228,75 +228,59 @@ impl<'a> UndoStack<'a> {
 
 #[cfg(test)]
 mod test {
+    use std::rc::Rc;
+    use std::cell::{Cell, RefCell};
     use {UndoStack, UndoCmd};
+
+    /// Pops an element from a vector.
+    #[derive(Clone)]
+    struct PopCmd {
+        vec: Rc<RefCell<Vec<i32>>>,
+        e: Option<i32>,
+    }
+
+    impl UndoCmd for PopCmd {
+        fn redo(&mut self) {
+            self.e = self.vec.borrow_mut().pop();
+        }
+
+        fn undo(&mut self) {
+            self.vec.borrow_mut().push(self.e.unwrap());
+            self.e = None;
+        }
+    }
 
     #[test]
     fn pop() {
-        use std::rc::Rc;
-        use std::cell::{Cell, RefCell};
-
-        /// Pops an element from a vector.
-        #[derive(Clone)]
-        struct PopCmd {
-            vec: Rc<RefCell<Vec<i32>>>,
-            e: Option<i32>,
-        }
-
-        impl UndoCmd for PopCmd {
-            fn redo(&mut self) {
-                self.e = self.vec.borrow_mut().pop();
-            }
-
-            fn undo(&mut self) {
-                self.vec.borrow_mut().push(self.e.unwrap());
-                self.e = None;
-            }
-        }
-
-        let a = Cell::new(0);
-        let b = Cell::new(0);
-        // We need to use Rc<RefCell> since all commands are going to mutate the vec.
+        let x = Cell::new(0);
         let vec = Rc::new(RefCell::new(vec![1, 2, 3]));
         let mut undo_stack = UndoStack::with_capacity(3)
-            .on_clean(|| a.set(1))
-            .on_dirty(|| b.set(1));
+            .on_clean(|| x.set(0))
+            .on_dirty(|| x.set(1));
 
         let cmd = PopCmd { vec: vec.clone(), e: None };
         undo_stack.push(cmd.clone());
         undo_stack.push(cmd.clone());
         undo_stack.push(cmd.clone());
-
+        assert_eq!(x.get(), 0);
         assert!(vec.borrow().is_empty());
 
-        assert_eq!(b.get(), 0);
-        undo_stack.undo();
-        assert_eq!(b.get(), 1);
-        b.set(0);
-
         undo_stack.undo();
         undo_stack.undo();
-
+        undo_stack.undo();
+        assert_eq!(x.get(), 1);
         assert_eq!(vec, Rc::new(RefCell::new(vec![1, 2, 3])));
 
-        assert_eq!(a.get(), 0);
         undo_stack.push(cmd.clone());
-        assert_eq!(a.get(), 1);
-        a.set(0);
-
+        assert_eq!(x.get(), 0);
         assert_eq!(vec, Rc::new(RefCell::new(vec![1, 2])));
 
-        assert_eq!(b.get(), 0);
         undo_stack.undo();
-        assert_eq!(b.get(), 1);
-        b.set(0);
-
+        assert_eq!(x.get(), 1);
         assert_eq!(vec, Rc::new(RefCell::new(vec![1, 2, 3])));
 
-        assert_eq!(a.get(), 0);
         undo_stack.redo();
-        assert_eq!(a.get(), 1);
-        a.set(0);
-
+        assert_eq!(x.get(), 0);
         assert_eq!(vec, Rc::new(RefCell::new(vec![1, 2])));
     }
 }
