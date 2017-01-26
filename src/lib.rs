@@ -67,6 +67,8 @@ mod stack;
 pub use group::{Uid, UndoGroup};
 pub use stack::UndoStack;
 
+use std::fmt;
+
 /// Every command needs to implement the `UndoCmd` trait to be able to be used with the `UndoStack`.
 pub trait UndoCmd {
     /// Executes the desired command.
@@ -89,7 +91,7 @@ pub trait UndoCmd {
     ///
     /// Default implementation returns `None`, which means the command will never be merged.
     ///
-    /// # Example
+    /// # Examples
     /// ```
     /// use std::rc::Rc;
     /// use std::cell::RefCell;
@@ -138,7 +140,18 @@ pub trait UndoCmd {
     ///     assert!(vec.borrow().is_empty());
     /// }
     /// ```
+    #[inline]
     fn id(&self) -> Option<u64> {
         None
+    }
+}
+
+impl<'a> fmt::Debug for UndoCmd + 'a {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.id() {
+            Some(id) => write!(f, "{}", id),
+            None => write!(f, "_"),
+        }
     }
 }

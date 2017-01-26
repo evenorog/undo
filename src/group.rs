@@ -15,6 +15,7 @@ pub struct Uid(u64);
 /// An `UndoGroup` is useful when working with multiple `UndoStack`s and only one of them should
 /// be active at a given time, eg. a text editor with multiple documents opened. However, if only
 /// a single stack is needed, it is easier to just use the `UndoStack` directly.
+#[derive(Debug, Default)]
 pub struct UndoGroup<'a> {
     // The stacks in the group.
     group: FnvHashMap<u64, UndoStack<'a>>,

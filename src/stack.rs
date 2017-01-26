@@ -1,3 +1,4 @@
+use std::fmt;
 use UndoCmd;
 
 /// `UndoStack` maintains a stack of `UndoCmd`s that can be undone and redone by using methods
@@ -11,7 +12,7 @@ pub struct UndoStack<'a> {
     // All commands on the stack.
     stack: Vec<Box<UndoCmd + 'a>>,
     // Current position in the stack.
-    len: usize,
+    idx: usize,
     // Called when the state changes from dirty to clean.
     on_clean: Box<FnMut() + 'a>,
     // Called when the state changes from clean to dirty.
@@ -24,7 +25,7 @@ impl<'a> UndoStack<'a> {
     pub fn new() -> Self {
         UndoStack {
             stack: Vec::new(),
-            len: 0,
+            idx: 0,
             on_clean: Box::new(|| {}),
             on_dirty: Box::new(|| {}),
         }
@@ -35,7 +36,7 @@ impl<'a> UndoStack<'a> {
     pub fn with_capacity(capacity: usize) -> Self {
         UndoStack {
             stack: Vec::with_capacity(capacity),
-            len: 0,
+            idx: 0,
             on_clean: Box::new(|| {}),
             on_dirty: Box::new(|| {}),
         }
@@ -106,7 +107,7 @@ impl<'a> UndoStack<'a> {
     /// Returns `true` if the state of the stack is clean, `false` otherwise.
     #[inline]
     pub fn is_clean(&self) -> bool {
-        self.len == self.stack.len()
+        self.idx == self.stack.len()
     }
 
     /// Returns `true` if the state of the stack is dirty, `false` otherwise.
@@ -125,14 +126,14 @@ impl<'a> UndoStack<'a> {
         where T: UndoCmd + 'a,
     {
         let is_dirty = self.is_dirty();
-        let len = self.len;
-        // Pop off all elements after len from stack.
-        self.stack.truncate(len);
+        let idx = self.idx;
+        // Pop off all elements after idx from stack.
+        self.stack.truncate(idx);
         cmd.redo();
 
         // Check if we should merge cmd with the top command on stack.
         let id = cmd.id();
-        if len > 0 && id.is_some() && id == unsafe { self.stack.get_unchecked(len - 1).id() } {
+        if idx > 0 && id.is_some() && id == unsafe { self.stack.get_unchecked(idx - 1).id() } {
 
             // MergeCmd is the result of the merging.
             struct MergeCmd<'a> {
@@ -163,14 +164,14 @@ impl<'a> UndoStack<'a> {
             let cmd = MergeCmd {
                 cmd1: unsafe {
                     // Unchecked pop.
-                    self.stack.set_len(len - 1);
+                    self.stack.set_len(idx - 1);
                     ::std::ptr::read(self.stack.get_unchecked(self.stack.len()))
                 },
                 cmd2: Box::new(cmd),
             };
             self.stack.push(Box::new(cmd));
         } else {
-            self.len += 1;
+            self.idx += 1;
             self.stack.push(Box::new(cmd));
         }
 
@@ -188,13 +189,13 @@ impl<'a> UndoStack<'a> {
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     pub fn redo(&mut self) {
-        if self.len < self.stack.len() {
+        if self.idx < self.stack.len() {
             let is_dirty = self.is_dirty();
             unsafe {
-                let cmd = self.stack.get_unchecked_mut(self.len);
+                let cmd = self.stack.get_unchecked_mut(self.idx);
                 cmd.redo();
             }
-            self.len += 1;
+            self.idx += 1;
             // Check if stack went from dirty to clean.
             if is_dirty && self.is_clean() {
                 let ref mut f = self.on_clean;
@@ -210,11 +211,11 @@ impl<'a> UndoStack<'a> {
     ///
     /// [`undo`]: trait.UndoCmd.html#tymethod.undo
     pub fn undo(&mut self) {
-        if self.len > 0 {
+        if self.idx > 0 {
             let is_clean = self.is_clean();
-            self.len -= 1;
+            self.idx -= 1;
             unsafe {
-                let cmd = self.stack.get_unchecked_mut(self.len);
+                let cmd = self.stack.get_unchecked_mut(self.idx);
                 cmd.undo();
             }
             // Check if stack went from clean to dirty.
@@ -223,6 +224,23 @@ impl<'a> UndoStack<'a> {
                 f();
             }
         }
+    }
+}
+
+impl<'a> Default for UndoStack<'a> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> fmt::Debug for UndoStack<'a> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("UndoStack")
+            .field("stack", &self.stack)
+            .field("idx", &self.idx)
+            .finish()
     }
 }
 
