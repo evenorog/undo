@@ -19,7 +19,7 @@ for a given command.
 
 ```toml
 [dependencies]
-undo = "0.3.0"
+undo = "0.4.0"
 ```
 
 ## Example
