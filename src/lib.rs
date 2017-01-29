@@ -10,7 +10,7 @@
 //!
 //! The `UndoStack` also supports automatic merging of commands that has the same [id].
 //!
-//! # Example
+//! # Examples
 //! ```
 //! use std::rc::Rc;
 //! use std::cell::RefCell;

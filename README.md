@@ -1,5 +1,5 @@
 # Undo
-A undo/redo library.
+An undo/redo library.
 
 It uses the [Command Pattern](https://en.wikipedia.org/wiki/Command_pattern) where the user
 implements the `UndoCmd` trait for each command and then the commands can be used with the
@@ -22,7 +22,7 @@ for a given command.
 undo = "0.4.0"
 ```
 
-## Example
+## Examples
 ```rust
 extern crate undo;
 
