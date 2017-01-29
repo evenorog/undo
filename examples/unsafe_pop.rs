@@ -3,7 +3,7 @@ extern crate undo;
 use undo::{UndoCmd, UndoStack};
 
 /// Pops an element from a vector.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct PopCmd {
     vec: *mut Vec<i32>,
     e: Option<i32>,
@@ -30,9 +30,9 @@ fn main() {
     let mut stack = UndoStack::new();
 
     let cmd = PopCmd { vec: &mut vec, e: None };
-    stack.push(cmd.clone());
-    stack.push(cmd.clone());
-    stack.push(cmd.clone());
+    stack.push(cmd);
+    stack.push(cmd);
+    stack.push(cmd);
 
     assert!(vec.is_empty());
 

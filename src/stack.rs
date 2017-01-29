@@ -13,6 +13,8 @@ pub struct UndoStack<'a> {
     stack: Vec<Box<UndoCmd + 'a>>,
     // Current position in the stack.
     idx: usize,
+    // Max amount of commands allowed on the stack.
+    limit: Option<usize>,
     // Called when the state changes from dirty to clean.
     on_clean: Box<FnMut() + 'a>,
     // Called when the state changes from clean to dirty.
@@ -26,6 +28,7 @@ impl<'a> UndoStack<'a> {
         UndoStack {
             stack: Vec::new(),
             idx: 0,
+            limit: None,
             on_clean: Box::new(|| {}),
             on_dirty: Box::new(|| {}),
         }
@@ -37,6 +40,7 @@ impl<'a> UndoStack<'a> {
         UndoStack {
             stack: Vec::with_capacity(capacity),
             idx: 0,
+            limit: None,
             on_clean: Box::new(|| {}),
             on_dirty: Box::new(|| {}),
         }
@@ -62,6 +66,66 @@ impl<'a> UndoStack<'a> {
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.stack.shrink_to_fit();
+    }
+
+    /// Sets the limit on how many `UndoCmd`s can be stored in the stack. If this limit is reached
+    /// it will start popping of commands at the bottom of the stack when pushing new commands
+    /// on to the stack. No limit is set by default which means it may grow indefinitely.
+    ///
+    /// # Panics
+    /// Panics if the given limit is zero.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoCmd, UndoStack};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #   vec: *mut Vec<i32>,
+    /// #   e: Option<i32>,
+    /// # }
+    /// # impl UndoCmd for PopCmd {
+    /// #   fn redo(&mut self) {
+    /// #       self.e = unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.pop()
+    /// #       }
+    /// #   }
+    /// #   fn undo(&mut self) {
+    /// #       unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.push(self.e.unwrap());
+    /// #       }
+    /// #   }
+    /// # }
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = UndoStack::new()
+    ///     .limit(2);
+    ///
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    /// stack.push(cmd);
+    /// stack.push(cmd);
+    /// stack.push(cmd); // Pops off the first cmd.
+    ///
+    /// assert!(vec.is_empty());
+    ///
+    /// stack.undo();
+    /// stack.undo();
+    /// stack.undo(); // Does nothing.
+    ///
+    /// assert_eq!(vec, vec![1, 2]);
+    /// ```
+    #[inline]
+    pub fn limit(mut self, limit: usize) -> Self {
+        assert_ne!(limit, 0);
+
+        if limit < self.idx {
+            let x = self.idx - limit;
+            self.stack.drain(..x);
+            self.idx = limit;
+            debug_assert_eq!(self.stack.len(), limit);
+        }
+        self.limit = Some(limit);
+        self
     }
 
     /// Sets what should happen if the state changes from dirty to clean.
@@ -171,7 +235,10 @@ impl<'a> UndoStack<'a> {
             };
             self.stack.push(Box::new(cmd));
         } else {
-            self.idx += 1;
+            match self.limit.map(|limit| idx == limit) {
+                Some(false) | None => self.idx += 1,
+                Some(true) => { self.stack.remove(0); },
+            }
             self.stack.push(Box::new(cmd));
         }
 
@@ -246,59 +313,89 @@ impl<'a> fmt::Debug for UndoStack<'a> {
 
 #[cfg(test)]
 mod test {
-    use std::rc::Rc;
-    use std::cell::{Cell, RefCell};
     use {UndoStack, UndoCmd};
 
-    /// Pops an element from a vector.
-    #[derive(Clone)]
+    #[derive(Clone, Copy)]
     struct PopCmd {
-        vec: Rc<RefCell<Vec<i32>>>,
+        vec: *mut Vec<i32>,
         e: Option<i32>,
     }
 
     impl UndoCmd for PopCmd {
         fn redo(&mut self) {
-            self.e = self.vec.borrow_mut().pop();
+            self.e = unsafe {
+                let ref mut vec = *self.vec;
+                vec.pop()
+            }
         }
 
         fn undo(&mut self) {
-            self.vec.borrow_mut().push(self.e.unwrap());
-            self.e = None;
+            unsafe {
+                let ref mut vec = *self.vec;
+                vec.push(self.e.unwrap());
+            }
         }
     }
 
     #[test]
     fn pop() {
+        use std::cell::Cell;
+
         let x = Cell::new(0);
-        let vec = Rc::new(RefCell::new(vec![1, 2, 3]));
-        let mut undo_stack = UndoStack::with_capacity(3)
+        let mut vec = vec![1, 2, 3];
+        let mut undo_stack = UndoStack::new()
             .on_clean(|| x.set(0))
             .on_dirty(|| x.set(1));
 
-        let cmd = PopCmd { vec: vec.clone(), e: None };
-        undo_stack.push(cmd.clone());
-        undo_stack.push(cmd.clone());
-        undo_stack.push(cmd.clone());
+        let cmd = PopCmd { vec: &mut vec, e: None };
+        for _ in 0..3 {
+            undo_stack.push(cmd);
+        }
         assert_eq!(x.get(), 0);
-        assert!(vec.borrow().is_empty());
+        assert!(vec.is_empty());
 
-        undo_stack.undo();
-        undo_stack.undo();
+        for _ in 0..3 {
+            undo_stack.undo();
+        }
+        assert_eq!(x.get(), 1);
+        assert_eq!(vec, vec![1, 2, 3]);
+
+        undo_stack.push(cmd);
+        assert_eq!(x.get(), 0);
+        assert_eq!(vec, vec![1, 2]);
+
         undo_stack.undo();
         assert_eq!(x.get(), 1);
-        assert_eq!(vec, Rc::new(RefCell::new(vec![1, 2, 3])));
-
-        undo_stack.push(cmd.clone());
-        assert_eq!(x.get(), 0);
-        assert_eq!(vec, Rc::new(RefCell::new(vec![1, 2])));
-
-        undo_stack.undo();
-        assert_eq!(x.get(), 1);
-        assert_eq!(vec, Rc::new(RefCell::new(vec![1, 2, 3])));
+        assert_eq!(vec, vec![1, 2, 3]);
 
         undo_stack.redo();
         assert_eq!(x.get(), 0);
-        assert_eq!(vec, Rc::new(RefCell::new(vec![1, 2])));
+        assert_eq!(vec, vec![1, 2]);
+    }
+
+    #[test]
+    fn limit() {
+        let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let mut undo_stack = UndoStack::new();
+
+        let cmd = PopCmd { vec: &mut vec, e: None };
+
+        for _ in 0..6 {
+            undo_stack.push(cmd);
+        }
+        assert_eq!(vec, vec![1, 2, 3, 4]);
+
+        undo_stack = undo_stack.limit(3);
+        assert_eq!(undo_stack.stack.len(), 3);
+
+        for _ in 0..6 {
+            undo_stack.undo();
+        }
+        assert_eq!(vec, vec![1, 2, 3, 4, 5, 6, 7]);
+
+        for _ in 0..6 {
+            undo_stack.redo();
+        }
+        assert_eq!(vec, vec![1, 2, 3, 4]);
     }
 }

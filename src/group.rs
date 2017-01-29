@@ -163,32 +163,33 @@ impl<'a> UndoGroup<'a> {
 
 #[cfg(test)]
 mod test {
-    use std::rc::Rc;
-    use std::cell::RefCell;
     use {UndoCmd, UndoStack, UndoGroup};
 
-    /// Pops an element from a vector.
-    #[derive(Clone)]
     struct PopCmd {
-        vec: Rc<RefCell<Vec<i32>>>,
+        vec: *mut Vec<i32>,
         e: Option<i32>,
     }
 
     impl UndoCmd for PopCmd {
         fn redo(&mut self) {
-            self.e = self.vec.borrow_mut().pop();
+            self.e = unsafe {
+                let ref mut vec = *self.vec;
+                vec.pop()
+            }
         }
 
         fn undo(&mut self) {
-            self.vec.borrow_mut().push(self.e.unwrap());
-            self.e = None;
+            unsafe {
+                let ref mut vec = *self.vec;
+                vec.push(self.e.unwrap());
+            }
         }
     }
 
     #[test]
     fn pop() {
-        let vec1 = Rc::new(RefCell::new(vec![1, 2, 3]));
-        let vec2 = Rc::new(RefCell::new(vec![1, 2, 3]));
+        let mut vec1 = vec![1, 2, 3];
+        let mut vec2 = vec![1, 2, 3];
 
         let mut group = UndoGroup::new();
 
@@ -196,25 +197,25 @@ mod test {
         let b = group.add(UndoStack::new());
 
         group.set_active(&a);
-        group.push(PopCmd { vec: vec1.clone(), e: None });
-        assert_eq!(vec1.borrow().len(), 2);
+        group.push(PopCmd { vec: &mut vec1, e: None });
+        assert_eq!(vec1.len(), 2);
 
         group.set_active(&b);
-        group.push(PopCmd { vec: vec2.clone(), e: None });
-        assert_eq!(vec2.borrow().len(), 2);
+        group.push(PopCmd { vec: &mut vec2, e: None });
+        assert_eq!(vec2.len(), 2);
 
         group.set_active(&a);
         group.undo();
-        assert_eq!(vec1.borrow().len(), 3);
+        assert_eq!(vec1.len(), 3);
 
         group.set_active(&b);
         group.undo();
-        assert_eq!(vec2.borrow().len(), 3);
+        assert_eq!(vec2.len(), 3);
 
         group.remove(b);
         assert_eq!(group.group.len(), 1);
 
         group.redo();
-        assert_eq!(vec2.borrow().len(), 3);
+        assert_eq!(vec2.len(), 3);
     }
 }
