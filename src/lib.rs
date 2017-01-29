@@ -64,10 +64,21 @@ extern crate fnv;
 mod group;
 mod stack;
 
-pub use group::{Uid, UndoGroup};
+pub use group::UndoGroup;
 pub use stack::UndoStack;
 
 use std::fmt;
+
+type Key = u32;
+
+/// An unique id for an `UndoStack`.
+///
+/// This id is returned from the [add] method and consumed when calling the [remove] method in
+/// `UndoGroup`.
+///
+/// [add]: struct.UndoGroup.html#method.add
+/// [remove]: struct.UndoGroup.html#method.remove
+pub struct Id(Key);
 
 /// Every command needs to implement the `UndoCmd` trait to be able to be used with the `UndoStack`.
 pub trait UndoCmd {

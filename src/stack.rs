@@ -281,6 +281,7 @@ impl<'a> UndoStack<'a> {
         if self.idx > 0 {
             let is_clean = self.is_clean();
             self.idx -= 1;
+            debug_assert!(self.idx < self.stack.len());
             unsafe {
                 let cmd = self.stack.get_unchecked_mut(self.idx);
                 cmd.undo();

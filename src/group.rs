@@ -1,14 +1,5 @@
 use fnv::FnvHashMap;
-use {UndoCmd, UndoStack};
-
-/// An unique id for an `UndoStack`.
-///
-/// This id is returned from the [add] method and consumed when calling the [remove] method in
-/// `UndoGroup`.
-///
-/// [add]: struct.UndoGroup.html#method.add
-/// [remove]: struct.UndoGroup.html#method.remove
-pub struct Uid(u64);
+use {Id, Key, UndoCmd, UndoStack};
 
 /// A collection of `UndoStack`s.
 ///
@@ -18,11 +9,11 @@ pub struct Uid(u64);
 #[derive(Debug, Default)]
 pub struct UndoGroup<'a> {
     // The stacks in the group.
-    group: FnvHashMap<u64, UndoStack<'a>>,
+    group: FnvHashMap<Key, UndoStack<'a>>,
     // The active stack.
-    active: Option<u64>,
-    // Counter for generating new ids.
-    id: u64,
+    active: Option<Key>,
+    // Counter for generating new keys.
+    key: Key,
 }
 
 impl<'a> UndoGroup<'a> {
@@ -32,7 +23,7 @@ impl<'a> UndoGroup<'a> {
         UndoGroup {
             group: FnvHashMap::default(),
             active: None,
-            id: 0,
+            key: 0,
         }
     }
 
@@ -42,7 +33,7 @@ impl<'a> UndoGroup<'a> {
         UndoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
             active: None,
-            id: 0,
+            key: 0,
         }
     }
 
@@ -70,31 +61,31 @@ impl<'a> UndoGroup<'a> {
 
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.
     #[inline]
-    pub fn add(&mut self, stack: UndoStack<'a>) -> Uid {
-        let id = self.id;
-        self.id += 1;
-        self.group.insert(id, stack);
-        Uid(id)
+    pub fn add(&mut self, stack: UndoStack<'a>) -> Id {
+        let key = self.key;
+        self.key += 1;
+        self.group.insert(key, stack);
+        Id(key)
     }
 
     /// Removes the `UndoStack` with the specified id and returns the stack.
     /// Returns `None` if the stack was not found.
     #[inline]
-    pub fn remove(&mut self, Uid(id): Uid) -> Option<UndoStack<'a>> {
+    pub fn remove(&mut self, Id(key): Id) -> Option<UndoStack<'a>> {
         // Check if it was the active stack that was removed.
         if let Some(active) = self.active {
-            if active == id {
+            if active == key {
                 self.clear_active();
             }
         }
-        self.group.remove(&id)
+        self.group.remove(&key)
     }
 
     /// Sets the `UndoStack` with the specified id as the current active one.
     #[inline]
-    pub fn set_active(&mut self, &Uid(id): &Uid) {
-        if self.group.contains_key(&id) {
-            self.active = Some(id);
+    pub fn set_active(&mut self, &Id(key): &Id) {
+        if self.group.contains_key(&key) {
+            self.active = Some(key);
         }
     }
 
