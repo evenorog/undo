@@ -72,6 +72,9 @@ impl<'a> UndoStack<'a> {
     /// it will start popping of commands at the bottom of the stack when pushing new commands
     /// on to the stack. No limit is set by default which means it may grow indefinitely.
     ///
+    /// The stack will never grow above the limit, but it may remove multiple commands at a
+    /// time to increase performance.
+    ///
     /// # Panics
     /// Panics if the given limit is zero.
     ///
@@ -122,7 +125,7 @@ impl<'a> UndoStack<'a> {
             let x = self.idx - limit;
             self.stack.drain(..x);
             self.idx = limit;
-            debug_assert_eq!(self.stack.len(), limit);
+            debug_assert_eq!(self.idx, self.stack.len());
         }
         self.limit = Some(limit);
         self
@@ -197,7 +200,7 @@ impl<'a> UndoStack<'a> {
 
         // Check if we should merge cmd with the top command on stack.
         let id = cmd.id();
-        if idx > 0 && id.is_some() && id == unsafe { self.stack.get_unchecked(idx - 1).id() } {
+        if idx != 0 && id.is_some() && id == unsafe { self.stack.get_unchecked(idx - 1).id() } {
 
             // MergeCmd is the result of the merging.
             struct MergeCmd<'a> {
@@ -235,13 +238,19 @@ impl<'a> UndoStack<'a> {
             };
             self.stack.push(Box::new(cmd));
         } else {
-            match self.limit.map(|limit| idx == limit) {
-                Some(false) | None => self.idx += 1,
-                Some(true) => { self.stack.remove(0); },
+            match self.limit {
+                Some(limit) if idx == limit => {
+                    // Remove ~25% of the stack at once.
+                    let x = idx / 4 + 1;
+                    self.stack.drain(..x);
+                    self.idx -= x - 1;
+                },
+                _ => self.idx += 1,
             }
             self.stack.push(Box::new(cmd));
         }
 
+        debug_assert_eq!(self.idx, self.stack.len());
         // State is always clean after a push, check if it was dirty before.
         if is_dirty {
             let ref mut f = self.on_clean;
@@ -344,32 +353,32 @@ mod test {
 
         let x = Cell::new(0);
         let mut vec = vec![1, 2, 3];
-        let mut undo_stack = UndoStack::new()
+        let mut stack = UndoStack::new()
             .on_clean(|| x.set(0))
             .on_dirty(|| x.set(1));
 
         let cmd = PopCmd { vec: &mut vec, e: None };
         for _ in 0..3 {
-            undo_stack.push(cmd);
+            stack.push(cmd);
         }
         assert_eq!(x.get(), 0);
         assert!(vec.is_empty());
 
         for _ in 0..3 {
-            undo_stack.undo();
+            stack.undo();
         }
         assert_eq!(x.get(), 1);
         assert_eq!(vec, vec![1, 2, 3]);
 
-        undo_stack.push(cmd);
+        stack.push(cmd);
         assert_eq!(x.get(), 0);
         assert_eq!(vec, vec![1, 2]);
 
-        undo_stack.undo();
+        stack.undo();
         assert_eq!(x.get(), 1);
         assert_eq!(vec, vec![1, 2, 3]);
 
-        undo_stack.redo();
+        stack.redo();
         assert_eq!(x.get(), 0);
         assert_eq!(vec, vec![1, 2]);
     }
@@ -377,25 +386,25 @@ mod test {
     #[test]
     fn limit() {
         let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let mut undo_stack = UndoStack::new();
+        let mut stack = UndoStack::new();
 
         let cmd = PopCmd { vec: &mut vec, e: None };
 
         for _ in 0..6 {
-            undo_stack.push(cmd);
+            stack.push(cmd);
         }
         assert_eq!(vec, vec![1, 2, 3, 4]);
 
-        undo_stack = undo_stack.limit(3);
-        assert_eq!(undo_stack.stack.len(), 3);
+        stack = stack.limit(3);
+        assert_eq!(stack.stack.len(), 3);
 
         for _ in 0..6 {
-            undo_stack.undo();
+            stack.undo();
         }
         assert_eq!(vec, vec![1, 2, 3, 4, 5, 6, 7]);
 
         for _ in 0..6 {
-            undo_stack.redo();
+            stack.redo();
         }
         assert_eq!(vec, vec![1, 2, 3, 4]);
     }
