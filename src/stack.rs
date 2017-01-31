@@ -298,6 +298,7 @@ impl<'a> fmt::Debug for UndoStack<'a> {
         f.debug_struct("UndoStack")
             .field("stack", &self.stack)
             .field("idx", &self.idx)
+            .field("limit", &self.limit)
             .finish()
     }
 }
