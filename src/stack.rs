@@ -193,61 +193,42 @@ impl<'a> UndoStack<'a> {
         where T: UndoCmd + 'a,
     {
         let is_dirty = self.is_dirty();
-        let idx = self.idx;
-        // Pop off all elements after idx from stack.
-        self.stack.truncate(idx);
+        let len = self.idx;
+        // Pop off all elements after len from stack.
+        self.stack.truncate(len);
         cmd.redo();
 
-        // Check if we should merge cmd with the top command on stack.
-        let id = cmd.id();
-        if idx != 0 && id.is_some() && id == unsafe { self.stack.get_unchecked(idx - 1).id() } {
-
-            // MergeCmd is the result of the merging.
-            struct MergeCmd<'a> {
-                cmd1: Box<UndoCmd + 'a>,
-                cmd2: Box<UndoCmd + 'a>,
-            }
-
-            impl<'a> UndoCmd for MergeCmd<'a> {
-                #[inline]
-                fn redo(&mut self) {
-                    self.cmd1.redo();
-                    self.cmd2.redo();
-                }
-
-                #[inline]
-                fn undo(&mut self) {
-                    self.cmd2.undo();
-                    self.cmd1.undo();
-                }
-
-                #[inline]
-                fn id(&self) -> Option<u64> {
-                    self.cmd1.id()
-                }
-            }
-
-            // Merge the command with the one on the top of the stack.
-            let cmd = MergeCmd {
-                cmd1: unsafe {
-                    // Unchecked pop.
-                    self.stack.set_len(idx - 1);
-                    ::std::ptr::read(self.stack.get_unchecked(self.stack.len()))
-                },
-                cmd2: Box::new(cmd),
-            };
+        if len == 0 {
+            self.idx += 1;
             self.stack.push(Box::new(cmd));
         } else {
-            match self.limit {
-                Some(limit) if idx == limit => {
-                    // Remove ~25% of the stack at once.
-                    let x = idx / 4 + 1;
-                    self.stack.drain(..x);
-                    self.idx -= x - 1;
+            let idx = len - 1;
+            match (cmd.id(), unsafe { self.stack.get_unchecked(idx).id() }) {
+                (Some(id1), Some(id2)) if id1 == id2 => {
+                    // Merge the command with the one on the top of the stack.
+                    let cmd = MergeCmd {
+                        cmd1: unsafe {
+                            // Unchecked pop.
+                            self.stack.set_len(idx);
+                            ::std::ptr::read(self.stack.get_unchecked(idx))
+                        },
+                        cmd2: Box::new(cmd),
+                    };
+                    self.stack.push(Box::new(cmd));
                 },
-                _ => self.idx += 1,
+                _ => {
+                    match self.limit {
+                        Some(limit) if len == limit => {
+                            // Remove ~25% of the stack at once.
+                            let x = len / 4 + 1;
+                            self.stack.drain(..x);
+                            self.idx -= x - 1;
+                        },
+                        _ => self.idx += 1,
+                    }
+                    self.stack.push(Box::new(cmd));
+                },
             }
-            self.stack.push(Box::new(cmd));
         }
 
         debug_assert_eq!(self.idx, self.stack.len());
@@ -318,6 +299,30 @@ impl<'a> fmt::Debug for UndoStack<'a> {
             .field("stack", &self.stack)
             .field("idx", &self.idx)
             .finish()
+    }
+}
+
+struct MergeCmd<'a> {
+    cmd1: Box<UndoCmd + 'a>,
+    cmd2: Box<UndoCmd + 'a>,
+}
+
+impl<'a> UndoCmd for MergeCmd<'a> {
+    #[inline]
+    fn redo(&mut self) {
+        self.cmd1.redo();
+        self.cmd2.redo();
+    }
+
+    #[inline]
+    fn undo(&mut self) {
+        self.cmd2.undo();
+        self.cmd1.undo();
+    }
+
+    #[inline]
+    fn id(&self) -> Option<u64> {
+        self.cmd1.id()
     }
 }
 
