@@ -28,8 +28,8 @@ impl UndoCmd for PopCmd {
 fn main() {
     let mut vec = vec![1, 2, 3];
     let mut stack = UndoStack::new();
-
     let cmd = PopCmd { vec: &mut vec, e: None };
+
     stack.push(cmd);
     stack.push(cmd);
     stack.push(cmd);

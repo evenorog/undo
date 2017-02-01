@@ -26,9 +26,7 @@ fn main() {
     // We need to use Rc<RefCell> in safe code since all commands are going to mutate the vec.
     // unsafe_pop.rs shows how to use raw pointers instead, if performance is important.
     let vec = Rc::new(RefCell::new(vec![1, 2, 3]));
-    let mut stack = UndoStack::new()
-        .on_clean(|| println!("This is called when the stack changes from dirty to clean!"))
-        .on_dirty(|| println!("This is called when the stack changes from clean to dirty!"));
+    let mut stack = UndoStack::new();
 
     let cmd = PopCmd { vec: vec.clone(), e: None };
     stack.push(cmd.clone());
@@ -37,7 +35,7 @@ fn main() {
 
     assert!(vec.borrow().is_empty());
 
-    stack.undo(); // on_dirty is going to be called here.
+    stack.undo();
     stack.undo();
     stack.undo();
 

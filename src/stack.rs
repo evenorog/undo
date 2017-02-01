@@ -16,9 +16,9 @@ pub struct UndoStack<'a> {
     // Max amount of commands allowed on the stack.
     limit: Option<usize>,
     // Called when the state changes from dirty to clean.
-    on_clean: Box<FnMut() + 'a>,
+    on_clean: Option<Box<FnMut() + 'a>>,
     // Called when the state changes from clean to dirty.
-    on_dirty: Box<FnMut() + 'a>,
+    on_dirty: Option<Box<FnMut() + 'a>>,
 }
 
 impl<'a> UndoStack<'a> {
@@ -29,54 +29,17 @@ impl<'a> UndoStack<'a> {
             stack: Vec::new(),
             idx: 0,
             limit: None,
-            on_clean: Box::new(|| {}),
-            on_dirty: Box::new(|| {}),
+            on_clean: None,
+            on_dirty: None,
         }
     }
 
-    /// Creates a new `UndoStack` with the specified capacity.
-    #[inline]
-    pub fn with_capacity(capacity: usize) -> Self {
-        UndoStack {
-            stack: Vec::with_capacity(capacity),
-            idx: 0,
-            limit: None,
-            on_clean: Box::new(|| {}),
-            on_dirty: Box::new(|| {}),
-        }
-    }
-
-    /// Returns the capacity of the `UndoStack`.
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.stack.capacity()
-    }
-
-    /// Reserves capacity for at least `additional` more commands to be inserted in the given stack.
-    /// The stack may reserve more space to avoid frequent reallocations.
+    /// Creates a new `UndoStack` with a limit on how many `UndoCmd`s can be stored in the stack.
+    /// If this limit is reached it will start popping of commands at the bottom of the stack when
+    /// pushing new commands on to the stack. No limit is set by default which means it may grow
+    /// indefinitely.
     ///
-    /// # Panics
-    /// Panics if the new capacity overflows usize.
-    #[inline]
-    pub fn reserve(&mut self, additional: usize) {
-        self.stack.reserve(additional);
-    }
-
-    /// Shrinks the capacity of the `UndoStack` as much as possible.
-    #[inline]
-    pub fn shrink_to_fit(&mut self) {
-        self.stack.shrink_to_fit();
-    }
-
-    /// Sets the limit on how many `UndoCmd`s can be stored in the stack. If this limit is reached
-    /// it will start popping of commands at the bottom of the stack when pushing new commands
-    /// on to the stack. No limit is set by default which means it may grow indefinitely.
-    ///
-    /// The stack will never grow above the limit, but it may remove multiple commands at a
-    /// time to increase performance.
-    ///
-    /// # Panics
-    /// Panics if the given limit is zero.
+    /// The stack may remove multiple commands at a time to increase performance.
     ///
     /// # Examples
     /// ```
@@ -101,10 +64,9 @@ impl<'a> UndoStack<'a> {
     /// #   }
     /// # }
     /// let mut vec = vec![1, 2, 3];
-    /// let mut stack = UndoStack::new()
-    ///     .limit(2);
-    ///
+    /// let mut stack = UndoStack::with_limit(2);
     /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
     /// stack.push(cmd);
     /// stack.push(cmd);
     /// stack.push(cmd); // Pops off the first cmd.
@@ -118,17 +80,76 @@ impl<'a> UndoStack<'a> {
     /// assert_eq!(vec, vec![1, 2]);
     /// ```
     #[inline]
-    pub fn limit(mut self, limit: usize) -> Self {
-        assert_ne!(limit, 0);
-
-        if limit < self.idx {
-            let x = self.idx - limit;
-            self.stack.drain(..x);
-            self.idx = limit;
-            debug_assert_eq!(self.idx, self.stack.len());
+    pub fn with_limit(limit: usize) -> Self {
+        UndoStack {
+            stack: Vec::new(),
+            idx: 0,
+            limit: Some(limit),
+            on_clean: None,
+            on_dirty: None,
         }
-        self.limit = Some(limit);
-        self
+    }
+
+    /// Creates a new `UndoStack` with the specified capacity.
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        UndoStack {
+            stack: Vec::with_capacity(capacity),
+            idx: 0,
+            limit: None,
+            on_clean: None,
+            on_dirty: None,
+        }
+    }
+
+    /// Creates a new `UndoStack` with the specified capacity and limit.
+    #[inline]
+    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> Self {
+        UndoStack {
+            stack: Vec::with_capacity(capacity),
+            idx: 0,
+            limit: Some(limit),
+            on_clean: None,
+            on_dirty: None,
+        }
+    }
+
+    /// Returns the limit of the `UndoStack`, or `None` if it has no limit.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::UndoStack;
+    /// let stack = UndoStack::with_limit(10);
+    /// assert_eq!(stack.limit(), Some(10));
+    ///
+    /// let stack = UndoStack::new();
+    /// assert_eq!(stack.limit(), None);
+    /// ```
+    #[inline]
+    pub fn limit(&self) -> Option<usize> {
+        self.limit
+    }
+
+    /// Returns the capacity of the `UndoStack`.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.stack.capacity()
+    }
+
+    /// Reserves capacity for at least `additional` more commands to be inserted in the given stack.
+    /// The stack may reserve more space to avoid frequent reallocations.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.stack.reserve(additional);
+    }
+
+    /// Shrinks the capacity of the `UndoStack` as much as possible.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.stack.shrink_to_fit();
     }
 
     /// Sets what should happen if the state changes from dirty to clean.
@@ -141,15 +162,14 @@ impl<'a> UndoStack<'a> {
     /// # #![allow(unused_variables)]
     /// # use undo::UndoStack;
     /// let mut x = 0;
-    /// let stack = UndoStack::new()
-    ///     .on_clean(|| x += 1);
+    /// let mut stack = UndoStack::new();
+    /// stack.on_clean(|| x += 1);
     /// ```
     #[inline]
-    pub fn on_clean<F>(mut self, f: F) -> Self
+    pub fn on_clean<F>(&mut self, f: F)
         where F: FnMut() + 'a,
     {
-        self.on_clean = Box::new(f);
-        self
+        self.on_clean = Some(Box::new(f));
     }
 
     /// Sets what should happen if the state changes from clean to dirty.
@@ -160,15 +180,14 @@ impl<'a> UndoStack<'a> {
     /// # #![allow(unused_variables)]
     /// # use undo::UndoStack;
     /// let mut x = 0;
-    /// let stack = UndoStack::new()
-    ///     .on_dirty(|| x += 1);
+    /// let mut stack = UndoStack::new();
+    /// stack.on_dirty(|| x += 1);
     /// ```
     #[inline]
-    pub fn on_dirty<F>(mut self, f: F) -> Self
+    pub fn on_dirty<F>(&mut self, f: F)
         where F: FnMut() + 'a,
     {
-        self.on_dirty = Box::new(f);
-        self
+        self.on_dirty = Some(Box::new(f));
     }
 
     /// Returns `true` if the state of the stack is clean, `false` otherwise.
@@ -234,8 +253,9 @@ impl<'a> UndoStack<'a> {
         debug_assert_eq!(self.idx, self.stack.len());
         // State is always clean after a push, check if it was dirty before.
         if is_dirty {
-            let ref mut f = self.on_clean;
-            f();
+            if let Some(ref mut f) = self.on_clean {
+                f();
+            }
         }
     }
 
@@ -255,8 +275,9 @@ impl<'a> UndoStack<'a> {
             self.idx += 1;
             // Check if stack went from dirty to clean.
             if is_dirty && self.is_clean() {
-                let ref mut f = self.on_clean;
-                f();
+                if let Some(ref mut f) = self.on_clean {
+                    f();
+                }
             }
         }
     }
@@ -278,8 +299,9 @@ impl<'a> UndoStack<'a> {
             }
             // Check if stack went from clean to dirty.
             if is_clean && self.is_dirty() {
-                let ref mut f = self.on_dirty;
-                f();
+                if let Some(ref mut f) = self.on_dirty {
+                    f();
+                }
             }
         }
     }
@@ -359,9 +381,9 @@ mod test {
 
         let x = Cell::new(0);
         let mut vec = vec![1, 2, 3];
-        let mut stack = UndoStack::new()
-            .on_clean(|| x.set(0))
-            .on_dirty(|| x.set(1));
+        let mut stack = UndoStack::new();
+        stack.on_clean(|| x.set(0));
+        stack.on_dirty(|| x.set(1));
 
         let cmd = PopCmd { vec: &mut vec, e: None };
         for _ in 0..3 {
@@ -392,26 +414,15 @@ mod test {
     #[test]
     fn limit() {
         let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let mut stack = UndoStack::new();
+        let mut stack = UndoStack::with_limit(9);
 
         let cmd = PopCmd { vec: &mut vec, e: None };
 
-        for _ in 0..6 {
+        for _ in 0..10 {
             stack.push(cmd);
         }
-        assert_eq!(vec, vec![1, 2, 3, 4]);
 
-        stack = stack.limit(3);
-        assert_eq!(stack.stack.len(), 3);
-
-        for _ in 0..6 {
-            stack.undo();
-        }
-        assert_eq!(vec, vec![1, 2, 3, 4, 5, 6, 7]);
-
-        for _ in 0..6 {
-            stack.redo();
-        }
-        assert_eq!(vec, vec![1, 2, 3, 4]);
+        assert!(vec.is_empty());
+        assert_eq!(stack.stack.len(), 7);
     }
 }
