@@ -178,7 +178,7 @@ mod test {
     }
 
     #[test]
-    fn pop() {
+    fn state() {
         let mut vec1 = vec![1, 2, 3];
         let mut vec2 = vec![1, 2, 3];
 

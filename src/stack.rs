@@ -376,7 +376,7 @@ mod test {
     }
 
     #[test]
-    fn pop() {
+    fn state() {
         use std::cell::Cell;
 
         let x = Cell::new(0);

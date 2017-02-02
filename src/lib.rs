@@ -75,6 +75,7 @@ type Key = u32;
 ///
 /// [add]: struct.UndoGroup.html#method.add
 /// [remove]: struct.UndoGroup.html#method.remove
+#[derive(Debug)]
 pub struct Id(Key);
 
 /// Every command needs to implement the `UndoCmd` trait to be able to be used with the `UndoStack`.
