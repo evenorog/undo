@@ -1,60 +1,64 @@
 //! An undo/redo library.
 //!
-//! It uses the [Command Pattern] where the user implements the `UndoCmd` trait for each command
-//! and then the commands can be used with the `UndoStack`.
+//! It uses the [Command Pattern] where the user implements the `UndoCmd` trait for each command.
 //!
-//! The `UndoStack` has two different states, clean and dirty. The stack is in a clean state when
-//! there are no more commands that can be redone, otherwise it's in a dirty state. The stack
-//! can be configured to call a given method when this state changes, using the [on_clean] and
-//! [on_dirty] methods.
+//! The `UndoStack` has two states, clean and dirty. The stack is clean when no more commands can
+//! be redone, otherwise it is dirty. The stack will notice when it's state changes to either dirty
+//! or clean, and call the user defined methods set in [on_clean] and [on_dirty]. This is useful if
+//! you want to trigger some event when the state changes, eg. enabling and disabling buttons in an ui.
 //!
-//! The `UndoStack` also supports automatic merging of commands that has the same [id].
+//! It also supports [automatic merging] of commands that has the same id.
 //!
 //! # Examples
 //! ```
-//! use std::rc::Rc;
-//! use std::cell::RefCell;
 //! use undo::{UndoCmd, UndoStack};
 //!
-//! /// Pops an element from a vector.
-//! #[derive(Clone)]
+//! #[derive(Clone, Copy)]
 //! struct PopCmd {
-//!     vec: Rc<RefCell<Vec<i32>>>,
+//!     vec: *mut Vec<i32>,
 //!     e: Option<i32>,
 //! }
 //!
 //! impl UndoCmd for PopCmd {
 //!     fn redo(&mut self) {
-//!         self.e = self.vec.borrow_mut().pop();
+//!         self.e = unsafe {
+//!             let ref mut vec = *self.vec;
+//!             vec.pop()
+//!         }
 //!     }
 //!
 //!     fn undo(&mut self) {
-//!         self.vec.borrow_mut().push(self.e.unwrap());
-//!         self.e = None;
+//!         unsafe {
+//!             let ref mut vec = *self.vec;
+//!             vec.push(self.e.unwrap());
+//!         }
 //!     }
 //! }
 //!
-//! let vec = Rc::new(RefCell::new(vec![1, 2, 3]));
+//! let mut vec = vec![1, 2, 3];
 //! let mut stack = UndoStack::new();
-//! let cmd = PopCmd { vec: vec.clone(), e: None };
+//! let cmd = PopCmd { vec: &mut vec, e: None };
 //!
-//! stack.push(cmd.clone());
-//! stack.push(cmd.clone());
-//! stack.push(cmd.clone());
+//! stack.push(cmd);
+//! stack.push(cmd);
+//! stack.push(cmd);
 //!
-//! assert!(vec.borrow().is_empty());
+//! assert!(vec.is_empty());
 //!
 //! stack.undo();
 //! stack.undo();
 //! stack.undo();
 //!
-//! assert_eq!(vec.borrow().len(), 3);
+//! assert_eq!(vec.len(), 3);
 //! ```
+//!
+//! *An unsafe implementation of `redo` and `undo` is used in examples since it is less verbose and
+//! makes the examples easier to follow.*
 //!
 //! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 //! [on_clean]: struct.UndoStack.html#method.on_clean
 //! [on_dirty]: struct.UndoStack.html#method.on_dirty
-//! [id]: trait.UndoCmd.html#method.id
+//! [automatic merging]: trait.UndoCmd.html#method.id
 
 extern crate fnv;
 
@@ -90,37 +94,36 @@ pub trait UndoCmd {
 
     /// Used for merging of `UndoCmd`s.
     ///
-    /// When two commands are merged together, undoing and redoing them are done in one step.
-    /// An example where this is useful is a text editor where you might want to undo a whole word
-    /// instead of each character.
-    ///
     /// Two commands are merged together when a command is pushed on the `UndoStack`, and it has
-    /// the same id as the top command already on the stack. It is normal to have an unique
-    /// id for each implementation of `UndoCmd`, but this is not mandatory.
+    /// the same id as the top command already on the stack. When commands are merged together,
+    /// undoing and redoing them are done in one step. An example where this is useful is a text
+    /// editor where you might want to undo a whole word instead of each character.
     ///
     /// Default implementation returns `None`, which means the command will never be merged.
     ///
     /// # Examples
     /// ```
-    /// use std::rc::Rc;
-    /// use std::cell::RefCell;
     /// use undo::{UndoCmd, UndoStack};
     ///
-    /// /// Pops an element from a vector.
-    /// #[derive(Clone)]
+    /// #[derive(Clone, Copy)]
     /// struct PopCmd {
-    ///     vec: Rc<RefCell<Vec<i32>>>,
+    ///     vec: *mut Vec<i32>,
     ///     e: Option<i32>,
     /// }
     ///
     /// impl UndoCmd for PopCmd {
     ///     fn redo(&mut self) {
-    ///         self.e = self.vec.borrow_mut().pop();
+    ///         self.e = unsafe {
+    ///             let ref mut vec = *self.vec;
+    ///             vec.pop()
+    ///         }
     ///     }
     ///
     ///     fn undo(&mut self) {
-    ///         self.vec.borrow_mut().push(self.e.unwrap());
-    ///         self.e = None;
+    ///         unsafe {
+    ///             let ref mut vec = *self.vec;
+    ///             vec.push(self.e.unwrap());
+    ///         }
     ///     }
     ///
     ///     fn id(&self) -> Option<u64> {
@@ -128,25 +131,19 @@ pub trait UndoCmd {
     ///     }
     /// }
     ///
-    /// fn main() {
-    ///     let vec = Rc::new(RefCell::new(vec![1, 2, 3]));
-    ///     let mut stack = UndoStack::new();
-    ///     let cmd = PopCmd { vec: vec.clone(), e: None };
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = UndoStack::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    ///     stack.push(cmd.clone());
-    ///     stack.push(cmd.clone());
-    ///     stack.push(cmd.clone());
+    /// stack.push(cmd);
+    /// stack.push(cmd);
+    /// stack.push(cmd);
     ///
-    ///     assert!(vec.borrow().is_empty());
-    ///
-    ///     stack.undo();
-    ///
-    ///     assert_eq!(vec.borrow().len(), 3);
-    ///
-    ///     stack.redo();
-    ///
-    ///     assert!(vec.borrow().is_empty());
-    /// }
+    /// assert!(vec.is_empty());
+    /// stack.undo();
+    /// assert_eq!(vec.len(), 3);
+    /// stack.redo();
+    /// assert!(vec.is_empty());
     /// ```
     #[inline]
     fn id(&self) -> Option<u64> {

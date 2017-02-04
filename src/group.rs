@@ -3,9 +3,36 @@ use {Id, Key, UndoCmd, UndoStack};
 
 /// A collection of `UndoStack`s.
 ///
-/// An `UndoGroup` is useful when working with multiple `UndoStack`s and only one of them should
+/// An `UndoGroup` is useful when working with multiple stacks and only one of them should
 /// be active at a given time, eg. a text editor with multiple documents opened. However, if only
-/// a single stack is needed, it is easier to just use the `UndoStack` directly.
+/// a single stack is needed, it is easier to just use the stack directly.
+///
+/// The `PopCmd` given in the examples below is defined as:
+///
+/// ```
+/// # use undo::UndoCmd;
+/// #[derive(Clone, Copy)]
+/// struct PopCmd {
+///     vec: *mut Vec<i32>,
+///     e: Option<i32>,
+/// }
+///
+/// impl UndoCmd for PopCmd {
+///     fn redo(&mut self) {
+///         self.e = unsafe {
+///             let ref mut vec = *self.vec;
+///             vec.pop()
+///         }
+///     }
+///
+///     fn undo(&mut self) {
+///         unsafe {
+///             let ref mut vec = *self.vec;
+///             vec.push(self.e.unwrap());
+///         }
+///     }
+/// }
+/// ```
 #[derive(Debug, Default)]
 pub struct UndoGroup<'a> {
     // The stacks in the group.
@@ -18,8 +45,14 @@ pub struct UndoGroup<'a> {
 
 impl<'a> UndoGroup<'a> {
     /// Creates a new `UndoGroup`.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::UndoGroup;
+    /// let group = UndoGroup::new();
+    /// ```
     #[inline]
-    pub fn new() -> Self {
+    pub fn new() -> UndoGroup<'a> {
         UndoGroup {
             group: FnvHashMap::default(),
             active: None,
@@ -28,8 +61,15 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Creates a new `UndoGroup` with the specified capacity.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::UndoGroup;
+    /// let group = UndoGroup::with_capacity(10);
+    /// assert!(group.capacity() >= 10);
+    /// ```
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Self {
+    pub fn with_capacity(capacity: usize) -> UndoGroup<'a> {
         UndoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
             active: None,
@@ -38,6 +78,13 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Returns the capacity of the `UndoGroup`.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::UndoGroup;
+    /// let group = UndoGroup::with_capacity(10);
+    /// assert!(group.capacity() >= 10);
+    /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
         self.group.capacity()
@@ -48,18 +95,49 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoStack, UndoGroup};
+    /// let mut group = UndoGroup::new();
+    /// group.add(UndoStack::new());
+    /// group.reserve(10);
+    /// assert!(group.capacity() >= 11);
+    /// ```
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.group.reserve(additional);
     }
 
     /// Shrinks the capacity of the `UndoGroup` as much as possible.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoStack, UndoGroup};
+    /// let mut group = UndoGroup::with_capacity(10);
+    /// group.add(UndoStack::new());
+    /// group.add(UndoStack::new());
+    /// group.add(UndoStack::new());
+    ///
+    /// assert!(group.capacity() >= 10);
+    /// group.shrink_to_fit();
+    /// assert!(group.capacity() >= 3);
+    /// ```
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.group.shrink_to_fit();
     }
 
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoStack, UndoGroup};
+    /// let mut group = UndoGroup::new();
+    /// let a = group.add(UndoStack::new());
+    /// let b = group.add(UndoStack::new());
+    /// let c = group.add(UndoStack::new());
+    /// ```
     #[inline]
     pub fn add(&mut self, stack: UndoStack<'a>) -> Id {
         let key = self.key;
@@ -70,6 +148,15 @@ impl<'a> UndoGroup<'a> {
 
     /// Removes the `UndoStack` with the specified id and returns the stack.
     /// Returns `None` if the stack was not found.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoStack, UndoGroup};
+    /// let mut group = UndoGroup::new();
+    /// let a = group.add(UndoStack::new());
+    /// let stack = group.remove(a);
+    /// assert!(stack.is_some());
+    /// ```
     #[inline]
     pub fn remove(&mut self, Id(key): Id) -> Option<UndoStack<'a>> {
         // Check if it was the active stack that was removed.
@@ -82,6 +169,14 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Sets the `UndoStack` with the specified id as the current active one.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoStack, UndoGroup};
+    /// let mut group = UndoGroup::new();
+    /// let a = group.add(UndoStack::new());
+    /// group.set_active(&a);
+    /// ```
     #[inline]
     pub fn set_active(&mut self, &Id(key): &Id) {
         if self.group.contains_key(&key) {
@@ -90,6 +185,15 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Clears the current active `UndoStack`.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoStack, UndoGroup};
+    /// let mut group = UndoGroup::new();
+    /// let a = group.add(UndoStack::new());
+    /// group.set_active(&a);
+    /// group.clear_active();
+    /// ```
     #[inline]
     pub fn clear_active(&mut self) {
         self.active = None;
@@ -97,6 +201,43 @@ impl<'a> UndoGroup<'a> {
 
     /// Calls [`is_clean`] on the active `UndoStack`, if there is one.
     /// Returns `None` if there is no active stack.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoCmd, UndoStack, UndoGroup};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #   vec: *mut Vec<i32>,
+    /// #   e: Option<i32>,
+    /// # }
+    /// # impl UndoCmd for PopCmd {
+    /// #   fn redo(&mut self) {
+    /// #       self.e = unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.pop()
+    /// #       }
+    /// #   }
+    /// #   fn undo(&mut self) {
+    /// #       unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.push(self.e.unwrap());
+    /// #       }
+    /// #   }
+    /// # }
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut group = UndoGroup::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// let a = group.add(UndoStack::new());
+    /// assert_eq!(group.is_clean(), None);
+    /// group.set_active(&a);
+    ///
+    /// assert_eq!(group.is_clean(), Some(true)); // An empty stack is always clean.
+    /// group.push(cmd);
+    /// assert_eq!(group.is_clean(), Some(true));
+    /// group.undo();
+    /// assert_eq!(group.is_clean(), Some(false));
+    /// ```
     ///
     /// [`is_clean`]: struct.UndoStack.html#method.is_clean
     #[inline]
@@ -107,6 +248,43 @@ impl<'a> UndoGroup<'a> {
     /// Calls [`is_dirty`] on the active `UndoStack`, if there is one.
     /// Returns `None` if there is no active stack.
     ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoCmd, UndoStack, UndoGroup};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #   vec: *mut Vec<i32>,
+    /// #   e: Option<i32>,
+    /// # }
+    /// # impl UndoCmd for PopCmd {
+    /// #   fn redo(&mut self) {
+    /// #       self.e = unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.pop()
+    /// #       }
+    /// #   }
+    /// #   fn undo(&mut self) {
+    /// #       unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.push(self.e.unwrap());
+    /// #       }
+    /// #   }
+    /// # }
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut group = UndoGroup::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// let a = group.add(UndoStack::new());
+    /// assert_eq!(group.is_dirty(), None);
+    /// group.set_active(&a);
+    ///
+    /// assert_eq!(group.is_dirty(), Some(false)); // An empty stack is always clean.
+    /// group.push(cmd);
+    /// assert_eq!(group.is_dirty(), Some(false));
+    /// group.undo();
+    /// assert_eq!(group.is_dirty(), Some(true));
+    /// ```
+    ///
     /// [`is_dirty`]: struct.UndoStack.html#method.is_dirty
     #[inline]
     pub fn is_dirty(&self) -> Option<bool> {
@@ -116,10 +294,46 @@ impl<'a> UndoGroup<'a> {
     /// Calls [`push`] on the active `UndoStack`, if there is one.
     /// Does nothing if there is no active stack.
     ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoCmd, UndoStack, UndoGroup};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #   vec: *mut Vec<i32>,
+    /// #   e: Option<i32>,
+    /// # }
+    /// # impl UndoCmd for PopCmd {
+    /// #   fn redo(&mut self) {
+    /// #       self.e = unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.pop()
+    /// #       }
+    /// #   }
+    /// #   fn undo(&mut self) {
+    /// #       unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.push(self.e.unwrap());
+    /// #       }
+    /// #   }
+    /// # }
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut group = UndoGroup::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// let a = group.add(UndoStack::new());
+    /// group.set_active(&a);
+    ///
+    /// group.push(cmd);
+    /// group.push(cmd);
+    /// group.push(cmd);
+    ///
+    /// assert!(vec.is_empty());
+    /// ```
+    ///
     /// [`push`]: struct.UndoStack.html#method.push
     #[inline]
     pub fn push<T>(&mut self, cmd: T)
-        where T: UndoCmd + 'a,
+        where T: UndoCmd + 'a
     {
         if let Some(ref active) = self.active {
             let stack = self.group.get_mut(active).unwrap();
@@ -129,6 +343,54 @@ impl<'a> UndoGroup<'a> {
 
     /// Calls [`redo`] on the active `UndoStack`, if there is one.
     /// Does nothing if there is no active stack.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoCmd, UndoStack, UndoGroup};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #   vec: *mut Vec<i32>,
+    /// #   e: Option<i32>,
+    /// # }
+    /// # impl UndoCmd for PopCmd {
+    /// #   fn redo(&mut self) {
+    /// #       self.e = unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.pop()
+    /// #       }
+    /// #   }
+    /// #   fn undo(&mut self) {
+    /// #       unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.push(self.e.unwrap());
+    /// #       }
+    /// #   }
+    /// # }
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut group = UndoGroup::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// let a = group.add(UndoStack::new());
+    /// group.set_active(&a);
+    ///
+    /// group.push(cmd);
+    /// group.push(cmd);
+    /// group.push(cmd);
+    ///
+    /// assert!(vec.is_empty());
+    ///
+    /// group.undo();
+    /// group.undo();
+    /// group.undo();
+    ///
+    /// assert_eq!(vec, vec![1, 2, 3]);
+    ///
+    /// group.redo();
+    /// group.redo();
+    /// group.redo();
+    ///
+    /// assert!(vec.is_empty());
+    /// ```
     ///
     /// [`redo`]: struct.UndoStack.html#method.redo
     #[inline]
@@ -141,6 +403,48 @@ impl<'a> UndoGroup<'a> {
 
     /// Calls [`undo`] on the active `UndoStack`, if there is one.
     /// Does nothing if there is no active stack.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{UndoCmd, UndoStack, UndoGroup};
+    /// # #[derive(Clone, Copy)]
+    /// # struct PopCmd {
+    /// #   vec: *mut Vec<i32>,
+    /// #   e: Option<i32>,
+    /// # }
+    /// # impl UndoCmd for PopCmd {
+    /// #   fn redo(&mut self) {
+    /// #       self.e = unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.pop()
+    /// #       }
+    /// #   }
+    /// #   fn undo(&mut self) {
+    /// #       unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.push(self.e.unwrap());
+    /// #       }
+    /// #   }
+    /// # }
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut group = UndoGroup::new();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// let a = group.add(UndoStack::new());
+    /// group.set_active(&a);
+    ///
+    /// group.push(cmd);
+    /// group.push(cmd);
+    /// group.push(cmd);
+    ///
+    /// assert!(vec.is_empty());
+    ///
+    /// group.undo();
+    /// group.undo();
+    /// group.undo();
+    ///
+    /// assert_eq!(vec, vec![1, 2, 3]);
+    /// ```
     ///
     /// [`undo`]: struct.UndoStack.html#method.undo
     #[inline]

@@ -33,10 +33,10 @@ use UndoCmd;
 ///     }
 /// }
 /// ```
-/// *Unsafe code is used since it is less verbose than using* `Rc` *and* `RefCell`.
 ///
 /// [on_clean]: struct.UndoStack.html#method.on_clean
 /// [on_dirty]: struct.UndoStack.html#method.on_dirty
+#[derive(Default)]
 pub struct UndoStack<'a> {
     // All commands on the stack.
     stack: Vec<Box<UndoCmd + 'a>>,
@@ -59,7 +59,7 @@ impl<'a> UndoStack<'a> {
     /// let stack = UndoStack::new();
     /// ```
     #[inline]
-    pub fn new() -> Self {
+    pub fn new() -> UndoStack<'a> {
         UndoStack {
             stack: Vec::new(),
             idx: 0,
@@ -115,7 +115,7 @@ impl<'a> UndoStack<'a> {
     /// assert_eq!(vec, vec![1, 2]);
     /// ```
     #[inline]
-    pub fn with_limit(limit: usize) -> Self {
+    pub fn with_limit(limit: usize) -> UndoStack<'a> {
         UndoStack {
             stack: Vec::new(),
             idx: 0,
@@ -135,7 +135,7 @@ impl<'a> UndoStack<'a> {
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Self {
+    pub fn with_capacity(capacity: usize) -> UndoStack<'a> {
         UndoStack {
             stack: Vec::with_capacity(capacity),
             idx: 0,
@@ -155,7 +155,7 @@ impl<'a> UndoStack<'a> {
     /// assert_eq!(stack.limit(), Some(10));
     /// ```
     #[inline]
-    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> Self {
+    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> UndoStack<'a> {
         UndoStack {
             stack: Vec::with_capacity(capacity),
             idx: 0,
@@ -290,7 +290,7 @@ impl<'a> UndoStack<'a> {
     /// ```
     #[inline]
     pub fn on_clean<F>(&mut self, f: F)
-        where F: FnMut() + 'a,
+        where F: FnMut() + 'a
     {
         self.on_clean = Some(Box::new(f));
     }
@@ -307,7 +307,7 @@ impl<'a> UndoStack<'a> {
     /// ```
     #[inline]
     pub fn on_dirty<F>(&mut self, f: F)
-        where F: FnMut() + 'a,
+        where F: FnMut() + 'a
     {
         self.on_dirty = Some(Box::new(f));
     }
@@ -340,15 +340,10 @@ impl<'a> UndoStack<'a> {
     /// let mut stack = UndoStack::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    /// // An empty stack is always clean.
-    /// assert!(stack.is_clean());
-    ///
+    /// assert!(stack.is_clean()); // An empty stack is always clean.
     /// stack.push(cmd);
-    ///
     /// assert!(stack.is_clean());
-    ///
     /// stack.undo();
-    ///
     /// assert!(!stack.is_clean());
     /// ```
     #[inline]
@@ -384,15 +379,10 @@ impl<'a> UndoStack<'a> {
     /// let mut stack = UndoStack::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    /// // An empty stack is always clean.
-    /// assert!(!stack.is_dirty());
-    ///
+    /// assert!(!stack.is_dirty()); // An empty stack is always clean.
     /// stack.push(cmd);
-    ///
     /// assert!(!stack.is_dirty());
-    ///
     /// stack.undo();
-    ///
     /// assert!(stack.is_dirty());
     /// ```
     #[inline]
@@ -440,7 +430,7 @@ impl<'a> UndoStack<'a> {
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     pub fn push<T>(&mut self, mut cmd: T)
-        where T: UndoCmd + 'a,
+        where T: UndoCmd + 'a
     {
         let is_dirty = self.is_dirty();
         let len = self.idx;
@@ -619,13 +609,6 @@ impl<'a> UndoStack<'a> {
                 }
             }
         }
-    }
-}
-
-impl<'a> Default for UndoStack<'a> {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
     }
 }
 
