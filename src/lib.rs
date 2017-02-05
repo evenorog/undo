@@ -11,7 +11,7 @@
 //!
 //! # Examples
 //! ```
-//! use undo::{UndoCmd, UndoStack};
+//! use undo::{self, UndoCmd, UndoStack};
 //!
 //! #[derive(Clone, Copy)]
 //! struct PopCmd {
@@ -20,36 +20,45 @@
 //! }
 //!
 //! impl UndoCmd for PopCmd {
-//!     fn redo(&mut self) {
+//!     type Err = ();
+//!
+//!     fn redo(&mut self) -> undo::Result<()> {
 //!         self.e = unsafe {
 //!             let ref mut vec = *self.vec;
 //!             vec.pop()
-//!         }
+//!         };
+//!         Ok(())
 //!     }
 //!
-//!     fn undo(&mut self) {
+//!     fn undo(&mut self) -> undo::Result<()> {
 //!         unsafe {
 //!             let ref mut vec = *self.vec;
-//!             vec.push(self.e.unwrap());
+//!             let e = self.e.ok_or(())?;
+//!             vec.push(e);
 //!         }
+//!         Ok(())
 //!     }
 //! }
 //!
-//! let mut vec = vec![1, 2, 3];
-//! let mut stack = UndoStack::new();
-//! let cmd = PopCmd { vec: &mut vec, e: None };
+//! fn foo() -> undo::Result<()> {
+//!     let mut vec = vec![1, 2, 3];
+//!     let mut stack = UndoStack::new();
+//!     let cmd = PopCmd { vec: &mut vec, e: None };
 //!
-//! stack.push(cmd);
-//! stack.push(cmd);
-//! stack.push(cmd);
+//!     stack.push(cmd)?;
+//!     stack.push(cmd)?;
+//!     stack.push(cmd)?;
 //!
-//! assert!(vec.is_empty());
+//!     assert!(vec.is_empty());
 //!
-//! stack.undo();
-//! stack.undo();
-//! stack.undo();
+//!     stack.undo()?;
+//!     stack.undo()?;
+//!     stack.undo()?;
 //!
-//! assert_eq!(vec.len(), 3);
+//!     assert_eq!(vec.len(), 3);
+//!     Ok(())
+//! }
+//! # foo().unwrap();
 //! ```
 //!
 //! *An unsafe implementation of `redo` and `undo` is used in examples since it is less verbose and
@@ -69,6 +78,7 @@ pub use group::UndoGroup;
 pub use stack::UndoStack;
 
 use std::fmt;
+use std::result;
 
 type Key = u32;
 
@@ -82,15 +92,26 @@ type Key = u32;
 #[derive(Debug)]
 pub struct Id(Key);
 
+/// Error type for `undo`.
+pub type Result<E> = result::Result<(), E>;
+
 /// Every command needs to implement the `UndoCmd` trait to be able to be used with the `UndoStack`.
 pub trait UndoCmd {
-    /// Executes the desired command.
-    fn redo(&mut self);
+    /// The error type.
+    ///
+    /// This needs to be the same for all `UndoCmd`s that is going to be used in the same stack or
+    /// group.
+    type Err;
 
-    /// Restores the state as it was before [`redo`] was called.
+    /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
+    /// something went wrong.
+    fn redo(&mut self) -> Result<Self::Err>;
+
+    /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
+    /// went fine, and `Err` if something went wrong.
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
-    fn undo(&mut self);
+    fn undo(&mut self) -> Result<Self::Err>;
 
     /// Used for merging of `UndoCmd`s.
     ///
@@ -103,7 +124,7 @@ pub trait UndoCmd {
     ///
     /// # Examples
     /// ```
-    /// use undo::{UndoCmd, UndoStack};
+    /// use undo::{self, UndoCmd, UndoStack};
     ///
     /// #[derive(Clone, Copy)]
     /// struct PopCmd {
@@ -112,18 +133,23 @@ pub trait UndoCmd {
     /// }
     ///
     /// impl UndoCmd for PopCmd {
-    ///     fn redo(&mut self) {
+    ///     type Err = ();
+    ///
+    ///     fn redo(&mut self) -> undo::Result<()> {
     ///         self.e = unsafe {
     ///             let ref mut vec = *self.vec;
     ///             vec.pop()
-    ///         }
+    ///         };
+    ///         Ok(())
     ///     }
     ///
-    ///     fn undo(&mut self) {
+    ///     fn undo(&mut self) -> undo::Result<()> {
     ///         unsafe {
     ///             let ref mut vec = *self.vec;
-    ///             vec.push(self.e.unwrap());
+    ///             let e = self.e.ok_or(())?;
+    ///             vec.push(e);
     ///         }
+    ///         Ok(())
     ///     }
     ///
     ///     fn id(&self) -> Option<u64> {
@@ -131,19 +157,23 @@ pub trait UndoCmd {
     ///     }
     /// }
     ///
-    /// let mut vec = vec![1, 2, 3];
-    /// let mut stack = UndoStack::new();
-    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    /// fn foo() -> undo::Result<()> {
+    ///     let mut vec = vec![1, 2, 3];
+    ///     let mut stack = UndoStack::new();
+    ///     let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    /// stack.push(cmd);
-    /// stack.push(cmd);
-    /// stack.push(cmd);
+    ///     stack.push(cmd)?;
+    ///     stack.push(cmd)?;
+    ///     stack.push(cmd)?;
     ///
-    /// assert!(vec.is_empty());
-    /// stack.undo();
-    /// assert_eq!(vec.len(), 3);
-    /// stack.redo();
-    /// assert!(vec.is_empty());
+    ///     assert!(vec.is_empty());
+    ///     stack.undo()?;
+    ///     assert_eq!(vec.len(), 3);
+    ///     stack.redo()?;
+    ///     assert!(vec.is_empty());
+    ///     Ok(())
+    /// }
+    /// # foo().unwrap();
     /// ```
     #[inline]
     fn id(&self) -> Option<u64> {
@@ -151,7 +181,7 @@ pub trait UndoCmd {
     }
 }
 
-impl<'a> fmt::Debug for UndoCmd + 'a {
+impl<'a, E> fmt::Debug for UndoCmd<Err = E> + 'a {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.id() {
