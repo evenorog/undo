@@ -347,7 +347,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     /// [`push`]: struct.UndoStack.html#method.push
     #[inline]
     pub fn push<T>(&mut self, cmd: T) -> Option<Result<E>>
-        where T: UndoCmd<Err = E> + 'a
+        where T: UndoCmd<Err=E> + 'a
     {
         self.active.map(|active| self.group.get_mut(&active).unwrap().push(cmd))
     }
@@ -469,7 +469,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
 
 #[cfg(test)]
 mod test {
-    use {UndoCmd, UndoStack, UndoGroup};
+    use super::*;
 
     struct PopCmd {
         vec: *mut Vec<i32>,
@@ -479,7 +479,7 @@ mod test {
     impl UndoCmd for PopCmd {
         type Err = ();
 
-        fn redo(&mut self) -> ::Result<()> {
+        fn redo(&mut self) -> Result<()> {
             self.e = unsafe {
                 let ref mut vec = *self.vec;
                 vec.pop()
@@ -487,7 +487,7 @@ mod test {
             Ok(())
         }
 
-        fn undo(&mut self) -> ::Result<()> {
+        fn undo(&mut self) -> Result<()> {
             unsafe {
                 let ref mut vec = *self.vec;
                 let e = self.e.ok_or(())?;

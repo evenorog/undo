@@ -44,7 +44,7 @@ use {Result, UndoCmd};
 #[derive(Default)]
 pub struct UndoStack<'a, E> {
     // All commands on the stack.
-    stack: Vec<Box<UndoCmd<Err = E> + 'a>>,
+    stack: Vec<Box<UndoCmd<Err=E> + 'a>>,
     // Current position in the stack.
     idx: usize,
     // Max amount of commands allowed on the stack.
@@ -546,7 +546,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     pub fn push<T>(&mut self, mut cmd: T) -> Result<E>
-        where T: UndoCmd<Err = E> + 'a
+        where T: UndoCmd<Err=E> + 'a
     {
         let is_dirty = self.is_dirty();
         let len = self.idx;
@@ -753,8 +753,8 @@ impl<'a, E> fmt::Debug for UndoStack<'a, E> {
 }
 
 struct MergeCmd<'a, E> {
-    cmd1: Box<UndoCmd<Err = E> + 'a>,
-    cmd2: Box<UndoCmd<Err = E> + 'a>,
+    cmd1: Box<UndoCmd<Err=E> + 'a>,
+    cmd2: Box<UndoCmd<Err=E> + 'a>,
 }
 
 impl<'a, E: 'a> UndoCmd for MergeCmd<'a, E> {
@@ -782,7 +782,7 @@ impl<'a, E: 'a> UndoCmd for MergeCmd<'a, E> {
 
 #[cfg(test)]
 mod test {
-    use {UndoCmd, UndoStack};
+    use super::*;
 
     #[derive(Clone, Copy)]
     struct PopCmd {
@@ -793,7 +793,7 @@ mod test {
     impl UndoCmd for PopCmd {
         type Err = ();
 
-        fn redo(&mut self) -> ::Result<()> {
+        fn redo(&mut self) -> Result<()> {
             self.e = unsafe {
                 let ref mut vec = *self.vec;
                 vec.pop()
@@ -801,7 +801,7 @@ mod test {
             Ok(())
         }
 
-        fn undo(&mut self) -> ::Result<()> {
+        fn undo(&mut self) -> Result<()> {
             unsafe {
                 let ref mut vec = *self.vec;
                 vec.push(self.e.ok_or(())?);

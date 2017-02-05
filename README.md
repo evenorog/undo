@@ -1,17 +1,16 @@
 # Undo
 An undo/redo library.
 
+## About
 It uses the [Command Pattern](https://en.wikipedia.org/wiki/Command_pattern) where the user
-implements the `UndoCmd` trait for each command and then the commands can be used with the
-`UndoStack`.
+implements the `UndoCmd` trait for each command.
 
-The `UndoStack` has two different states, clean and dirty. The stack is in a clean state when
-there are no more commands that can be redone, otherwise it's in a dirty state. The stack
-can be configured to call a given method when this state changes, using the `on_clean` and
-`on_dirty` methods.
+The `UndoStack` has two states, clean and dirty. The stack is clean when no more commands can
+be redone, otherwise it is dirty. The stack will notice when it's state changes to either dirty
+or clean, and call the user defined methods set in `on_clean` and `on_dirty`. This is useful if
+you want to trigger some event when the state changes, eg. enabling and disabling buttons in an ui.
 
-The `UndoStack` also supports easy merging of commands by just implementing the `id` method
-for a given command.
+It also supports automatic merging of commands that has the same id.
 
 [![Build Status](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
@@ -19,50 +18,56 @@ for a given command.
 
 ```toml
 [dependencies]
-undo = "0.4.0"
+undo = "0.5.0"
 ```
 
 ## Examples
 ```rust
-extern crate undo;
+use undo::{self, UndoCmd, UndoStack};
 
-use std::rc::Rc;
-use std::cell::RefCell;
-use undo::{UndoCmd, UndoStack};
-
-/// Pops an element from a vector.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct PopCmd {
-    vec: Rc<RefCell<Vec<i32>>>,
+    vec: *mut Vec<i32>,
     e: Option<i32>,
 }
 
 impl UndoCmd for PopCmd {
-    fn redo(&mut self) {
-        self.e = self.vec.borrow_mut().pop();
+    type Err = ();
+
+    fn redo(&mut self) -> undo::Result<()> {
+        self.e = unsafe {
+            let ref mut vec = *self.vec;
+            vec.pop()
+        };
+        Ok(())
     }
 
-    fn undo(&mut self) {
-        self.vec.borrow_mut().push(self.e.unwrap());
-        self.e = None;
+    fn undo(&mut self) -> undo::Result<()> {
+        unsafe {
+            let ref mut vec = *self.vec;
+            let e = self.e.ok_or(())?;
+            vec.push(e);
+        }
+        Ok(())
     }
 }
 
-fn main() {
-    let vec = Rc::new(RefCell::new(vec![1, 2, 3]));
+fn foo() -> undo::Result<()> {
+    let mut vec = vec![1, 2, 3];
     let mut stack = UndoStack::new();
-    let cmd = PopCmd { vec: vec.clone(), e: None };
+    let cmd = PopCmd { vec: &mut vec, e: None };
 
-    stack.push(cmd.clone());
-    stack.push(cmd.clone());
-    stack.push(cmd.clone());
+    stack.push(cmd)?;
+    stack.push(cmd)?;
+    stack.push(cmd)?;
 
-    assert!(vec.borrow().is_empty());
+    assert!(vec.is_empty());
 
-    stack.undo();
-    stack.undo();
-    stack.undo();
+    stack.undo()?;
+    stack.undo()?;
+    stack.undo()?;
 
-    assert_eq!(vec.borrow().len(), 3);
+    assert_eq!(vec.len(), 3);
+    Ok(())
 }
 ```

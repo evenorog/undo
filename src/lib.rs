@@ -1,10 +1,11 @@
 //! An undo/redo library.
 //!
+//! # About
 //! It uses the [Command Pattern] where the user implements the `UndoCmd` trait for each command.
 //!
 //! The `UndoStack` has two states, clean and dirty. The stack is clean when no more commands can
 //! be redone, otherwise it is dirty. The stack will notice when it's state changes to either dirty
-//! or clean, and call the user defined methods set in [on_clean] and [on_dirty]. This is useful if
+//! or clean, and call the user defined methods set in [`on_clean`] and [`on_dirty`]. This is useful if
 //! you want to trigger some event when the state changes, eg. enabling and disabling buttons in an ui.
 //!
 //! It also supports [automatic merging] of commands that has the same id.
@@ -65,8 +66,8 @@
 //! makes the examples easier to follow.*
 //!
 //! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
-//! [on_clean]: struct.UndoStack.html#method.on_clean
-//! [on_dirty]: struct.UndoStack.html#method.on_dirty
+//! [`on_clean`]: struct.UndoStack.html#method.on_clean
+//! [`on_dirty`]: struct.UndoStack.html#method.on_dirty
 //! [automatic merging]: trait.UndoCmd.html#method.id
 
 extern crate fnv;
@@ -92,10 +93,12 @@ type Key = u32;
 #[derive(Debug)]
 pub struct Id(Key);
 
-/// Error type for `undo`.
+/// A specialized `Result` that does not carry any data on success.
 pub type Result<E> = result::Result<(), E>;
 
-/// Every command needs to implement the `UndoCmd` trait to be able to be used with the `UndoStack`.
+/// Trait that defines the functionality of a command.
+///
+/// Every command needs to implement this trait to be able to be used with the `UndoStack`.
 pub trait UndoCmd {
     /// The error type.
     ///
