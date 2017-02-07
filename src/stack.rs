@@ -3,7 +3,9 @@ use {Result, UndoCmd};
 
 /// Maintains a stack of `UndoCmd`s.
 ///
-/// `UndoStack` will notice when it's state changes to either dirty or clean, and call the user
+/// `UndoStack` uses dynamic dispatch so it can hold multiple types of commands at a given time.
+///
+/// It will notice when it's state changes to either dirty or clean, and call the user
 /// defined methods set in [on_clean] and [on_dirty]. This is useful if you want to trigger some
 /// event when the state changes, eg. enabling and disabling buttons in an ui.
 ///
@@ -81,6 +83,9 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     ///
     /// The stack may remove multiple commands at a time to increase performance.
     ///
+    /// # Panics
+    /// Panics if `limit` is 0.
+    ///
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
@@ -128,6 +133,8 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     #[inline]
     pub fn with_limit(limit: usize) -> UndoStack<'a, E> {
+        assert_ne!(limit, 0);
+
         UndoStack {
             stack: Vec::new(),
             idx: 0,
@@ -138,6 +145,8 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     }
 
     /// Creates a new `UndoStack` with the specified [capacity].
+    ///
+    ///
     /// # Examples
     /// ```
     /// # use undo::UndoStack;
@@ -159,6 +168,9 @@ impl<'a, E: 'a> UndoStack<'a, E> {
 
     /// Creates a new `UndoStack` with the specified capacity and limit.
     ///
+    /// # Panics
+    /// Panics if `limit` is 0.
+    ///
     /// # Examples
     /// ```
     /// # use undo::UndoStack;
@@ -168,6 +180,8 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     #[inline]
     pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> UndoStack<'a, E> {
+        assert_ne!(limit, 0);
+
         UndoStack {
             stack: Vec::with_capacity(capacity),
             idx: 0,
@@ -336,7 +350,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # fn foo() -> undo::Result<()> {
     /// let mut vec = vec![1, 2, 3];
     /// let x = Cell::new(0);
-    /// let mut stack = UndoStack::<()>::new();
+    /// let mut stack = UndoStack::new();
     /// stack.on_clean(|| x.set(1));
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
@@ -388,7 +402,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # fn foo() -> undo::Result<()> {
     /// let mut vec = vec![1, 2, 3];
     /// let x = Cell::new(0);
-    /// let mut stack = UndoStack::<()>::new();
+    /// let mut stack = UndoStack::new();
     /// stack.on_dirty(|| x.set(1));
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
@@ -552,7 +566,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         let len = self.idx;
         // Pop off all elements after len from stack.
         self.stack.truncate(len);
-        let result = cmd.redo()?;
+        cmd.redo()?;
 
         if len == 0 {
             self.idx += 1;
@@ -594,7 +608,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                 f();
             }
         }
-        Ok(result)
+        Ok(())
     }
 
     /// Calls the [`redo`] method for the active `UndoCmd` and sets the next `UndoCmd` as the new

@@ -303,7 +303,9 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     }
 
     /// Calls [`push`] on the active `UndoStack`, if there is one.
-    /// Returns `None` if there is no active stack.
+    ///
+    /// Returns `Some(Ok)` if everything went fine, `Some(Err)` if something went wrong, and `None`
+    /// if there is no active stack.
     ///
     /// # Examples
     /// ```
@@ -353,7 +355,9 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     }
 
     /// Calls [`redo`] on the active `UndoStack`, if there is one.
-    /// Returns `None` if there is no active stack.
+    ///
+    /// Returns `Some(Ok)` if everything went fine, `Some(Err)` if something went wrong, and `None`
+    /// if there is no active stack.
     ///
     /// # Examples
     /// ```
@@ -413,7 +417,9 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     }
 
     /// Calls [`undo`] on the active `UndoStack`, if there is one.
-    /// Returns `None` if there is no active stack.
+    ///
+    /// Returns `Some(Ok)` if everything went fine, `Some(Err)` if something went wrong, and `None`
+    /// if there is no active stack.
     ///
     /// # Examples
     /// ```

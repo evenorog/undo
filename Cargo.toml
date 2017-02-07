@@ -1,8 +1,8 @@
 [package]
 name = "undo"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["evenorog <evenorog@gmail.com>"]
-description = "An undo/redo library with state awareness and automatic command merging."
+description = "An undo/redo library with dynamic dispatch, state handling and automatic command merging."
 documentation = "https://docs.rs/undo"
 repository = "https://github.com/evenorog/undo"
 readme = "README.md"

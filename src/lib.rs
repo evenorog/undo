@@ -8,7 +8,23 @@
 //! or clean, and call the user defined methods set in [`on_clean`] and [`on_dirty`]. This is useful if
 //! you want to trigger some event when the state changes, eg. enabling and disabling buttons in an ui.
 //!
-//! It also supports [automatic merging] of commands that has the same id.
+//! It also supports [automatic merging] of commands with the same id.
+//!
+//! # Redo vs Undo
+//! |                 | Redo         | Undo            |
+//! |-----------------|--------------|-----------------|
+//! | Dispatch        | Static       | Dynamic         |
+//! | State Handling  | Yes          | Yes             |
+//! | Command Merging | Yes (manual) | Yes (automatic) |
+//!
+//! `undo` uses [dynamic dispatch] instead of [static dispatch] to store the commands, which means
+//! it has some additional overhead compared to [`redo`]. However, this has the benefit that you
+//! can store multiple types of commands in a `UndoStack` at a time. Both supports state handling
+//! and command merging but `undo` will automatically merge commands with the same id, while
+//! in `redo` you need to implement the merge method yourself.
+//!
+//! I recommend using `undo` by default and to use `redo` when performance is important.
+//! They have similar API, so it should be easy to switch between them if necessary.
 //!
 //! # Examples
 //! ```
@@ -69,6 +85,9 @@
 //! [`on_clean`]: struct.UndoStack.html#method.on_clean
 //! [`on_dirty`]: struct.UndoStack.html#method.on_dirty
 //! [automatic merging]: trait.UndoCmd.html#method.id
+//! [static dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#static-dispatch
+//! [dynamic dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
+//! [`redo`]: https://crates.io/crates/redo
 
 extern crate fnv;
 
@@ -84,12 +103,6 @@ use std::result;
 type Key = u32;
 
 /// An unique id for an `UndoStack`.
-///
-/// This id is returned from the [add] method and consumed when calling the [remove] method in
-/// `UndoGroup`.
-///
-/// [add]: struct.UndoGroup.html#method.add
-/// [remove]: struct.UndoGroup.html#method.remove
 #[derive(Debug)]
 pub struct Id(Key);
 
