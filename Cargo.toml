@@ -1,6 +1,6 @@
 [package]
 name = "undo"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "An undo/redo library with dynamic dispatch, state handling and automatic command merging."
 documentation = "https://docs.rs/undo"
@@ -11,3 +11,6 @@ keywords = ["undo", "redo"]
 
 [dependencies]
 fnv = "1.0.5"
+
+[features]
+no_state = []

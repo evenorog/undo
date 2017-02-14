@@ -31,10 +31,18 @@ in `redo` you need to implement the merge method yourself.
 I recommend using `undo` by default and to use `redo` when performance is important.
 They have similar API, so it should be easy to switch between them if necessary.
 
+## Disable State Handling
+If state handling is not needed, it can be disabled by setting the `no_state` feature flag.
+
+```toml
+[dependencies]
+undo = { version = "0.5.2", features = ["no_state"] }
+```
+
 ## Examples
 ```toml
 [dependencies]
-undo = "0.5.1"
+undo = "0.5.2"
 ```
 
 ```rust

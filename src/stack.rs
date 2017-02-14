@@ -52,8 +52,10 @@ pub struct UndoStack<'a, E> {
     // Max amount of commands allowed on the stack.
     limit: Option<usize>,
     // Called when the state changes from dirty to clean.
+    #[cfg(not(feature = "no_state"))]
     on_clean: Option<Box<FnMut() + 'a>>,
     // Called when the state changes from clean to dirty.
+    #[cfg(not(feature = "no_state"))]
     on_dirty: Option<Box<FnMut() + 'a>>,
 }
 
@@ -67,12 +69,24 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     #[inline]
     pub fn new() -> UndoStack<'a, E> {
-        UndoStack {
-            stack: Vec::new(),
-            idx: 0,
-            limit: None,
-            on_clean: None,
-            on_dirty: None,
+        #[cfg(not(feature = "no_state"))]
+        {
+            UndoStack {
+                stack: Vec::new(),
+                idx: 0,
+                limit: None,
+                on_clean: None,
+                on_dirty: None,
+            }
+        }
+
+        #[cfg(feature = "no_state")]
+        {
+            UndoStack {
+                stack: Vec::new(),
+                idx: 0,
+                limit: None,
+            }
         }
     }
 
@@ -84,7 +98,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// The stack may remove multiple commands at a time to increase performance.
     ///
     /// # Panics
-    /// Panics if `limit` is 0.
+    /// Panics if `limit` is `0`.
     ///
     /// # Examples
     /// ```
@@ -135,12 +149,24 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     pub fn with_limit(limit: usize) -> UndoStack<'a, E> {
         assert_ne!(limit, 0);
 
-        UndoStack {
-            stack: Vec::new(),
-            idx: 0,
-            limit: Some(limit),
-            on_clean: None,
-            on_dirty: None,
+        #[cfg(not(feature = "no_state"))]
+        {
+            UndoStack {
+                stack: Vec::new(),
+                idx: 0,
+                limit: Some(limit),
+                on_clean: None,
+                on_dirty: None,
+            }
+        }
+
+        #[cfg(feature = "no_state")]
+        {
+            UndoStack {
+                stack: Vec::new(),
+                idx: 0,
+                limit: Some(limit),
+            }
         }
     }
 
@@ -157,19 +183,31 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
     pub fn with_capacity(capacity: usize) -> UndoStack<'a, E> {
-        UndoStack {
-            stack: Vec::with_capacity(capacity),
-            idx: 0,
-            limit: None,
-            on_clean: None,
-            on_dirty: None,
+        #[cfg(not(feature = "no_state"))]
+        {
+            UndoStack {
+                stack: Vec::with_capacity(capacity),
+                idx: 0,
+                limit: None,
+                on_clean: None,
+                on_dirty: None,
+            }
+        }
+
+        #[cfg(feature = "no_state")]
+        {
+            UndoStack {
+                stack: Vec::with_capacity(capacity),
+                idx: 0,
+                limit: None,
+            }
         }
     }
 
     /// Creates a new `UndoStack` with the specified capacity and limit.
     ///
     /// # Panics
-    /// Panics if `limit` is 0.
+    /// Panics if `limit` is `0`.
     ///
     /// # Examples
     /// ```
@@ -182,12 +220,24 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> UndoStack<'a, E> {
         assert_ne!(limit, 0);
 
-        UndoStack {
-            stack: Vec::with_capacity(capacity),
-            idx: 0,
-            limit: Some(limit),
-            on_clean: None,
-            on_dirty: None,
+        #[cfg(not(feature = "no_state"))]
+        {
+            UndoStack {
+                stack: Vec::with_capacity(capacity),
+                idx: 0,
+                limit: Some(limit),
+                on_clean: None,
+                on_dirty: None,
+            }
+        }
+
+        #[cfg(feature = "no_state")]
+        {
+            UndoStack {
+                stack: Vec::with_capacity(capacity),
+                idx: 0,
+                limit: Some(limit),
+            }
         }
     }
 
@@ -363,6 +413,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # }
     /// # foo().unwrap();
     /// ```
+    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn on_clean<F>(&mut self, f: F)
         where F: FnMut() + 'a
@@ -414,6 +465,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # }
     /// # foo().unwrap();
     /// ```
+    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn on_dirty<F>(&mut self, f: F)
         where F: FnMut() + 'a
@@ -462,6 +514,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # }
     /// # foo().unwrap();
     /// ```
+    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_clean(&self) -> bool {
         self.idx == self.stack.len()
@@ -508,6 +561,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # }
     /// # foo().unwrap();
     /// ```
+    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
@@ -562,6 +616,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     pub fn push<T>(&mut self, mut cmd: T) -> Result<E>
         where T: UndoCmd<Err=E> + 'a
     {
+        #[cfg(not(feature = "no_state"))]
         let is_dirty = self.is_dirty();
         let len = self.idx;
         // Pop off all elements after len from stack.
@@ -602,10 +657,13 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         }
 
         debug_assert_eq!(self.idx, self.stack.len());
-        // State is always clean after a push, check if it was dirty before.
-        if is_dirty {
-            if let Some(ref mut f) = self.on_clean {
-                f();
+        #[cfg(not(feature = "no_state"))]
+        {
+            // State is always clean after a push, check if it was dirty before.
+            if is_dirty {
+                if let Some(ref mut f) = self.on_clean {
+                    f();
+                }
             }
         }
         Ok(())
@@ -667,18 +725,23 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
+    #[inline]
     pub fn redo(&mut self) -> Result<E> {
         if self.idx < self.stack.len() {
+            #[cfg(not(feature = "no_state"))]
             let is_dirty = self.is_dirty();
             unsafe {
                 let cmd = self.stack.get_unchecked_mut(self.idx);
                 cmd.redo()?;
             }
             self.idx += 1;
-            // Check if stack went from dirty to clean.
-            if is_dirty && self.is_clean() {
-                if let Some(ref mut f) = self.on_clean {
-                    f();
+            #[cfg(not(feature = "no_state"))]
+            {
+                // Check if stack went from dirty to clean.
+                if is_dirty && self.is_clean() {
+                    if let Some(ref mut f) = self.on_clean {
+                        f();
+                    }
                 }
             }
         }
@@ -735,8 +798,10 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     ///
     /// [`undo`]: trait.UndoCmd.html#tymethod.undo
+    #[inline]
     pub fn undo(&mut self) -> Result<E> {
         if self.idx > 0 {
+            #[cfg(not(feature = "no_state"))]
             let is_clean = self.is_clean();
             self.idx -= 1;
             debug_assert!(self.idx < self.stack.len());
@@ -744,10 +809,13 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                 let cmd = self.stack.get_unchecked_mut(self.idx);
                 cmd.undo()?;
             }
-            // Check if stack went from clean to dirty.
-            if is_clean && self.is_dirty() {
-                if let Some(ref mut f) = self.on_dirty {
-                    f();
+            #[cfg(not(feature = "no_state"))]
+            {
+                // Check if stack went from clean to dirty.
+                if is_clean && self.is_dirty() {
+                    if let Some(ref mut f) = self.on_dirty {
+                        f();
+                    }
                 }
             }
         }
@@ -777,15 +845,13 @@ impl<'a, E: 'a> UndoCmd for MergeCmd<'a, E> {
     #[inline]
     fn redo(&mut self) -> Result<E> {
         self.cmd1.redo()?;
-        self.cmd2.redo()?;
-        Ok(())
+        self.cmd2.redo()
     }
 
     #[inline]
     fn undo(&mut self) -> Result<E> {
         self.cmd2.undo()?;
-        self.cmd1.undo()?;
-        Ok(())
+        self.cmd1.undo()
     }
 
     #[inline]
@@ -824,6 +890,7 @@ mod test {
         }
     }
 
+    #[cfg(not(feature = "no_state"))]
     #[test]
     fn state() {
         use std::cell::Cell;

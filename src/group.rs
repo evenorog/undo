@@ -248,6 +248,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     /// ```
     ///
     /// [`is_clean`]: struct.UndoStack.html#method.is_clean
+    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_clean(&self) -> Option<bool> {
         self.active.map(|i| self.group[&i].is_clean())
@@ -297,6 +298,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     /// ```
     ///
     /// [`is_dirty`]: struct.UndoStack.html#method.is_dirty
+    #[cfg(not(feature = "no_state"))]
     #[inline]
     pub fn is_dirty(&self) -> Option<bool> {
         self.is_clean().map(|t| !t)
@@ -504,7 +506,7 @@ mod test {
     }
 
     #[test]
-    fn state() {
+    fn active() {
         let mut vec1 = vec![1, 2, 3];
         let mut vec2 = vec![1, 2, 3];
 

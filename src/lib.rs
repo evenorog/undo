@@ -21,12 +21,14 @@
 //! it has some additional overhead compared to [`redo`]. However, this has the benefit that you
 //! can store multiple types of commands in a `UndoStack` at a time. Both supports state handling
 //! and command merging but `undo` will automatically merge commands with the same id, while
-//! in `redo` you need to implement the merge method yourself.
+//! in `redo` you need to implement the merge method yourself. If state handling is not needed, it
+//! can be disabled by setting the `no_state` feature flag.
 //!
 //! I recommend using `undo` by default and to use `redo` when performance is important.
 //! They have similar API, so it should be easy to switch between them if necessary.
 //!
 //! # Examples
+//!
 //! ```
 //! use undo::{self, UndoCmd, UndoStack};
 //!
@@ -88,6 +90,12 @@
 //! [static dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#static-dispatch
 //! [dynamic dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
 //! [`redo`]: https://crates.io/crates/redo
+
+#![deny(missing_docs,
+        missing_debug_implementations,
+        unstable_features,
+        unused_import_braces,
+        unused_qualifications)]
 
 extern crate fnv;
 
