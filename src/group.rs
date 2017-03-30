@@ -53,6 +53,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     ///
     /// # Examples
     /// ```
+    /// # #![allow(unused_variables)]
     /// # use undo::UndoGroup;
     /// let group = UndoGroup::<()>::new();
     /// ```
@@ -137,6 +138,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     ///
     /// # Examples
     /// ```
+    /// # #![allow(unused_variables)]
     /// # use undo::{UndoStack, UndoGroup};
     /// let mut group = UndoGroup::<()>::new();
     /// let a = group.add(UndoStack::new());

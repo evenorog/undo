@@ -64,6 +64,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     ///
     /// # Examples
     /// ```
+    /// # #![allow(unused_variables)]
     /// # use undo::UndoStack;
     /// let stack = UndoStack::<()>::new();
     /// ```
@@ -623,36 +624,29 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         self.stack.truncate(len);
         cmd.redo()?;
 
-        if len == 0 {
-            self.idx += 1;
-            self.stack.push(Box::new(cmd));
-        } else {
-            let idx = len - 1;
-            match (cmd.id(), unsafe { self.stack.get_unchecked(idx).id() }) {
-                (Some(id1), Some(id2)) if id1 == id2 => {
-                    // Merge the command with the one on the top of the stack.
-                    let cmd = MergeCmd {
-                        cmd1: unsafe {
-                            // Unchecked pop.
-                            self.stack.set_len(idx);
-                            ::std::ptr::read(self.stack.get_unchecked(idx))
-                        },
-                        cmd2: Box::new(cmd),
-                    };
-                    self.stack.push(Box::new(cmd));
-                },
-                _ => {
-                    match self.limit {
-                        Some(limit) if len == limit => {
-                            // Remove ~25% of the stack at once.
-                            let x = len / 4 + 1;
-                            self.stack.drain(..x);
-                            self.idx -= x - 1;
-                        },
-                        _ => self.idx += 1,
-                    }
-                    self.stack.push(Box::new(cmd));
-                },
+        match (cmd.id(), self.stack.last().and_then(|cmd| cmd.id())) {
+            (Some(id1), Some(id2)) if id1 == id2 => {
+                // Merge the command with the one on the top of the stack.
+                let cmd = MergeCmd {
+                    cmd1: unsafe {
+                        self.stack.set_len(len - 1);
+                        ::std::ptr::read(self.stack.get_unchecked(len - 1))
+                    },
+                    cmd2: Box::new(cmd),
+                };
+                self.stack.push(Box::new(cmd));
+            }
+            _ => {
+                match self.limit {
+                    Some(limit) if len == limit => {
+                        // Remove ~25% of the stack at once.
+                        let x = len / 4 + 1;
+                        self.stack.drain(..x);
+                        self.idx -= x - 1;
+                    },
+                    _ => self.idx += 1,
+                }
+                self.stack.push(Box::new(cmd));
             }
         }
 
