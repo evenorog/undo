@@ -91,9 +91,9 @@
 //! [dynamic dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
 //! [`redo`]: https://crates.io/crates/redo
 
+#![forbid(unstable_features)]
 #![deny(missing_docs,
         missing_debug_implementations,
-        unstable_features,
         unused_import_braces,
         unused_qualifications)]
 
