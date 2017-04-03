@@ -45,7 +45,7 @@ pub struct UndoGroup<'a, E> {
     // The active stack.
     active: Option<Key>,
     // Counter for generating new keys.
-    key: Key,
+    key: Key
 }
 
 impl<'a, E: 'a> UndoGroup<'a, E> {
@@ -62,7 +62,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
         UndoGroup {
             group: FnvHashMap::default(),
             active: None,
-            key: 0,
+            key: 0
         }
     }
 
@@ -79,7 +79,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
         UndoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
             active: None,
-            key: 0,
+            key: 0
         }
     }
 
@@ -483,7 +483,7 @@ mod test {
 
     struct PopCmd {
         vec: *mut Vec<i32>,
-        e: Option<i32>,
+        e: Option<i32>
     }
 
     impl UndoCmd for PopCmd {

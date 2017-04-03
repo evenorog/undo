@@ -77,7 +77,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                 idx: 0,
                 limit: None,
                 on_clean: None,
-                on_dirty: None,
+                on_dirty: None
             }
         }
 
@@ -86,7 +86,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
             UndoStack {
                 stack: Vec::new(),
                 idx: 0,
-                limit: None,
+                limit: None
             }
         }
     }
@@ -157,7 +157,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                 idx: 0,
                 limit: Some(limit),
                 on_clean: None,
-                on_dirty: None,
+                on_dirty: None
             }
         }
 
@@ -166,7 +166,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
             UndoStack {
                 stack: Vec::new(),
                 idx: 0,
-                limit: Some(limit),
+                limit: Some(limit)
             }
         }
     }
@@ -191,7 +191,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                 idx: 0,
                 limit: None,
                 on_clean: None,
-                on_dirty: None,
+                on_dirty: None
             }
         }
 
@@ -200,7 +200,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
             UndoStack {
                 stack: Vec::with_capacity(capacity),
                 idx: 0,
-                limit: None,
+                limit: None
             }
         }
     }
@@ -228,7 +228,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                 idx: 0,
                 limit: Some(limit),
                 on_clean: None,
-                on_dirty: None,
+                on_dirty: None
             }
         }
 
@@ -237,7 +237,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
             UndoStack {
                 stack: Vec::with_capacity(capacity),
                 idx: 0,
-                limit: Some(limit),
+                limit: Some(limit)
             }
         }
     }
@@ -617,6 +617,8 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     pub fn push<T>(&mut self, mut cmd: T) -> Result<E>
         where T: UndoCmd<Err=E> + 'a
     {
+        use std::ptr;
+
         #[cfg(not(feature = "no_state"))]
         let is_dirty = self.is_dirty();
         let len = self.idx;
@@ -630,9 +632,9 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                 let cmd = MergeCmd {
                     cmd1: unsafe {
                         self.stack.set_len(len - 1);
-                        ::std::ptr::read(self.stack.get_unchecked(len - 1))
+                        ptr::read(self.stack.get_unchecked(self.stack.len()))
                     },
-                    cmd2: Box::new(cmd),
+                    cmd2: Box::new(cmd)
                 };
                 self.stack.push(Box::new(cmd));
             }
@@ -643,8 +645,8 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                         let x = len / 4 + 1;
                         self.stack.drain(..x);
                         self.idx -= x - 1;
-                    },
-                    _ => self.idx += 1,
+                    }
+                    _ => self.idx += 1
                 }
                 self.stack.push(Box::new(cmd));
             }
@@ -830,7 +832,7 @@ impl<'a, E> fmt::Debug for UndoStack<'a, E> {
 
 struct MergeCmd<'a, E> {
     cmd1: Box<UndoCmd<Err=E> + 'a>,
-    cmd2: Box<UndoCmd<Err=E> + 'a>,
+    cmd2: Box<UndoCmd<Err=E> + 'a>
 }
 
 impl<'a, E: 'a> UndoCmd for MergeCmd<'a, E> {
@@ -861,7 +863,7 @@ mod test {
     #[derive(Clone, Copy)]
     struct PopCmd {
         vec: *mut Vec<i32>,
-        e: Option<i32>,
+        e: Option<i32>
     }
 
     impl UndoCmd for PopCmd {
