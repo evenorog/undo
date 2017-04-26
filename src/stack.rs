@@ -1,4 +1,5 @@
 use std::fmt;
+use std::collections::VecDeque;
 use {Result, UndoCmd};
 
 /// Maintains a stack of `UndoCmd`s.
@@ -46,7 +47,7 @@ use {Result, UndoCmd};
 #[derive(Default)]
 pub struct UndoStack<'a, E> {
     // All commands on the stack.
-    stack: Vec<Box<UndoCmd<Err=E> + 'a>>,
+    stack: VecDeque<Box<UndoCmd<Err=E> + 'a>>,
     // Current position in the stack.
     idx: usize,
     // Max amount of commands allowed on the stack.
@@ -73,7 +74,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         #[cfg(not(feature = "no_state"))]
         {
             UndoStack {
-                stack: Vec::new(),
+                stack: VecDeque::new(),
                 idx: 0,
                 limit: None,
                 on_clean: None,
@@ -84,7 +85,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         #[cfg(feature = "no_state")]
         {
             UndoStack {
-                stack: Vec::new(),
+                stack: VecDeque::new(),
                 idx: 0,
                 limit: None
             }
@@ -153,7 +154,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         #[cfg(not(feature = "no_state"))]
         {
             UndoStack {
-                stack: Vec::new(),
+                stack: VecDeque::new(),
                 idx: 0,
                 limit: Some(limit),
                 on_clean: None,
@@ -164,7 +165,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         #[cfg(feature = "no_state")]
         {
             UndoStack {
-                stack: Vec::new(),
+                stack: VecDeque::new(),
                 idx: 0,
                 limit: Some(limit)
             }
@@ -178,7 +179,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     /// # use undo::UndoStack;
     /// let stack = UndoStack::<()>::with_capacity(10);
-    /// assert_eq!(stack.capacity(), 10);
+    /// assert!(stack.capacity() >= 10);
     /// ```
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
@@ -187,7 +188,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         #[cfg(not(feature = "no_state"))]
         {
             UndoStack {
-                stack: Vec::with_capacity(capacity),
+                stack: VecDeque::with_capacity(capacity),
                 idx: 0,
                 limit: None,
                 on_clean: None,
@@ -198,7 +199,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         #[cfg(feature = "no_state")]
         {
             UndoStack {
-                stack: Vec::with_capacity(capacity),
+                stack: VecDeque::with_capacity(capacity),
                 idx: 0,
                 limit: None
             }
@@ -214,7 +215,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     /// # use undo::UndoStack;
     /// let stack = UndoStack::<()>::with_capacity_and_limit(10, 10);
-    /// assert_eq!(stack.capacity(), 10);
+    /// assert!(stack.capacity() >= 10);
     /// assert_eq!(stack.limit(), Some(10));
     /// ```
     #[inline]
@@ -224,7 +225,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         #[cfg(not(feature = "no_state"))]
         {
             UndoStack {
-                stack: Vec::with_capacity(capacity),
+                stack: VecDeque::with_capacity(capacity),
                 idx: 0,
                 limit: Some(limit),
                 on_clean: None,
@@ -235,7 +236,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         #[cfg(feature = "no_state")]
         {
             UndoStack {
-                stack: Vec::with_capacity(capacity),
+                stack: VecDeque::with_capacity(capacity),
                 idx: 0,
                 limit: Some(limit)
             }
@@ -264,7 +265,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     /// # use undo::UndoStack;
     /// let stack = UndoStack::<()>::with_capacity(10);
-    /// assert_eq!(stack.capacity(), 10);
+    /// assert!(stack.capacity() >= 10);
     /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
@@ -355,7 +356,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// stack.push(cmd)?;
     /// stack.push(cmd)?;
     ///
-    /// assert_eq!(stack.capacity(), 10);
+    /// assert!(stack.capacity() >= 10);
     /// stack.shrink_to_fit();
     /// assert!(stack.capacity() >= 3);
     /// # Ok(())
@@ -617,8 +618,6 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     pub fn push<T>(&mut self, mut cmd: T) -> Result<E>
         where T: UndoCmd<Err=E> + 'a
     {
-        use std::ptr;
-
         #[cfg(not(feature = "no_state"))]
         let is_dirty = self.is_dirty();
         let len = self.idx;
@@ -626,29 +625,23 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         self.stack.truncate(len);
         cmd.redo()?;
 
-        match (cmd.id(), self.stack.last().and_then(|cmd| cmd.id())) {
+        match (cmd.id(), self.stack.back().and_then(|cmd| cmd.id())) {
             (Some(id1), Some(id2)) if id1 == id2 => {
                 // Merge the command with the one on the top of the stack.
                 let cmd = MergeCmd {
-                    cmd1: unsafe {
-                        self.stack.set_len(len - 1);
-                        ptr::read(self.stack.get_unchecked(self.stack.len()))
-                    },
+                    cmd1: self.stack.pop_back().unwrap(),
                     cmd2: Box::new(cmd)
                 };
-                self.stack.push(Box::new(cmd));
+                self.stack.push_back(Box::new(cmd));
             }
             _ => {
                 match self.limit {
                     Some(limit) if len == limit => {
-                        // Remove ~25% of the stack at once.
-                        let x = len / 4 + 1;
-                        self.stack.drain(..x);
-                        self.idx -= x - 1;
-                    }
+                        let _ = self.stack.pop_front();
+                    },
                     _ => self.idx += 1
                 }
-                self.stack.push(Box::new(cmd));
+                self.stack.push_back(Box::new(cmd));
             }
         }
 
@@ -726,10 +719,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
         if self.idx < self.stack.len() {
             #[cfg(not(feature = "no_state"))]
             let is_dirty = self.is_dirty();
-            unsafe {
-                let cmd = self.stack.get_unchecked_mut(self.idx);
-                cmd.redo()?;
-            }
+            self.stack[self.idx].redo()?;
             self.idx += 1;
             #[cfg(not(feature = "no_state"))]
             {
@@ -800,11 +790,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
             #[cfg(not(feature = "no_state"))]
             let is_clean = self.is_clean();
             self.idx -= 1;
-            debug_assert!(self.idx < self.stack.len());
-            unsafe {
-                let cmd = self.stack.get_unchecked_mut(self.idx);
-                cmd.undo()?;
-            }
+            self.stack[self.idx].undo()?;
             #[cfg(not(feature = "no_state"))]
             {
                 // Check if stack went from clean to dirty.
@@ -921,20 +907,5 @@ mod test {
         stack.redo().unwrap();
         assert_eq!(x.get(), 0);
         assert_eq!(vec, vec![1, 2]);
-    }
-
-    #[test]
-    fn limit() {
-        let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let mut stack = UndoStack::with_limit(9);
-
-        let cmd = PopCmd { vec: &mut vec, e: None };
-
-        for _ in 0..10 {
-            stack.push(cmd).unwrap();
-        }
-
-        assert!(vec.is_empty());
-        assert_eq!(stack.stack.len(), 7);
     }
 }
