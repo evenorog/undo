@@ -1,5 +1,5 @@
 # Undo
-An undo/redo library.
+An undo/redo library with dynamic dispatch, state handling and automatic command merging.
 
 [![Build Status](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
@@ -27,9 +27,6 @@ it has some additional overhead compared to [`redo`]. However, this has the bene
 can store multiple types of commands in a `UndoStack` at a time. Both supports state handling
 and command merging but `undo` will automatically merge commands with the same id, while
 in `redo` you need to implement the merge method yourself.
-
-I recommend using `undo` by default and to use `redo` when performance is important.
-They have similar API, so it should be easy to switch between them if necessary.
 
 ## Disable State Handling
 If state handling is not needed, it can be disabled by setting the `no_state` feature flag.
