@@ -28,14 +28,6 @@ can store multiple types of commands in a `UndoStack` at a time. Both supports s
 and command merging but `undo` will automatically merge commands with the same id, while
 in `redo` you need to implement the merge method yourself.
 
-## Disable State Handling
-If state handling is not needed, it can be disabled by setting the `no_state` feature flag.
-
-```toml
-[dependencies]
-undo = { version = "0.5.2", features = ["no_state"] }
-```
-
 ## Examples
 ```toml
 [dependencies]
@@ -91,9 +83,6 @@ fn foo() -> undo::Result<()> {
     Ok(())
 }
 ```
-
-*An unsafe implementation of `redo` and `undo` is used in examples since it is less verbose and
-makes the examples easier to follow.*
 
 [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 [`on_clean`]: struct.UndoStack.html#method.on_clean

@@ -77,9 +77,6 @@
 //! # foo().unwrap();
 //! ```
 //!
-//! *An unsafe implementation of `redo` and `undo` is used in examples since it is less verbose and
-//! makes the examples easier to follow.*
-//!
 //! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 //! [`on_clean`]: struct.UndoStack.html#method.on_clean
 //! [`on_dirty`]: struct.UndoStack.html#method.on_dirty
