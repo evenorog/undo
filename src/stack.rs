@@ -1,5 +1,5 @@
-use std::fmt;
 use std::collections::VecDeque;
+use std::fmt;
 use {Result, UndoCmd};
 
 /// Maintains a stack of `UndoCmd`s.
