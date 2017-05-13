@@ -102,11 +102,9 @@ pub use stack::UndoStack;
 use std::fmt;
 use std::result;
 
-type Key = u32;
-
 /// An unique id for an `UndoStack`.
 #[derive(Debug)]
-pub struct Id(Key);
+pub struct Id(u32);
 
 /// A specialized `Result` that does not carry any data on success.
 pub type Result<E> = result::Result<(), E>;
@@ -142,56 +140,57 @@ pub trait UndoCmd {
     ///
     /// # Examples
     /// ```
-    /// use undo::{self, UndoCmd, UndoStack};
+    /// use undo::{UndoCmd, UndoStack};
     ///
-    /// #[derive(Clone, Copy)]
-    /// struct PopCmd {
-    ///     vec: *mut Vec<i32>,
-    ///     e: Option<i32>,
-    /// }
+    /// struct TxtCmd(char);
     ///
-    /// impl UndoCmd for PopCmd {
+    /// impl UndoCmd for TxtCmd {
     ///     type Err = ();
     ///
     ///     fn redo(&mut self) -> undo::Result<()> {
-    ///         self.e = unsafe {
-    ///             let ref mut vec = *self.vec;
-    ///             vec.pop()
-    ///         };
     ///         Ok(())
     ///     }
     ///
     ///     fn undo(&mut self) -> undo::Result<()> {
-    ///         unsafe {
-    ///             let ref mut vec = *self.vec;
-    ///             let e = self.e.ok_or(())?;
-    ///             vec.push(e);
-    ///         }
     ///         Ok(())
     ///     }
     ///
     ///     fn id(&self) -> Option<u64> {
-    ///         Some(1)
+    ///         // Merge cmd if not a space.
+    ///         if self.0 == ' ' {
+    ///             None
+    ///         } else {
+    ///             Some(1)
+    ///         }
     ///     }
     /// }
     ///
     /// fn foo() -> undo::Result<()> {
-    ///     let mut vec = vec![1, 2, 3];
     ///     let mut stack = UndoStack::new();
-    ///     let cmd = PopCmd { vec: &mut vec, e: None };
+    ///     stack.push(TxtCmd('a'))?;
+    ///     stack.push(TxtCmd('b'))?; // 'a' and 'b' is merged.
+    ///     stack.push(TxtCmd(' '))?;
+    ///     stack.push(TxtCmd('c'))?;
+    ///     stack.push(TxtCmd('d'))?; // 'c' and 'd' is merged.
     ///
-    ///     stack.push(cmd)?;
-    ///     stack.push(cmd)?;
-    ///     stack.push(cmd)?;
-    ///
-    ///     assert!(vec.is_empty());
-    ///     stack.undo()?;
-    ///     assert_eq!(vec.len(), 3);
-    ///     stack.redo()?;
-    ///     assert!(vec.is_empty());
+    ///     println!("{:#?}", stack);
     ///     Ok(())
     /// }
     /// # foo().unwrap();
+    /// ```
+    ///
+    /// Output:
+    ///
+    /// ```txt
+    /// UndoStack {
+    ///     stack: [
+    ///         1,
+    ///         _,
+    ///         1
+    ///     ],
+    ///     idx: 3,
+    ///     limit: None
+    /// }
     /// ```
     #[inline]
     fn id(&self) -> Option<u64> {

@@ -47,7 +47,7 @@ use {Result, UndoCmd};
 #[derive(Default)]
 pub struct UndoStack<'a, E> {
     // All commands on the stack.
-    stack: VecDeque<Box<UndoCmd<Err=E> + 'a>>,
+    stack: VecDeque<Box<UndoCmd<Err = E> + 'a>>,
     // Current position in the stack.
     idx: usize,
     // Max amount of commands allowed on the stack.
@@ -74,7 +74,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
             idx: 0,
             limit: None,
             on_clean: None,
-            on_dirty: None
+            on_dirty: None,
         }
     }
 
@@ -84,9 +84,6 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// indefinitely.
     ///
     /// The stack may remove multiple commands at a time to increase performance.
-    ///
-    /// # Panics
-    /// Panics if `limit` is `0`.
     ///
     /// # Examples
     /// ```
@@ -135,14 +132,16 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     #[inline]
     pub fn with_limit(limit: usize) -> UndoStack<'a, E> {
-        assert_ne!(limit, 0);
-
         UndoStack {
             stack: VecDeque::new(),
             idx: 0,
-            limit: Some(limit),
+            limit: if limit == 0 {
+                None
+            } else {
+                Some(limit)
+            },
             on_clean: None,
-            on_dirty: None
+            on_dirty: None,
         }
     }
 
@@ -164,14 +163,11 @@ impl<'a, E: 'a> UndoStack<'a, E> {
             idx: 0,
             limit: None,
             on_clean: None,
-            on_dirty: None
+            on_dirty: None,
         }
     }
 
     /// Creates a new `UndoStack` with the specified capacity and limit.
-    ///
-    /// # Panics
-    /// Panics if `limit` is `0`.
     ///
     /// # Examples
     /// ```
@@ -182,14 +178,16 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     #[inline]
     pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> UndoStack<'a, E> {
-        assert_ne!(limit, 0);
-
         UndoStack {
             stack: VecDeque::with_capacity(capacity),
             idx: 0,
-            limit: Some(limit),
+            limit: if limit == 0 {
+                None
+            } else {
+                Some(limit)
+            },
             on_clean: None,
-            on_dirty: None
+            on_dirty: None,
         }
     }
 
@@ -562,7 +560,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     pub fn push<T>(&mut self, mut cmd: T) -> Result<E>
-        where T: UndoCmd<Err=E> + 'a
+        where T: UndoCmd<Err = E> + 'a
     {
         let is_dirty = self.is_dirty();
         let len = self.idx;
@@ -575,7 +573,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                 // Merge the command with the one on the top of the stack.
                 let cmd = MergeCmd {
                     cmd1: self.stack.pop_back().unwrap(),
-                    cmd2: Box::new(cmd)
+                    cmd2: Box::new(cmd),
                 };
                 self.stack.push_back(Box::new(cmd));
             }
@@ -583,8 +581,8 @@ impl<'a, E: 'a> UndoStack<'a, E> {
                 match self.limit {
                     Some(limit) if len == limit => {
                         let _ = self.stack.pop_front();
-                    },
-                    _ => self.idx += 1
+                    }
+                    _ => self.idx += 1,
                 }
                 self.stack.push_back(Box::new(cmd));
             }
@@ -751,8 +749,8 @@ impl<'a, E> fmt::Debug for UndoStack<'a, E> {
 }
 
 struct MergeCmd<'a, E> {
-    cmd1: Box<UndoCmd<Err=E> + 'a>,
-    cmd2: Box<UndoCmd<Err=E> + 'a>
+    cmd1: Box<UndoCmd<Err = E> + 'a>,
+    cmd2: Box<UndoCmd<Err = E> + 'a>,
 }
 
 impl<'a, E: 'a> UndoCmd for MergeCmd<'a, E> {
@@ -783,7 +781,7 @@ mod test {
     #[derive(Clone, Copy)]
     struct PopCmd {
         vec: *mut Vec<i32>,
-        e: Option<i32>
+        e: Option<i32>,
     }
 
     impl UndoCmd for PopCmd {
@@ -816,7 +814,10 @@ mod test {
         stack.on_clean(|| x.set(0));
         stack.on_dirty(|| x.set(1));
 
-        let cmd = PopCmd { vec: &mut vec, e: None };
+        let cmd = PopCmd {
+            vec: &mut vec,
+            e: None,
+        };
         for _ in 0..3 {
             stack.push(cmd).unwrap();
         }

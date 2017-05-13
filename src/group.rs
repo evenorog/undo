@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use {Id, Key, Result, UndoCmd, UndoStack};
+use {Id, Result, UndoCmd, UndoStack};
 
 /// A collection of `UndoStack`s.
 ///
@@ -41,11 +41,11 @@ use {Id, Key, Result, UndoCmd, UndoStack};
 #[derive(Debug, Default)]
 pub struct UndoGroup<'a, E> {
     // The stacks in the group.
-    group: FnvHashMap<Key, UndoStack<'a, E>>,
+    group: FnvHashMap<u32, UndoStack<'a, E>>,
     // The active stack.
-    active: Option<Key>,
+    active: Option<u32>,
     // Counter for generating new keys.
-    key: Key
+    key: u32,
 }
 
 impl<'a, E: 'a> UndoGroup<'a, E> {
@@ -62,7 +62,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
         UndoGroup {
             group: FnvHashMap::default(),
             active: None,
-            key: 0
+            key: 0,
         }
     }
 
@@ -79,7 +79,7 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
         UndoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
             active: None,
-            key: 0
+            key: 0,
         }
     }
 
@@ -351,9 +351,10 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     /// [`push`]: struct.UndoStack.html#method.push
     #[inline]
     pub fn push<T>(&mut self, cmd: T) -> Option<Result<E>>
-        where T: UndoCmd<Err=E> + 'a
+        where T: UndoCmd<Err = E> + 'a
     {
-        self.active.map(|active| self.group.get_mut(&active).unwrap().push(cmd))
+        self.active
+            .map(|active| self.group.get_mut(&active).unwrap().push(cmd))
     }
 
     /// Calls [`redo`] on the active `UndoStack`, if there is one.
@@ -415,7 +416,8 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     /// [`redo`]: struct.UndoStack.html#method.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<E>> {
-        self.active.map(|active| self.group.get_mut(&active).unwrap().redo())
+        self.active
+            .map(|active| self.group.get_mut(&active).unwrap().redo())
     }
 
     /// Calls [`undo`] on the active `UndoStack`, if there is one.
@@ -471,7 +473,8 @@ impl<'a, E: 'a> UndoGroup<'a, E> {
     /// [`undo`]: struct.UndoStack.html#method.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result<E>> {
-        self.active.map(|active| self.group.get_mut(&active).unwrap().undo())
+        self.active
+            .map(|active| self.group.get_mut(&active).unwrap().undo())
     }
 }
 
@@ -481,7 +484,7 @@ mod test {
 
     struct PopCmd {
         vec: *mut Vec<i32>,
-        e: Option<i32>
+        e: Option<i32>,
     }
 
     impl UndoCmd for PopCmd {
@@ -516,11 +519,23 @@ mod test {
         let b = group.add(UndoStack::new());
 
         group.set_active(&a);
-        assert!(group.push(PopCmd { vec: &mut vec1, e: None }).unwrap().is_ok());
+        assert!(group
+                    .push(PopCmd {
+                              vec: &mut vec1,
+                              e: None,
+                          })
+                    .unwrap()
+                    .is_ok());
         assert_eq!(vec1.len(), 2);
 
         group.set_active(&b);
-        assert!(group.push(PopCmd { vec: &mut vec2, e: None }).unwrap().is_ok());
+        assert!(group
+                    .push(PopCmd {
+                              vec: &mut vec2,
+                              e: None,
+                          })
+                    .unwrap()
+                    .is_ok());
         assert_eq!(vec2.len(), 2);
 
         group.set_active(&a);
