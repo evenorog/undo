@@ -150,6 +150,22 @@ impl<'a> UndoGroup<'a> {
         Id(key)
     }
 
+    /// Adds a default `UndoStack` to the group and returns an unique id for this stack.
+    ///
+    /// # Examples
+    /// ```
+    /// # #![allow(unused_variables)]
+    /// # use undo::UndoGroup;
+    /// let mut group = UndoGroup::new();
+    /// let a = group.add_default();
+    /// let b = group.add_default();
+    /// let c = group.add_default();
+    /// ```
+    #[inline]
+    pub fn add_default(&mut self) -> Id {
+        self.add(Default::default())
+    }
+
     /// Removes the `UndoStack` with the specified id and returns the stack.
     /// Returns `None` if the stack was not found.
     ///
