@@ -31,22 +31,20 @@ in `redo` you need to implement the merge method yourself.
 ## Examples
 ```toml
 [dependencies]
-undo = "0.6.0"
+undo = "0.7.0"
 ```
 
 ```rust
 use undo::{self, UndoCmd, UndoStack};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct PopCmd {
     vec: *mut Vec<i32>,
     e: Option<i32>,
 }
 
 impl UndoCmd for PopCmd {
-    type Err = ();
-
-    fn redo(&mut self) -> undo::Result<()> {
+    fn redo(&mut self) -> undo::Result {
         self.e = unsafe {
             let ref mut vec = *self.vec;
             vec.pop()
@@ -54,17 +52,16 @@ impl UndoCmd for PopCmd {
         Ok(())
     }
 
-    fn undo(&mut self) -> undo::Result<()> {
+    fn undo(&mut self) -> undo::Result {
         unsafe {
             let ref mut vec = *self.vec;
-            let e = self.e.ok_or(())?;
-            vec.push(e);
+            vec.push(self.e.unwrap());
         }
         Ok(())
     }
 }
 
-fn foo() -> undo::Result<()> {
+fn foo() -> undo::Result {
     let mut vec = vec![1, 2, 3];
     let mut stack = UndoStack::new();
     let cmd = PopCmd { vec: &mut vec, e: None };

@@ -21,24 +21,21 @@
 //! it has some additional overhead compared to [`redo`]. However, this has the benefit that you
 //! can store multiple types of commands in a `UndoStack` at a time. Both supports state handling
 //! and command merging but `undo` will automatically merge commands with the same id, while
-//! in `redo` you need to implement the merge method yourself. If state handling is not needed, it
-//! can be disabled by setting the `no_state` feature flag.
+//! in `redo` you need to implement the merge method yourself.
 //!
 //! # Examples
 //!
 //! ```
 //! use undo::{self, UndoCmd, UndoStack};
 //!
-//! #[derive(Clone, Copy)]
+//! #[derive(Clone, Copy, Debug)]
 //! struct PopCmd {
 //!     vec: *mut Vec<i32>,
 //!     e: Option<i32>,
 //! }
 //!
 //! impl UndoCmd for PopCmd {
-//!     type Err = ();
-//!
-//!     fn redo(&mut self) -> undo::Result<()> {
+//!     fn redo(&mut self) -> undo::Result {
 //!         self.e = unsafe {
 //!             let ref mut vec = *self.vec;
 //!             vec.pop()
@@ -46,17 +43,17 @@
 //!         Ok(())
 //!     }
 //!
-//!     fn undo(&mut self) -> undo::Result<()> {
+//!     fn undo(&mut self) -> undo::Result {
 //!         unsafe {
 //!             let ref mut vec = *self.vec;
-//!             let e = self.e.ok_or(())?;
+//!             let e = self.e.unwrap();
 //!             vec.push(e);
 //!         }
 //!         Ok(())
 //!     }
 //! }
 //!
-//! fn foo() -> undo::Result<()> {
+//! fn foo() -> undo::Result {
 //!     let mut vec = vec![1, 2, 3];
 //!     let mut stack = UndoStack::new();
 //!     let cmd = PopCmd { vec: &mut vec, e: None };
@@ -101,33 +98,28 @@ pub use stack::UndoStack;
 
 use std::fmt;
 use std::result;
+use std::error;
 
 /// An unique id for an `UndoStack`.
 #[derive(Debug)]
 pub struct Id(u32);
 
 /// A specialized `Result` that does not carry any data on success.
-pub type Result<E> = result::Result<(), E>;
+pub type Result = result::Result<(), Box<error::Error>>;
 
 /// Trait that defines the functionality of a command.
 ///
 /// Every command needs to implement this trait to be able to be used with the `UndoStack`.
-pub trait UndoCmd {
-    /// The error type.
-    ///
-    /// This needs to be the same for all `UndoCmd`s that is going to be used in the same stack or
-    /// group.
-    type Err;
-
+pub trait UndoCmd: fmt::Debug {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self) -> Result<Self::Err>;
+    fn redo(&mut self) -> Result;
 
     /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
-    fn undo(&mut self) -> Result<Self::Err>;
+    fn undo(&mut self) -> Result;
 
     /// Used for merging of `UndoCmd`s.
     ///
@@ -142,16 +134,15 @@ pub trait UndoCmd {
     /// ```
     /// use undo::{UndoCmd, UndoStack};
     ///
+    /// #[derive(Debug)]
     /// struct TxtCmd(char);
     ///
     /// impl UndoCmd for TxtCmd {
-    ///     type Err = ();
-    ///
-    ///     fn redo(&mut self) -> undo::Result<()> {
+    ///     fn redo(&mut self) -> undo::Result {
     ///         Ok(())
     ///     }
     ///
-    ///     fn undo(&mut self) -> undo::Result<()> {
+    ///     fn undo(&mut self) -> undo::Result {
     ///         Ok(())
     ///     }
     ///
@@ -165,7 +156,7 @@ pub trait UndoCmd {
     ///     }
     /// }
     ///
-    /// fn foo() -> undo::Result<()> {
+    /// fn foo() -> undo::Result {
     ///     let mut stack = UndoStack::new();
     ///     stack.push(TxtCmd('a'))?;
     ///     stack.push(TxtCmd('b'))?; // 'a' and 'b' is merged.
@@ -178,32 +169,8 @@ pub trait UndoCmd {
     /// }
     /// # foo().unwrap();
     /// ```
-    ///
-    /// Output:
-    ///
-    /// ```txt
-    /// UndoStack {
-    ///     stack: [
-    ///         1,
-    ///         _,
-    ///         1
-    ///     ],
-    ///     idx: 3,
-    ///     limit: None
-    /// }
-    /// ```
     #[inline]
     fn id(&self) -> Option<u64> {
         None
-    }
-}
-
-impl<'a, E> fmt::Debug for UndoCmd<Err = E> + 'a {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.id() {
-            Some(id) => write!(f, "{}", id),
-            None => write!(f, "_"),
-        }
     }
 }

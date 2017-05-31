@@ -14,16 +14,14 @@ use {Result, UndoCmd};
 ///
 /// ```
 /// # use undo::{self, UndoCmd};
-/// #[derive(Clone, Copy)]
+/// #[derive(Clone, Copy, Debug)]
 /// struct PopCmd {
 ///     vec: *mut Vec<i32>,
 ///     e: Option<i32>,
 /// }
 ///
 /// impl UndoCmd for PopCmd {
-///     type Err = ();
-///
-///     fn redo(&mut self) -> undo::Result<()> {
+///     fn redo(&mut self) -> undo::Result {
 ///         self.e = unsafe {
 ///             let ref mut vec = *self.vec;
 ///             vec.pop()
@@ -31,11 +29,10 @@ use {Result, UndoCmd};
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self) -> undo::Result<()> {
+///     fn undo(&mut self) -> undo::Result {
 ///         unsafe {
 ///             let ref mut vec = *self.vec;
-///             let e = self.e.ok_or(())?;
-///             vec.push(e);
+///             vec.push(self.e.unwrap());
 ///         }
 ///         Ok(())
 ///     }
@@ -45,9 +42,9 @@ use {Result, UndoCmd};
 /// [on_clean]: struct.UndoStack.html#method.on_clean
 /// [on_dirty]: struct.UndoStack.html#method.on_dirty
 #[derive(Default)]
-pub struct UndoStack<'a, E> {
+pub struct UndoStack<'a> {
     // All commands on the stack.
-    stack: VecDeque<Box<UndoCmd<Err = E> + 'a>>,
+    stack: VecDeque<Box<UndoCmd + 'a>>,
     // Current position in the stack.
     idx: usize,
     // Max amount of commands allowed on the stack.
@@ -58,17 +55,17 @@ pub struct UndoStack<'a, E> {
     on_dirty: Option<Box<FnMut() + 'a>>,
 }
 
-impl<'a, E: 'a> UndoStack<'a, E> {
+impl<'a> UndoStack<'a> {
     /// Creates a new `UndoStack`.
     ///
     /// # Examples
     /// ```
     /// # #![allow(unused_variables)]
     /// # use undo::UndoStack;
-    /// let stack = UndoStack::<()>::new();
+    /// let stack = UndoStack::new();
     /// ```
     #[inline]
-    pub fn new() -> UndoStack<'a, E> {
+    pub fn new() -> UndoStack<'a> {
         UndoStack {
             stack: VecDeque::new(),
             idx: 0,
@@ -88,29 +85,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let mut stack = UndoStack::with_limit(2);
     /// let cmd = PopCmd { vec: &mut vec, e: None };
@@ -131,7 +127,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn with_limit(limit: usize) -> UndoStack<'a, E> {
+    pub fn with_limit(limit: usize) -> UndoStack<'a> {
         UndoStack {
             stack: VecDeque::new(),
             idx: 0,
@@ -151,13 +147,13 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::UndoStack;
-    /// let stack = UndoStack::<()>::with_capacity(10);
+    /// let stack = UndoStack::with_capacity(10);
     /// assert!(stack.capacity() >= 10);
     /// ```
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn with_capacity(capacity: usize) -> UndoStack<'a, E> {
+    pub fn with_capacity(capacity: usize) -> UndoStack<'a> {
         UndoStack {
             stack: VecDeque::with_capacity(capacity),
             idx: 0,
@@ -172,12 +168,12 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::UndoStack;
-    /// let stack = UndoStack::<()>::with_capacity_and_limit(10, 10);
+    /// let stack = UndoStack::with_capacity_and_limit(10, 10);
     /// assert!(stack.capacity() >= 10);
     /// assert_eq!(stack.limit(), Some(10));
     /// ```
     #[inline]
-    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> UndoStack<'a, E> {
+    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> UndoStack<'a> {
         UndoStack {
             stack: VecDeque::with_capacity(capacity),
             idx: 0,
@@ -196,10 +192,10 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::UndoStack;
-    /// let stack = UndoStack::<()>::with_limit(10);
+    /// let stack = UndoStack::with_limit(10);
     /// assert_eq!(stack.limit(), Some(10));
     ///
-    /// let stack = UndoStack::<()>::new();
+    /// let stack = UndoStack::new();
     /// assert_eq!(stack.limit(), None);
     /// ```
     #[inline]
@@ -212,7 +208,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::UndoStack;
-    /// let stack = UndoStack::<()>::with_capacity(10);
+    /// let stack = UndoStack::with_capacity(10);
     /// assert!(stack.capacity() >= 10);
     /// ```
     #[inline]
@@ -229,29 +225,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let mut stack = UndoStack::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
@@ -273,29 +268,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let mut stack = UndoStack::with_capacity(10);
     /// let cmd = PopCmd { vec: &mut vec, e: None };
@@ -325,29 +319,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     /// # use std::cell::Cell;
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let x = Cell::new(0);
     /// let mut stack = UndoStack::new();
@@ -377,29 +370,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     /// # use std::cell::Cell;
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let x = Cell::new(0);
     /// let mut stack = UndoStack::new();
@@ -426,29 +418,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let mut stack = UndoStack::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
@@ -472,29 +463,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let mut stack = UndoStack::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
@@ -521,29 +511,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let mut stack = UndoStack::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
@@ -559,8 +548,8 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// ```
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
-    pub fn push<T>(&mut self, mut cmd: T) -> Result<E>
-        where T: UndoCmd<Err = E> + 'a
+    pub fn push<T>(&mut self, mut cmd: T) -> Result
+        where T: UndoCmd + 'a
     {
         let is_dirty = self.is_dirty();
         let len = self.idx;
@@ -604,29 +593,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let mut stack = UndoStack::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
@@ -655,7 +643,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
     #[inline]
-    pub fn redo(&mut self) -> Result<E> {
+    pub fn redo(&mut self) -> Result {
         if self.idx < self.stack.len() {
             let is_dirty = self.is_dirty();
             self.stack[self.idx].redo()?;
@@ -676,29 +664,28 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy)]
+    /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
     /// #   e: Option<i32>,
     /// # }
     /// # impl UndoCmd for PopCmd {
-    /// #   type Err = ();
-    /// #   fn redo(&mut self) -> undo::Result<()> {
+    /// #   fn redo(&mut self) -> undo::Result {
     /// #       self.e = unsafe {
     /// #           let ref mut vec = *self.vec;
     /// #           vec.pop()
     /// #       };
     /// #       Ok(())
     /// #   }
-    /// #   fn undo(&mut self) -> undo::Result<()> {
+    /// #   fn undo(&mut self) -> undo::Result {
     /// #       unsafe {
     /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.ok_or(())?);
+    /// #           vec.push(self.e.unwrap());
     /// #       }
     /// #       Ok(())
     /// #   }
     /// # }
-    /// # fn foo() -> undo::Result<()> {
+    /// # fn foo() -> undo::Result {
     /// let mut vec = vec![1, 2, 3];
     /// let mut stack = UndoStack::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
@@ -721,7 +708,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     ///
     /// [`undo`]: trait.UndoCmd.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Result<E> {
+    pub fn undo(&mut self) -> Result {
         if self.idx > 0 {
             let is_clean = self.is_clean();
             self.idx -= 1;
@@ -737,7 +724,7 @@ impl<'a, E: 'a> UndoStack<'a, E> {
     }
 }
 
-impl<'a, E> fmt::Debug for UndoStack<'a, E> {
+impl<'a> fmt::Debug for UndoStack<'a> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("UndoStack")
@@ -748,22 +735,21 @@ impl<'a, E> fmt::Debug for UndoStack<'a, E> {
     }
 }
 
-struct MergeCmd<'a, E> {
-    cmd1: Box<UndoCmd<Err = E> + 'a>,
-    cmd2: Box<UndoCmd<Err = E> + 'a>,
+#[derive(Debug)]
+struct MergeCmd<'a> {
+    cmd1: Box<UndoCmd + 'a>,
+    cmd2: Box<UndoCmd + 'a>,
 }
 
-impl<'a, E: 'a> UndoCmd for MergeCmd<'a, E> {
-    type Err = E;
-
+impl<'a> UndoCmd for MergeCmd<'a> {
     #[inline]
-    fn redo(&mut self) -> Result<E> {
+    fn redo(&mut self) -> Result {
         self.cmd1.redo()?;
         self.cmd2.redo()
     }
 
     #[inline]
-    fn undo(&mut self) -> Result<E> {
+    fn undo(&mut self) -> Result {
         self.cmd2.undo()?;
         self.cmd1.undo()
     }
@@ -778,16 +764,14 @@ impl<'a, E: 'a> UndoCmd for MergeCmd<'a, E> {
 mod test {
     use super::*;
 
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Debug)]
     struct PopCmd {
         vec: *mut Vec<i32>,
         e: Option<i32>,
     }
 
     impl UndoCmd for PopCmd {
-        type Err = ();
-
-        fn redo(&mut self) -> Result<()> {
+        fn redo(&mut self) -> Result {
             self.e = unsafe {
                 let ref mut vec = *self.vec;
                 vec.pop()
@@ -795,10 +779,10 @@ mod test {
             Ok(())
         }
 
-        fn undo(&mut self) -> Result<()> {
+        fn undo(&mut self) -> Result {
             unsafe {
                 let ref mut vec = *self.vec;
-                vec.push(self.e.ok_or(())?);
+                vec.push(self.e.unwrap());
             }
             Ok(())
         }
