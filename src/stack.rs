@@ -10,35 +10,6 @@ use {Result, UndoCmd};
 /// defined methods set in [on_clean] and [on_dirty]. This is useful if you want to trigger some
 /// event when the state changes, eg. enabling and disabling buttons in an ui.
 ///
-/// The `PopCmd` given in the examples below is defined as:
-///
-/// ```
-/// # use undo::{self, UndoCmd};
-/// #[derive(Clone, Copy, Debug)]
-/// struct PopCmd {
-///     vec: *mut Vec<i32>,
-///     e: Option<i32>,
-/// }
-///
-/// impl UndoCmd for PopCmd {
-///     fn redo(&mut self) -> undo::Result {
-///         self.e = unsafe {
-///             let ref mut vec = *self.vec;
-///             vec.pop()
-///         };
-///         Ok(())
-///     }
-///
-///     fn undo(&mut self) -> undo::Result {
-///         unsafe {
-///             let ref mut vec = *self.vec;
-///             vec.push(self.e.unwrap());
-///         }
-///         Ok(())
-///     }
-/// }
-/// ```
-///
 /// [on_clean]: struct.UndoStack.html#method.on_clean
 /// [on_dirty]: struct.UndoStack.html#method.on_dirty
 #[derive(Default)]
@@ -131,11 +102,7 @@ impl<'a> UndoStack<'a> {
         UndoStack {
             stack: VecDeque::new(),
             idx: 0,
-            limit: if limit == 0 {
-                None
-            } else {
-                Some(limit)
-            },
+            limit: if limit == 0 { None } else { Some(limit) },
             on_clean: None,
             on_dirty: None,
         }
@@ -177,11 +144,7 @@ impl<'a> UndoStack<'a> {
         UndoStack {
             stack: VecDeque::with_capacity(capacity),
             idx: 0,
-            limit: if limit == 0 {
-                None
-            } else {
-                Some(limit)
-            },
+            limit: if limit == 0 { None } else { Some(limit) },
             on_clean: None,
             on_dirty: None,
         }

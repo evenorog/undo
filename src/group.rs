@@ -6,35 +6,6 @@ use {Id, Result, UndoCmd, UndoStack};
 /// An `UndoGroup` is useful when working with multiple stacks and only one of them should
 /// be active at a given time, eg. a text editor with multiple documents opened. However, if only
 /// a single stack is needed, it is easier to just use the stack directly.
-///
-/// The `PopCmd` given in the examples below is defined as:
-///
-/// ```
-/// # use undo::{self, UndoCmd};
-/// #[derive(Clone, Copy, Debug)]
-/// struct PopCmd {
-///     vec: *mut Vec<i32>,
-///     e: Option<i32>,
-/// }
-///
-/// impl UndoCmd for PopCmd {
-///     fn redo(&mut self) -> undo::Result {
-///         self.e = unsafe {
-///             let ref mut vec = *self.vec;
-///             vec.pop()
-///         };
-///         Ok(())
-///     }
-///
-///     fn undo(&mut self) -> undo::Result {
-///         unsafe {
-///             let ref mut vec = *self.vec;
-///             vec.push(self.e.unwrap());
-///         }
-///         Ok(())
-///     }
-/// }
-/// ```
 #[derive(Debug, Default)]
 pub struct UndoGroup<'a> {
     // The stacks in the group.
@@ -101,9 +72,9 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{UndoStack, UndoGroup};
+    /// # use undo::UndoGroup;
     /// let mut group = UndoGroup::new();
-    /// group.add(UndoStack::new());
+    /// group.add_default();
     /// group.reserve(10);
     /// assert!(group.capacity() >= 11);
     /// ```
@@ -116,11 +87,11 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{UndoStack, UndoGroup};
+    /// # use undo::UndoGroup;
     /// let mut group = UndoGroup::with_capacity(10);
-    /// group.add(UndoStack::new());
-    /// group.add(UndoStack::new());
-    /// group.add(UndoStack::new());
+    /// group.add_default();
+    /// group.add_default();
+    /// group.add_default();
     ///
     /// assert!(group.capacity() >= 10);
     /// group.shrink_to_fit();
@@ -171,9 +142,9 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{UndoStack, UndoGroup};
+    /// # use undo::UndoGroup;
     /// let mut group = UndoGroup::new();
-    /// let a = group.add(UndoStack::new());
+    /// let a = group.add_default();
     /// let stack = group.remove(a);
     /// assert!(stack.is_some());
     /// ```
@@ -192,9 +163,9 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{UndoStack, UndoGroup};
+    /// # use undo::UndoGroup;
     /// let mut group = UndoGroup::new();
-    /// let a = group.add(UndoStack::new());
+    /// let a = group.add_default();
     /// group.set_active(&a);
     /// ```
     #[inline]
@@ -208,9 +179,9 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{UndoStack, UndoGroup};
+    /// # use undo::UndoGroup;
     /// let mut group = UndoGroup::new();
-    /// let a = group.add(UndoStack::new());
+    /// let a = group.add_default();
     /// group.set_active(&a);
     /// group.clear_active();
     /// ```
@@ -224,7 +195,7 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{self, UndoCmd, UndoStack, UndoGroup};
+    /// # use undo::{self, UndoCmd, UndoGroup};
     /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
@@ -250,7 +221,7 @@ impl<'a> UndoGroup<'a> {
     /// let mut group = UndoGroup::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    /// let a = group.add(UndoStack::new());
+    /// let a = group.add_default();
     /// assert_eq!(group.is_clean(), None);
     /// group.set_active(&a);
     ///
@@ -272,7 +243,7 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{self, UndoCmd, UndoStack, UndoGroup};
+    /// # use undo::{self, UndoCmd, UndoGroup};
     /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
@@ -298,7 +269,7 @@ impl<'a> UndoGroup<'a> {
     /// let mut group = UndoGroup::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    /// let a = group.add(UndoStack::new());
+    /// let a = group.add_default();
     /// assert_eq!(group.is_dirty(), None);
     /// group.set_active(&a);
     ///
@@ -322,7 +293,7 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{self, UndoCmd, UndoStack, UndoGroup};
+    /// # use undo::{self, UndoCmd, UndoGroup};
     /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
@@ -348,7 +319,7 @@ impl<'a> UndoGroup<'a> {
     /// let mut group = UndoGroup::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    /// let a = group.add(UndoStack::new());
+    /// let a = group.add_default();
     /// group.set_active(&a);
     ///
     /// group.push(cmd);
@@ -374,7 +345,7 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{self, UndoCmd, UndoStack, UndoGroup};
+    /// # use undo::{self, UndoCmd, UndoGroup};
     /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
@@ -400,7 +371,7 @@ impl<'a> UndoGroup<'a> {
     /// let mut group = UndoGroup::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    /// let a = group.add(UndoStack::new());
+    /// let a = group.add_default();
     /// group.set_active(&a);
     ///
     /// group.push(cmd);
@@ -436,7 +407,7 @@ impl<'a> UndoGroup<'a> {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{self, UndoCmd, UndoStack, UndoGroup};
+    /// # use undo::{self, UndoCmd, UndoGroup};
     /// # #[derive(Clone, Copy, Debug)]
     /// # struct PopCmd {
     /// #   vec: *mut Vec<i32>,
@@ -462,7 +433,7 @@ impl<'a> UndoGroup<'a> {
     /// let mut group = UndoGroup::new();
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
-    /// let a = group.add(UndoStack::new());
+    /// let a = group.add_default();
     /// group.set_active(&a);
     ///
     /// group.push(cmd);

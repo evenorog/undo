@@ -98,14 +98,14 @@ pub use stack::UndoStack;
 
 use std::fmt;
 use std::result;
-use std::error;
+use std::error::Error;
 
 /// An unique id for an `UndoStack`.
 #[derive(Debug)]
 pub struct Id(u32);
 
 /// A specialized `Result` that does not carry any data on success.
-pub type Result = result::Result<(), Box<error::Error>>;
+pub type Result = result::Result<(), Box<Error>>;
 
 /// Trait that defines the functionality of a command.
 ///
@@ -162,10 +162,7 @@ pub trait UndoCmd: fmt::Debug {
     ///     stack.push(TxtCmd('b'))?; // 'a' and 'b' is merged.
     ///     stack.push(TxtCmd(' '))?;
     ///     stack.push(TxtCmd('c'))?;
-    ///     stack.push(TxtCmd('d'))?; // 'c' and 'd' is merged.
-    ///
-    ///     println!("{:#?}", stack);
-    ///     Ok(())
+    ///     stack.push(TxtCmd('d'))   // 'c' and 'd' is merged.
     /// }
     /// # foo().unwrap();
     /// ```

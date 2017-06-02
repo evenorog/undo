@@ -31,7 +31,7 @@ in `redo` you need to implement the merge method yourself.
 ## Examples
 ```toml
 [dependencies]
-undo = "0.7.0"
+undo = "0.7.1"
 ```
 
 ```rust
