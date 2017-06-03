@@ -1,3 +1,4 @@
+use std::fmt;
 use fnv::FnvHashMap;
 use {Id, Result, UndoCmd, UndoStack};
 
@@ -6,7 +7,7 @@ use {Id, Result, UndoCmd, UndoStack};
 /// An `UndoGroup` is useful when working with multiple stacks and only one of them should
 /// be active at a given time, eg. a text editor with multiple documents opened. However, if only
 /// a single stack is needed, it is easier to just use the stack directly.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct UndoGroup<'a> {
     // The stacks in the group.
     group: FnvHashMap<u32, UndoStack<'a>>,
@@ -14,6 +15,8 @@ pub struct UndoGroup<'a> {
     active: Option<u32>,
     // Counter for generating new keys.
     key: u32,
+    // Called when the active stack changes.
+    on_stack_change: Option<Box<FnMut(Option<bool>) + 'a>>,
 }
 
 impl<'a> UndoGroup<'a> {
@@ -31,6 +34,7 @@ impl<'a> UndoGroup<'a> {
             group: FnvHashMap::default(),
             active: None,
             key: 0,
+            on_stack_change: None,
         }
     }
 
@@ -48,6 +52,7 @@ impl<'a> UndoGroup<'a> {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
             active: None,
             key: 0,
+            on_stack_change: None,
         }
     }
 
@@ -100,6 +105,28 @@ impl<'a> UndoGroup<'a> {
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.group.shrink_to_fit();
+    }
+
+    /// Sets what should happen when the active stack changes.
+    /// By default the `UndoGroup` does nothing when the active stack changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::UndoGroup;
+    /// let mut group = UndoGroup::new();
+    /// group.on_stack_change(|is_clean| {
+    ///     match is_clean {
+    ///         Some(true) => { /* The new active stack is clean */ },
+    ///         Some(false) => { /* The new active stack is dirty */ },
+    ///         None => { /* No active stack */ },
+    ///     }
+    /// });
+    /// ```
+    #[inline]
+    pub fn on_stack_change<F>(&mut self, f: F)
+        where F: FnMut(Option<bool>) + 'a
+    {
+        self.on_stack_change = Some(Box::new(f));
     }
 
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.
@@ -170,8 +197,11 @@ impl<'a> UndoGroup<'a> {
     /// ```
     #[inline]
     pub fn set_active(&mut self, &Id(key): &Id) {
-        if self.group.contains_key(&key) {
+        if let Some(is_clean) = self.group.get(&key).map(|stack| stack.is_clean()) {
             self.active = Some(key);
+            if let Some(ref mut f) = self.on_stack_change {
+                f(Some(is_clean));
+            }
         }
     }
 
@@ -188,6 +218,9 @@ impl<'a> UndoGroup<'a> {
     #[inline]
     pub fn clear_active(&mut self) {
         self.active = None;
+        if let Some(ref mut f) = self.on_stack_change {
+            f(None);
+        }
     }
 
     /// Calls [`is_clean`] on the active `UndoStack`, if there is one.
@@ -283,7 +316,7 @@ impl<'a> UndoGroup<'a> {
     /// [`is_dirty`]: struct.UndoStack.html#method.is_dirty
     #[inline]
     pub fn is_dirty(&self) -> Option<bool> {
-        self.is_clean().map(|t| !t)
+        self.active.map(|i| self.group[&i].is_dirty())
     }
 
     /// Calls [`push`] on the active `UndoStack`, if there is one.
@@ -335,7 +368,8 @@ impl<'a> UndoGroup<'a> {
         where T: UndoCmd + 'a
     {
         self.active
-            .map(|active| self.group.get_mut(&active).unwrap().push(cmd))
+            .and_then(|active| self.group.get_mut(&active))
+            .map(|stack| stack.push(cmd))
     }
 
     /// Calls [`redo`] on the active `UndoStack`, if there is one.
@@ -397,7 +431,8 @@ impl<'a> UndoGroup<'a> {
     #[inline]
     pub fn redo(&mut self) -> Option<Result> {
         self.active
-            .map(|active| self.group.get_mut(&active).unwrap().redo())
+            .and_then(|active| self.group.get_mut(&active))
+            .map(|stack| stack.redo())
     }
 
     /// Calls [`undo`] on the active `UndoStack`, if there is one.
@@ -453,7 +488,19 @@ impl<'a> UndoGroup<'a> {
     #[inline]
     pub fn undo(&mut self) -> Option<Result> {
         self.active
-            .map(|active| self.group.get_mut(&active).unwrap().undo())
+            .and_then(|active| self.group.get_mut(&active))
+            .map(|stack| stack.undo())
+    }
+}
+
+impl<'a> fmt::Debug for UndoGroup<'a> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("UndoGroup")
+            .field("group", &self.group)
+            .field("active", &self.active)
+            .field("key", &self.key)
+            .finish()
     }
 }
 

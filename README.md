@@ -18,20 +18,17 @@ It also supports [automatic merging] of commands with the same id.
 ## Redo vs Undo
 |                 | Redo         | Undo            |
 |-----------------|--------------|-----------------|
-| Dispatch        | Static       | Dynamic         |
+| Dispatch        | [Static]     | [Dynamic]       |
 | State Handling  | Yes          | Yes             |
-| Command Merging | Yes (manual) | Yes (automatic) |
+| Command Merging | Manual       | Auto            |
 
-`undo` uses [dynamic dispatch] instead of [static dispatch] to store the commands, which means
-it has some additional overhead compared to [`redo`]. However, this has the benefit that you
-can store multiple types of commands in a `UndoStack` at a time. Both supports state handling
-and command merging but `undo` will automatically merge commands with the same id, while
-in `redo` you need to implement the merge method yourself.
+Both supports command merging but `undo` will automatically merge commands with the same id,
+while in `redo` you need to implement the merge method yourself.
 
 ## Examples
 ```toml
 [dependencies]
-undo = "0.7.1"
+undo = "0.7.2"
 ```
 
 ```rust
@@ -85,6 +82,6 @@ fn foo() -> undo::Result {
 [`on_clean`]: struct.UndoStack.html#method.on_clean
 [`on_dirty`]: struct.UndoStack.html#method.on_dirty
 [automatic merging]: trait.UndoCmd.html#method.id
-[static dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#static-dispatch
-[dynamic dispatch]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
+[Static]: https://doc.rust-lang.org/stable/book/trait-objects.html#static-dispatch
+[Dynamic]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
 [`redo`]: https://crates.io/crates/redo

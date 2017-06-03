@@ -20,10 +20,8 @@ pub struct UndoStack<'a> {
     idx: usize,
     // Max amount of commands allowed on the stack.
     limit: Option<usize>,
-    // Called when the state changes from dirty to clean.
-    on_clean: Option<Box<FnMut() + 'a>>,
-    // Called when the state changes from clean to dirty.
-    on_dirty: Option<Box<FnMut() + 'a>>,
+    // Called when the state changes.
+    on_state_change: Option<Box<FnMut(bool) + 'a>>,
 }
 
 impl<'a> UndoStack<'a> {
@@ -41,8 +39,7 @@ impl<'a> UndoStack<'a> {
             stack: VecDeque::new(),
             idx: 0,
             limit: None,
-            on_clean: None,
-            on_dirty: None,
+            on_state_change: None,
         }
     }
 
@@ -103,8 +100,7 @@ impl<'a> UndoStack<'a> {
             stack: VecDeque::new(),
             idx: 0,
             limit: if limit == 0 { None } else { Some(limit) },
-            on_clean: None,
-            on_dirty: None,
+            on_state_change: None,
         }
     }
 
@@ -125,8 +121,7 @@ impl<'a> UndoStack<'a> {
             stack: VecDeque::with_capacity(capacity),
             idx: 0,
             limit: None,
-            on_clean: None,
-            on_dirty: None,
+            on_state_change: None,
         }
     }
 
@@ -145,8 +140,7 @@ impl<'a> UndoStack<'a> {
             stack: VecDeque::with_capacity(capacity),
             idx: 0,
             limit: if limit == 0 { None } else { Some(limit) },
-            on_clean: None,
-            on_dirty: None,
+            on_state_change: None,
         }
     }
 
@@ -273,10 +267,8 @@ impl<'a> UndoStack<'a> {
         self.stack.shrink_to_fit();
     }
 
-    /// Sets what should happen if the state changes from dirty to clean.
+    /// Sets what should happen when the state changes from dirty to clean.
     /// By default the `UndoStack` does nothing when the state changes.
-    ///
-    /// Note: An empty stack is clean, so the first push will not trigger this method.
     ///
     /// # Examples
     /// ```
@@ -307,73 +299,28 @@ impl<'a> UndoStack<'a> {
     /// let mut vec = vec![1, 2, 3];
     /// let x = Cell::new(0);
     /// let mut stack = UndoStack::new();
-    /// stack.on_clean(|| x.set(1));
+    /// stack.on_state_change(|is_clean| {
+    ///     if is_clean {
+    ///         x.set(0);
+    ///     } else {
+    ///         x.set(1);
+    ///     }
+    /// });
     /// let cmd = PopCmd { vec: &mut vec, e: None };
-    ///
     /// stack.push(cmd)?;
     /// stack.undo()?;
-    /// assert_eq!(x.get(), 0);
+    /// assert_eq!(x.get(), 1);
     /// stack.redo()?;
-    /// assert_eq!(x.get(), 1);
-    /// # Ok(())
-    /// # }
-    /// # foo().unwrap();
-    /// ```
-    #[inline]
-    pub fn on_clean<F>(&mut self, f: F)
-        where F: FnMut() + 'a
-    {
-        self.on_clean = Some(Box::new(f));
-    }
-
-    /// Sets what should happen if the state changes from clean to dirty.
-    /// By default the `UndoStack` does nothing when the state changes.
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::cell::Cell;
-    /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy, Debug)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
-    /// # impl UndoCmd for PopCmd {
-    /// #   fn redo(&mut self) -> undo::Result {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> undo::Result {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.unwrap());
-    /// #       }
-    /// #       Ok(())
-    /// #   }
-    /// # }
-    /// # fn foo() -> undo::Result {
-    /// let mut vec = vec![1, 2, 3];
-    /// let x = Cell::new(0);
-    /// let mut stack = UndoStack::new();
-    /// stack.on_dirty(|| x.set(1));
-    /// let cmd = PopCmd { vec: &mut vec, e: None };
-    ///
-    /// stack.push(cmd)?;
     /// assert_eq!(x.get(), 0);
-    /// stack.undo()?;
-    /// assert_eq!(x.get(), 1);
     /// # Ok(())
     /// # }
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn on_dirty<F>(&mut self, f: F)
-        where F: FnMut() + 'a
+    pub fn on_state_change<F>(&mut self, f: F)
+        where F: FnMut(bool) + 'a
     {
-        self.on_dirty = Some(Box::new(f));
+        self.on_state_change = Some(Box::new(f));
     }
 
     /// Returns `true` if the state of the stack is clean, `false` otherwise.
@@ -543,8 +490,8 @@ impl<'a> UndoStack<'a> {
         debug_assert_eq!(self.idx, self.stack.len());
         // State is always clean after a push, check if it was dirty before.
         if is_dirty {
-            if let Some(ref mut f) = self.on_clean {
-                f();
+            if let Some(ref mut f) = self.on_state_change {
+                f(true);
             }
         }
         Ok(())
@@ -613,8 +560,8 @@ impl<'a> UndoStack<'a> {
             self.idx += 1;
             // Check if stack went from dirty to clean.
             if is_dirty && self.is_clean() {
-                if let Some(ref mut f) = self.on_clean {
-                    f();
+                if let Some(ref mut f) = self.on_state_change {
+                    f(true);
                 }
             }
         }
@@ -678,8 +625,8 @@ impl<'a> UndoStack<'a> {
             self.stack[self.idx].undo()?;
             // Check if stack went from clean to dirty.
             if is_clean && self.is_dirty() {
-                if let Some(ref mut f) = self.on_dirty {
-                    f();
+                if let Some(ref mut f) = self.on_state_change {
+                    f(false);
                 }
             }
         }
@@ -758,8 +705,13 @@ mod test {
         let x = Cell::new(0);
         let mut vec = vec![1, 2, 3];
         let mut stack = UndoStack::new();
-        stack.on_clean(|| x.set(0));
-        stack.on_dirty(|| x.set(1));
+        stack.on_state_change(|is_clean| {
+            if is_clean {
+                x.set(0);
+            } else {
+                x.set(1);
+            }
+        });
 
         let cmd = PopCmd {
             vec: &mut vec,
