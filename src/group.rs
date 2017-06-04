@@ -30,12 +30,7 @@ impl<'a> UndoGroup<'a> {
     /// ```
     #[inline]
     pub fn new() -> UndoGroup<'a> {
-        UndoGroup {
-            group: FnvHashMap::default(),
-            active: None,
-            key: 0,
-            on_stack_change: None,
-        }
+        Default::default()
     }
 
     /// Creates a new `UndoGroup` with the specified capacity.
@@ -50,9 +45,7 @@ impl<'a> UndoGroup<'a> {
     pub fn with_capacity(capacity: usize) -> UndoGroup<'a> {
         UndoGroup {
             group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
-            active: None,
-            key: 0,
-            on_stack_change: None,
+            ..Default::default()
         }
     }
 
@@ -500,6 +493,12 @@ impl<'a> fmt::Debug for UndoGroup<'a> {
             .field("group", &self.group)
             .field("active", &self.active)
             .field("key", &self.key)
+            .field("on_stack_change",
+                   &if self.on_stack_change.is_some() {
+                       "|_| { .. }"
+                   } else {
+                       "None"
+                   })
             .finish()
     }
 }

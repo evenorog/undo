@@ -92,7 +92,7 @@ mod group;
 mod stack;
 
 pub use group::UndoGroup;
-pub use stack::UndoStack;
+pub use stack::{UndoStack, UndoStackBuilder};
 
 use std::fmt;
 use std::result;

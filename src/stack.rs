@@ -35,12 +35,7 @@ impl<'a> UndoStack<'a> {
     /// ```
     #[inline]
     pub fn new() -> UndoStack<'a> {
-        UndoStack {
-            stack: VecDeque::new(),
-            idx: 0,
-            limit: None,
-            on_state_change: None,
-        }
+        Default::default()
     }
 
     /// Creates a new `UndoStack` with a limit on how many `UndoCmd`s can be stored in the stack.
@@ -97,10 +92,8 @@ impl<'a> UndoStack<'a> {
     #[inline]
     pub fn with_limit(limit: usize) -> UndoStack<'a> {
         UndoStack {
-            stack: VecDeque::new(),
-            idx: 0,
             limit: if limit == 0 { None } else { Some(limit) },
-            on_state_change: None,
+            ..Default::default()
         }
     }
 
@@ -119,28 +112,7 @@ impl<'a> UndoStack<'a> {
     pub fn with_capacity(capacity: usize) -> UndoStack<'a> {
         UndoStack {
             stack: VecDeque::with_capacity(capacity),
-            idx: 0,
-            limit: None,
-            on_state_change: None,
-        }
-    }
-
-    /// Creates a new `UndoStack` with the specified capacity and limit.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::UndoStack;
-    /// let stack = UndoStack::with_capacity_and_limit(10, 10);
-    /// assert!(stack.capacity() >= 10);
-    /// assert_eq!(stack.limit(), Some(10));
-    /// ```
-    #[inline]
-    pub fn with_capacity_and_limit(capacity: usize, limit: usize) -> UndoStack<'a> {
-        UndoStack {
-            stack: VecDeque::with_capacity(capacity),
-            idx: 0,
-            limit: if limit == 0 { None } else { Some(limit) },
-            on_state_change: None,
+            ..Default::default()
         }
     }
 
@@ -265,62 +237,6 @@ impl<'a> UndoStack<'a> {
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.stack.shrink_to_fit();
-    }
-
-    /// Sets what should happen when the state changes from dirty to clean.
-    /// By default the `UndoStack` does nothing when the state changes.
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::cell::Cell;
-    /// # use undo::{self, UndoCmd, UndoStack};
-    /// # #[derive(Clone, Copy, Debug)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
-    /// # impl UndoCmd for PopCmd {
-    /// #   fn redo(&mut self) -> undo::Result {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> undo::Result {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.unwrap());
-    /// #       }
-    /// #       Ok(())
-    /// #   }
-    /// # }
-    /// # fn foo() -> undo::Result {
-    /// let mut vec = vec![1, 2, 3];
-    /// let x = Cell::new(0);
-    /// let mut stack = UndoStack::new();
-    /// stack.on_state_change(|is_clean| {
-    ///     if is_clean {
-    ///         x.set(0);
-    ///     } else {
-    ///         x.set(1);
-    ///     }
-    /// });
-    /// let cmd = PopCmd { vec: &mut vec, e: None };
-    /// stack.push(cmd)?;
-    /// stack.undo()?;
-    /// assert_eq!(x.get(), 1);
-    /// stack.redo()?;
-    /// assert_eq!(x.get(), 0);
-    /// # Ok(())
-    /// # }
-    /// # foo().unwrap();
-    /// ```
-    #[inline]
-    pub fn on_state_change<F>(&mut self, f: F)
-        where F: FnMut(bool) + 'a
-    {
-        self.on_state_change = Some(Box::new(f));
     }
 
     /// Returns `true` if the state of the stack is clean, `false` otherwise.
@@ -641,6 +557,12 @@ impl<'a> fmt::Debug for UndoStack<'a> {
             .field("stack", &self.stack)
             .field("idx", &self.idx)
             .field("limit", &self.limit)
+            .field("on_state_change",
+                   &if self.on_state_change.is_some() {
+                       "|_| { .. }"
+                   } else {
+                       "None"
+                   })
             .finish()
     }
 }
@@ -667,6 +589,219 @@ impl<'a> UndoCmd for MergeCmd<'a> {
     #[inline]
     fn id(&self) -> Option<u64> {
         self.cmd1.id()
+    }
+}
+
+/// Builder for `UndoStack`.
+///
+/// # Examples
+/// ```
+/// # #![allow(unused_variables)]
+/// # use undo::UndoStackBuilder;
+/// let stack = UndoStackBuilder::new()
+///     .capacity(10)
+///     .limit(10)
+///     .on_state_change(|is_clean| {
+///         println!("{}", is_clean);
+///     })
+///     .build();
+/// ```
+#[derive(Default)]
+pub struct UndoStackBuilder<'a> {
+    capacity: usize,
+    limit: Option<usize>,
+    on_state_change: Option<Box<FnMut(bool) + 'a>>,
+}
+
+impl<'a> UndoStackBuilder<'a> {
+    /// Creates a new builder.
+    ///
+    /// # Examples
+    /// ```
+    /// # #![allow(unused_variables)]
+    /// # use undo::UndoStackBuilder;
+    /// let builder = UndoStackBuilder::new();
+    /// ```
+    #[inline]
+    pub fn new() -> UndoStackBuilder<'a> {
+        Default::default()
+    }
+
+    /// Sets the specified [capacity] for the stack.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::UndoStackBuilder;
+    /// let stack = UndoStackBuilder::new()
+    ///     .capacity(10)
+    ///     .build();
+    /// assert!(stack.capacity() >= 10);
+    /// ```
+    ///
+    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
+    #[inline]
+    pub fn capacity(mut self, capacity: usize) -> UndoStackBuilder<'a> {
+        self.capacity = capacity;
+        self
+    }
+
+    /// Sets a limit on how many `UndoCmd`s can be stored in the stack.
+    /// If this limit is reached it will start popping of commands at the bottom of the stack when
+    /// pushing new commands on to the stack. No limit is set by default which means it may grow
+    /// indefinitely.
+    ///
+    /// The stack may remove multiple commands at a time to increase performance.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::{self, UndoCmd, UndoStackBuilder};
+    /// # #[derive(Clone, Copy, Debug)]
+    /// # struct PopCmd {
+    /// #   vec: *mut Vec<i32>,
+    /// #   e: Option<i32>,
+    /// # }
+    /// # impl UndoCmd for PopCmd {
+    /// #   fn redo(&mut self) -> undo::Result {
+    /// #       self.e = unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.pop()
+    /// #       };
+    /// #       Ok(())
+    /// #   }
+    /// #   fn undo(&mut self) -> undo::Result {
+    /// #       unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.push(self.e.unwrap());
+    /// #       }
+    /// #       Ok(())
+    /// #   }
+    /// # }
+    /// # fn foo() -> undo::Result {
+    /// let mut vec = vec![1, 2, 3];
+    /// let mut stack = UndoStackBuilder::new()
+    ///     .limit(2)
+    ///     .build();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    ///
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?;
+    /// stack.push(cmd)?; // Pops off the first cmd.
+    ///
+    /// assert!(vec.is_empty());
+    ///
+    /// stack.undo()?;
+    /// stack.undo()?;
+    /// stack.undo()?; // Does nothing.
+    ///
+    /// assert_eq!(vec, vec![1, 2]);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
+    #[inline]
+    pub fn limit(mut self, limit: usize) -> UndoStackBuilder<'a> {
+        self.limit = if limit == 0 { None } else { Some(limit) };
+        self
+    }
+
+    /// Sets what should happen when the state changes.
+    /// By default the `UndoStack` does nothing when the state changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::cell::Cell;
+    /// # use undo::{self, UndoCmd, UndoStackBuilder};
+    /// # #[derive(Clone, Copy, Debug)]
+    /// # struct PopCmd {
+    /// #   vec: *mut Vec<i32>,
+    /// #   e: Option<i32>,
+    /// # }
+    /// # impl UndoCmd for PopCmd {
+    /// #   fn redo(&mut self) -> undo::Result {
+    /// #       self.e = unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.pop()
+    /// #       };
+    /// #       Ok(())
+    /// #   }
+    /// #   fn undo(&mut self) -> undo::Result {
+    /// #       unsafe {
+    /// #           let ref mut vec = *self.vec;
+    /// #           vec.push(self.e.unwrap());
+    /// #       }
+    /// #       Ok(())
+    /// #   }
+    /// # }
+    /// # fn foo() -> undo::Result {
+    /// let mut vec = vec![1, 2, 3];
+    /// let x = Cell::new(0);
+    /// let mut stack = UndoStackBuilder::new()
+    ///     .on_state_change(|is_clean| {
+    ///         if is_clean {
+    ///             x.set(0);
+    ///         } else {
+    ///             x.set(1);
+    ///         }
+    ///     })
+    ///     .build();
+    /// let cmd = PopCmd { vec: &mut vec, e: None };
+    /// stack.push(cmd)?;
+    /// stack.undo()?;
+    /// assert_eq!(x.get(), 1);
+    /// stack.redo()?;
+    /// assert_eq!(x.get(), 0);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
+    #[inline]
+    pub fn on_state_change<F>(mut self, f: F) -> UndoStackBuilder<'a>
+        where F: FnMut(bool) + 'a
+    {
+        self.on_state_change = Some(Box::new(f));
+        self
+    }
+
+    /// Builds the `UndoStack`.
+    ///
+    /// # Examples
+    /// ```
+    /// # #![allow(unused_variables)]
+    /// # use undo::UndoStackBuilder;
+    /// let stack = UndoStackBuilder::new()
+    ///     .capacity(10)
+    ///     .limit(10)
+    ///     .build();
+    /// ```
+    #[inline]
+    pub fn build(self) -> UndoStack<'a> {
+        let UndoStackBuilder {
+            capacity,
+            limit,
+            on_state_change,
+        } = self;
+        UndoStack {
+            stack: VecDeque::with_capacity(capacity),
+            limit,
+            on_state_change,
+            ..Default::default()
+        }
+    }
+}
+
+impl<'a> fmt::Debug for UndoStackBuilder<'a> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("UndoStackBuilder")
+            .field("capacity", &self.capacity)
+            .field("limit", &self.limit)
+            .field("on_state_change",
+                   &if self.on_state_change.is_some() {
+                       "|_| { .. }"
+                   } else {
+                       "None"
+                   })
+            .finish()
     }
 }
 
@@ -704,14 +839,13 @@ mod test {
 
         let x = Cell::new(0);
         let mut vec = vec![1, 2, 3];
-        let mut stack = UndoStack::new();
-        stack.on_state_change(|is_clean| {
-            if is_clean {
-                x.set(0);
-            } else {
-                x.set(1);
-            }
-        });
+        let mut stack = UndoStackBuilder::new()
+            .on_state_change(|is_clean| if is_clean {
+                                 x.set(0);
+                             } else {
+                                 x.set(1);
+                             })
+            .build();
 
         let cmd = PopCmd {
             vec: &mut vec,
