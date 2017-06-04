@@ -1,6 +1,6 @@
 use std::fmt;
 use fnv::FnvHashMap;
-use {Id, Result, UndoCmd, UndoStack};
+use {Key, Result, UndoCmd, UndoStack};
 
 /// A collection of `UndoStack`s.
 ///
@@ -10,9 +10,9 @@ use {Id, Result, UndoCmd, UndoStack};
 #[derive(Default)]
 pub struct UndoGroup<'a> {
     // The stacks in the group.
-    group: FnvHashMap<u32, UndoStack<'a>>,
+    group: FnvHashMap<Key, UndoStack<'a>>,
     // The active stack.
-    active: Option<u32>,
+    active: Option<Key>,
     // Counter for generating new keys.
     key: u32,
     // Called when the active stack changes.
@@ -112,11 +112,11 @@ impl<'a> UndoGroup<'a> {
     /// let c = group.add(UndoStack::new());
     /// ```
     #[inline]
-    pub fn add(&mut self, stack: UndoStack<'a>) -> Id {
-        let key = self.key;
+    pub fn add(&mut self, stack: UndoStack<'a>) -> Key {
+        let key = Key(self.key);
         self.key += 1;
         self.group.insert(key, stack);
-        Id(key)
+        key
     }
 
     /// Adds a default `UndoStack` to the group and returns an unique id for this stack.
@@ -131,7 +131,7 @@ impl<'a> UndoGroup<'a> {
     /// let c = group.add_default();
     /// ```
     #[inline]
-    pub fn add_default(&mut self) -> Id {
+    pub fn add_default(&mut self) -> Key {
         self.add(Default::default())
     }
 
@@ -147,7 +147,7 @@ impl<'a> UndoGroup<'a> {
     /// assert!(stack.is_some());
     /// ```
     #[inline]
-    pub fn remove(&mut self, Id(key): Id) -> Option<UndoStack<'a>> {
+    pub fn remove(&mut self, key: Key) -> Option<UndoStack<'a>> {
         // Check if it was the active stack that was removed.
         if let Some(active) = self.active {
             if active == key {
@@ -164,10 +164,10 @@ impl<'a> UndoGroup<'a> {
     /// # use undo::UndoGroup;
     /// let mut group = UndoGroup::new();
     /// let a = group.add_default();
-    /// group.set_active(&a);
+    /// group.set_active(a);
     /// ```
     #[inline]
-    pub fn set_active(&mut self, &Id(key): &Id) {
+    pub fn set_active(&mut self, key: Key) {
         if let Some(is_clean) = self.group.get(&key).map(|stack| stack.is_clean()) {
             self.active = Some(key);
             if let Some(ref mut f) = self.on_stack_change {
@@ -183,7 +183,7 @@ impl<'a> UndoGroup<'a> {
     /// # use undo::UndoGroup;
     /// let mut group = UndoGroup::new();
     /// let a = group.add_default();
-    /// group.set_active(&a);
+    /// group.set_active(a);
     /// group.clear_active();
     /// ```
     #[inline]
@@ -227,7 +227,7 @@ impl<'a> UndoGroup<'a> {
     ///
     /// let a = group.add_default();
     /// assert_eq!(group.is_clean(), None);
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// assert_eq!(group.is_clean(), Some(true)); // An empty stack is always clean.
     /// group.push(cmd);
@@ -275,7 +275,7 @@ impl<'a> UndoGroup<'a> {
     ///
     /// let a = group.add_default();
     /// assert_eq!(group.is_dirty(), None);
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// assert_eq!(group.is_dirty(), Some(false)); // An empty stack is always clean.
     /// group.push(cmd);
@@ -324,7 +324,7 @@ impl<'a> UndoGroup<'a> {
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
     /// let a = group.add_default();
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// group.push(cmd);
     /// group.push(cmd);
@@ -377,7 +377,7 @@ impl<'a> UndoGroup<'a> {
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
     /// let a = group.add_default();
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// group.push(cmd);
     /// group.push(cmd);
@@ -440,7 +440,7 @@ impl<'a> UndoGroup<'a> {
     /// let cmd = PopCmd { vec: &mut vec, e: None };
     ///
     /// let a = group.add_default();
-    /// group.set_active(&a);
+    /// group.set_active(a);
     ///
     /// group.push(cmd);
     /// group.push(cmd);
@@ -543,7 +543,7 @@ impl<'a> UndoGroupBuilder<'a> {
     /// ```
     /// # #![allow(unused_variables)]
     /// # use undo::UndoGroupBuilder;
-    /// let mut group = UndoGroupBuilder::new()
+    /// let group = UndoGroupBuilder::new()
     ///     .on_stack_change(|is_clean| {
     ///         match is_clean {
     ///             Some(true) => { /* The new active stack is clean */ },
@@ -638,7 +638,7 @@ mod test {
         let a = group.add(UndoStack::new());
         let b = group.add(UndoStack::new());
 
-        group.set_active(&a);
+        group.set_active(a);
         assert!(group
                     .push(PopCmd {
                               vec: &mut vec1,
@@ -648,7 +648,7 @@ mod test {
                     .is_ok());
         assert_eq!(vec1.len(), 2);
 
-        group.set_active(&b);
+        group.set_active(b);
         assert!(group
                     .push(PopCmd {
                               vec: &mut vec2,
@@ -658,11 +658,11 @@ mod test {
                     .is_ok());
         assert_eq!(vec2.len(), 2);
 
-        group.set_active(&a);
+        group.set_active(a);
         assert!(group.undo().unwrap().is_ok());
         assert_eq!(vec1.len(), 3);
 
-        group.set_active(&b);
+        group.set_active(b);
         assert!(group.undo().unwrap().is_ok());
         assert_eq!(vec2.len(), 3);
 

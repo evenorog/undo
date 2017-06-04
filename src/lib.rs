@@ -98,9 +98,9 @@ use std::fmt;
 use std::result;
 use std::error::Error;
 
-/// An unique id for an `UndoStack`.
-#[derive(Debug)]
-pub struct Id(u32);
+/// A key for an `UndoStack` in an `UndoGroup`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct Key(u32);
 
 /// A specialized `Result` that does not carry any data on success.
 pub type Result = result::Result<(), Box<Error>>;
