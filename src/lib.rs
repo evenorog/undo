@@ -91,7 +91,7 @@ extern crate fnv;
 mod group;
 mod stack;
 
-pub use group::UndoGroup;
+pub use group::{UndoGroup, UndoGroupBuilder};
 pub use stack::{UndoStack, UndoStackBuilder};
 
 use std::fmt;

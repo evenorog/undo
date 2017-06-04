@@ -100,28 +100,6 @@ impl<'a> UndoGroup<'a> {
         self.group.shrink_to_fit();
     }
 
-    /// Sets what should happen when the active stack changes.
-    /// By default the `UndoGroup` does nothing when the active stack changes.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::UndoGroup;
-    /// let mut group = UndoGroup::new();
-    /// group.on_stack_change(|is_clean| {
-    ///     match is_clean {
-    ///         Some(true) => { /* The new active stack is clean */ },
-    ///         Some(false) => { /* The new active stack is dirty */ },
-    ///         None => { /* No active stack */ },
-    ///     }
-    /// });
-    /// ```
-    #[inline]
-    pub fn on_stack_change<F>(&mut self, f: F)
-        where F: FnMut(Option<bool>) + 'a
-    {
-        self.on_stack_change = Some(Box::new(f));
-    }
-
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.
     ///
     /// # Examples
@@ -493,6 +471,125 @@ impl<'a> fmt::Debug for UndoGroup<'a> {
             .field("group", &self.group)
             .field("active", &self.active)
             .field("key", &self.key)
+            .field("on_stack_change",
+                   &if self.on_stack_change.is_some() {
+                       "|_| { .. }"
+                   } else {
+                       "None"
+                   })
+            .finish()
+    }
+}
+
+/// Builder for `UndoGroup`.
+///
+/// # Examples
+/// ```
+/// # #![allow(unused_variables)]
+/// # use undo::UndoGroupBuilder;
+/// let group = UndoGroupBuilder::new()
+///     .capacity(10)
+///     .on_stack_change(|is_clean| {
+///         match is_clean {
+///             Some(true) => { /* The new active stack is clean */ },
+///             Some(false) => { /* The new active stack is dirty */ },
+///             None => { /* No active stack */ },
+///         }
+///     })
+///     .build();
+/// ```
+#[derive(Default)]
+pub struct UndoGroupBuilder<'a> {
+    capacity: usize,
+    on_stack_change: Option<Box<FnMut(Option<bool>) + 'a>>,
+}
+
+impl<'a> UndoGroupBuilder<'a> {
+    /// Creates a new builder.
+    ///
+    /// # Examples
+    /// ```
+    /// # #![allow(unused_variables)]
+    /// # use undo::UndoGroupBuilder;
+    /// let builder = UndoGroupBuilder::new();
+    /// ```
+    #[inline]
+    pub fn new() -> UndoGroupBuilder<'a> {
+        Default::default()
+    }
+
+    /// Sets the specified [capacity] for the group.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::UndoGroupBuilder;
+    /// let group = UndoGroupBuilder::new()
+    ///     .capacity(10)
+    ///     .build();
+    /// assert!(group.capacity() >= 10);
+    /// ```
+    ///
+    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
+    #[inline]
+    pub fn capacity(mut self, capacity: usize) -> UndoGroupBuilder<'a> {
+        self.capacity = capacity;
+        self
+    }
+
+    /// Sets what should happen when the active stack changes.
+    /// By default the `UndoGroup` does nothing when the active stack changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # #![allow(unused_variables)]
+    /// # use undo::UndoGroupBuilder;
+    /// let mut group = UndoGroupBuilder::new()
+    ///     .on_stack_change(|is_clean| {
+    ///         match is_clean {
+    ///             Some(true) => { /* The new active stack is clean */ },
+    ///             Some(false) => { /* The new active stack is dirty */ },
+    ///             None => { /* No active stack */ },
+    ///         }
+    ///     })
+    ///     .build();
+    /// ```
+    #[inline]
+    pub fn on_stack_change<F>(mut self, f: F) -> UndoGroupBuilder<'a>
+        where F: FnMut(Option<bool>) + 'a
+    {
+        self.on_stack_change = Some(Box::new(f));
+        self
+    }
+
+    /// Builds the `UndoGroup`.
+    ///
+    /// # Examples
+    /// ```
+    /// # #![allow(unused_variables)]
+    /// # use undo::UndoGroupBuilder;
+    /// let group = UndoGroupBuilder::new()
+    ///     .capacity(10)
+    ///     .build();
+    /// ```
+    #[inline]
+    pub fn build(self) -> UndoGroup<'a> {
+        let UndoGroupBuilder {
+            capacity,
+            on_stack_change,
+        } = self;
+        UndoGroup {
+            group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
+            on_stack_change,
+            ..Default::default()
+        }
+    }
+}
+
+impl<'a> fmt::Debug for UndoGroupBuilder<'a> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("UndoStackBuilder")
+            .field("capacity", &self.capacity)
             .field("on_stack_change",
                    &if self.on_stack_change.is_some() {
                        "|_| { .. }"
