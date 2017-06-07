@@ -1,6 +1,7 @@
+use std::collections::hash_map;
 use std::fmt;
 use fnv::FnvHashMap;
-use {Key, Result, UndoCmd, UndoStack};
+use {DebugFn, Key, Result, UndoCmd, UndoStack};
 
 /// A collection of `UndoStack`s.
 ///
@@ -21,26 +22,14 @@ pub struct UndoGroup<'a> {
 
 impl<'a> UndoGroup<'a> {
     /// Creates a new `UndoGroup`.
-    ///
-    /// # Examples
-    /// ```
-    /// # #![allow(unused_variables)]
-    /// # use undo::UndoGroup;
-    /// let group = UndoGroup::new();
-    /// ```
     #[inline]
     pub fn new() -> UndoGroup<'a> {
         Default::default()
     }
 
-    /// Creates a new `UndoGroup` with the specified capacity.
+    /// Creates a new `UndoGroup` with the specified [capacity].
     ///
-    /// # Examples
-    /// ```
-    /// # use undo::UndoGroup;
-    /// let group = UndoGroup::with_capacity(10);
-    /// assert!(group.capacity() >= 10);
-    /// ```
+    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
     pub fn with_capacity(capacity: usize) -> UndoGroup<'a> {
         UndoGroup {
@@ -50,13 +39,6 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Returns the capacity of the `UndoGroup`.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::UndoGroup;
-    /// let group = UndoGroup::with_capacity(10);
-    /// assert!(group.capacity() >= 10);
-    /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
         self.group.capacity()
@@ -290,6 +272,16 @@ impl<'a> UndoGroup<'a> {
         self.active.map(|i| self.group[&i].is_dirty())
     }
 
+    /// Returns an iterator over the `(&Key, &UndoStack)` pairs in the group.
+    pub fn stacks(&'a self) -> Stacks<'a> {
+        Stacks(self.group.iter())
+    }
+
+    /// Returns an iterator over the `(&Key, &mut UndoStack)` pairs in the group.
+    pub fn stacks_mut(&'a mut self) -> StacksMut<'a> {
+        StacksMut(self.group.iter_mut())
+    }
+
     /// Calls [`push`] on the active `UndoStack`, if there is one.
     ///
     /// Returns `Some(Ok)` if everything went fine, `Some(Err)` if something went wrong, and `None`
@@ -464,6 +456,69 @@ impl<'a> UndoGroup<'a> {
     }
 }
 
+#[derive(Debug)]
+pub struct IntoStacks<'a>(hash_map::IntoIter<Key, UndoStack<'a>>);
+
+impl<'a> Iterator for IntoStacks<'a> {
+    type Item = (Key, UndoStack<'a>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl<'a> IntoIterator for UndoGroup<'a> {
+    type Item = (Key, UndoStack<'a>);
+    type IntoIter = IntoStacks<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        IntoStacks(self.group.into_iter())
+    }
+}
+
+#[derive(Debug)]
+pub struct Stacks<'a>(hash_map::Iter<'a, Key, UndoStack<'a>>);
+
+impl<'a> Iterator for Stacks<'a> {
+    type Item = (&'a Key, &'a UndoStack<'a>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl<'a> IntoIterator for &'a UndoGroup<'a> {
+    type Item = (&'a Key, &'a UndoStack<'a>);
+    type IntoIter = Stacks<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        Stacks(self.group.iter())
+    }
+}
+
+#[derive(Debug)]
+pub struct StacksMut<'a>(hash_map::IterMut<'a, Key, UndoStack<'a>>);
+
+impl<'a> Iterator for StacksMut<'a> {
+    type Item = (&'a Key, &'a mut UndoStack<'a>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut UndoGroup<'a> {
+    type Item = (&'a Key, &'a mut UndoStack<'a>);
+    type IntoIter = StacksMut<'a>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        StacksMut(self.group.iter_mut())
+    }
+}
+
 impl<'a> fmt::Debug for UndoGroup<'a> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -472,11 +527,7 @@ impl<'a> fmt::Debug for UndoGroup<'a> {
             .field("active", &self.active)
             .field("key", &self.key)
             .field("on_stack_change",
-                   &if self.on_stack_change.is_some() {
-                       "|_| { .. }"
-                   } else {
-                       "None"
-                   })
+                   &self.on_stack_change.as_ref().map(|_| DebugFn))
             .finish()
     }
 }
@@ -506,28 +557,12 @@ pub struct UndoGroupBuilder<'a> {
 
 impl<'a> UndoGroupBuilder<'a> {
     /// Creates a new builder.
-    ///
-    /// # Examples
-    /// ```
-    /// # #![allow(unused_variables)]
-    /// # use undo::UndoGroupBuilder;
-    /// let builder = UndoGroupBuilder::new();
-    /// ```
     #[inline]
     pub fn new() -> UndoGroupBuilder<'a> {
         Default::default()
     }
 
     /// Sets the specified [capacity] for the group.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::UndoGroupBuilder;
-    /// let group = UndoGroupBuilder::new()
-    ///     .capacity(10)
-    ///     .build();
-    /// assert!(group.capacity() >= 10);
-    /// ```
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
@@ -562,15 +597,6 @@ impl<'a> UndoGroupBuilder<'a> {
     }
 
     /// Builds the `UndoGroup`.
-    ///
-    /// # Examples
-    /// ```
-    /// # #![allow(unused_variables)]
-    /// # use undo::UndoGroupBuilder;
-    /// let group = UndoGroupBuilder::new()
-    ///     .capacity(10)
-    ///     .build();
-    /// ```
     #[inline]
     pub fn build(self) -> UndoGroup<'a> {
         let UndoGroupBuilder {
@@ -591,11 +617,7 @@ impl<'a> fmt::Debug for UndoGroupBuilder<'a> {
         f.debug_struct("UndoStackBuilder")
             .field("capacity", &self.capacity)
             .field("on_stack_change",
-                   &if self.on_stack_change.is_some() {
-                       "|_| { .. }"
-                   } else {
-                       "None"
-                   })
+                   &self.on_stack_change.as_ref().map(|_| DebugFn))
             .finish()
     }
 }

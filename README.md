@@ -13,14 +13,14 @@ be redone, otherwise it is dirty. The stack will notice when it's state changes 
 or clean, and call the user defined methods set in [`on_clean`] and [`on_dirty`]. This is useful if
 you want to trigger some event when the state changes, eg. enabling and disabling buttons in an ui.
 
-It also supports [automatic merging] of commands with the same id.
+It also supports [automatic merging][auto] of commands with the same id.
 
 ## Redo vs Undo
-|                 | Redo         | Undo            |
-|-----------------|--------------|-----------------|
-| Dispatch        | [Static]     | [Dynamic]       |
-| State Handling  | Yes          | Yes             |
-| Command Merging | Manual       | Auto            |
+|                 | Redo             | Undo            |
+|-----------------|------------------|-----------------|
+| Dispatch        | [Static]         | [Dynamic]       |
+| State Handling  | Yes              | Yes             |
+| Command Merging | [Manual][manual] | [Auto][auto]    |
 
 Both supports command merging but `undo` will automatically merge commands with the same id,
 while in `redo` you need to implement the merge method yourself.
@@ -28,7 +28,7 @@ while in `redo` you need to implement the merge method yourself.
 ## Examples
 ```toml
 [dependencies]
-undo = "0.7.2"
+undo = "0.8.0"
 ```
 
 ```rust
@@ -81,7 +81,8 @@ fn foo() -> undo::Result {
 [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 [`on_clean`]: struct.UndoStack.html#method.on_clean
 [`on_dirty`]: struct.UndoStack.html#method.on_dirty
-[automatic merging]: trait.UndoCmd.html#method.id
+[auto]: trait.UndoCmd.html#method.id
+[manual]: https://docs.rs/redo/0.4.0/redo/trait.RedoCmd.html#method.merge
 [Static]: https://doc.rust-lang.org/stable/book/trait-objects.html#static-dispatch
 [Dynamic]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
 [`redo`]: https://crates.io/crates/redo

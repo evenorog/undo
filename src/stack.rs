@@ -1,17 +1,16 @@
 use std::collections::VecDeque;
 use std::fmt;
-use {Result, UndoCmd};
+use {DebugFn, Result, UndoCmd};
 
 /// Maintains a stack of `UndoCmd`s.
 ///
 /// `UndoStack` uses dynamic dispatch so it can hold multiple types of commands at a given time.
 ///
-/// It will notice when it's state changes to either dirty or clean, and call the user
-/// defined methods set in [on_clean] and [on_dirty]. This is useful if you want to trigger some
-/// event when the state changes, eg. enabling and disabling buttons in an ui.
+/// When its state changes to either dirty or clean, it calls the user defined methods
+/// set in [`on_state_change`]. This is useful if you want to trigger some
+/// event when the state changes, eg. enabling and disabling undo and redo buttons.
 ///
-/// [on_clean]: struct.UndoStack.html#method.on_clean
-/// [on_dirty]: struct.UndoStack.html#method.on_dirty
+/// [`on_state_change`]: struct.UndoStackBuilder.html#method.on_state_change
 #[derive(Default)]
 pub struct UndoStack<'a> {
     // All commands on the stack.
@@ -26,13 +25,6 @@ pub struct UndoStack<'a> {
 
 impl<'a> UndoStack<'a> {
     /// Creates a new `UndoStack`.
-    ///
-    /// # Examples
-    /// ```
-    /// # #![allow(unused_variables)]
-    /// # use undo::UndoStack;
-    /// let stack = UndoStack::new();
-    /// ```
     #[inline]
     pub fn new() -> UndoStack<'a> {
         Default::default()
@@ -42,8 +34,6 @@ impl<'a> UndoStack<'a> {
     /// If this limit is reached it will start popping of commands at the bottom of the stack when
     /// pushing new commands on to the stack. No limit is set by default which means it may grow
     /// indefinitely.
-    ///
-    /// The stack may remove multiple commands at a time to increase performance.
     ///
     /// # Examples
     /// ```
@@ -99,14 +89,6 @@ impl<'a> UndoStack<'a> {
 
     /// Creates a new `UndoStack` with the specified [capacity].
     ///
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::UndoStack;
-    /// let stack = UndoStack::with_capacity(10);
-    /// assert!(stack.capacity() >= 10);
-    /// ```
-    ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
     pub fn with_capacity(capacity: usize) -> UndoStack<'a> {
@@ -117,29 +99,12 @@ impl<'a> UndoStack<'a> {
     }
 
     /// Returns the limit of the `UndoStack`, or `None` if it has no limit.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::UndoStack;
-    /// let stack = UndoStack::with_limit(10);
-    /// assert_eq!(stack.limit(), Some(10));
-    ///
-    /// let stack = UndoStack::new();
-    /// assert_eq!(stack.limit(), None);
-    /// ```
     #[inline]
     pub fn limit(&self) -> Option<usize> {
         self.limit
     }
 
     /// Returns the number of commands the stack can hold without reallocating.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::UndoStack;
-    /// let stack = UndoStack::with_capacity(10);
-    /// assert!(stack.capacity() >= 10);
-    /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
         self.stack.capacity()
@@ -558,11 +523,7 @@ impl<'a> fmt::Debug for UndoStack<'a> {
             .field("idx", &self.idx)
             .field("limit", &self.limit)
             .field("on_state_change",
-                   &if self.on_state_change.is_some() {
-                       "|_| { .. }"
-                   } else {
-                       "None"
-                   })
+                   &self.on_state_change.as_ref().map(|_| DebugFn))
             .finish()
     }
 }
@@ -615,28 +576,12 @@ pub struct UndoStackBuilder<'a> {
 
 impl<'a> UndoStackBuilder<'a> {
     /// Creates a new builder.
-    ///
-    /// # Examples
-    /// ```
-    /// # #![allow(unused_variables)]
-    /// # use undo::UndoStackBuilder;
-    /// let builder = UndoStackBuilder::new();
-    /// ```
     #[inline]
     pub fn new() -> UndoStackBuilder<'a> {
         Default::default()
     }
 
     /// Sets the specified [capacity] for the stack.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::UndoStackBuilder;
-    /// let stack = UndoStackBuilder::new()
-    ///     .capacity(10)
-    ///     .build();
-    /// assert!(stack.capacity() >= 10);
-    /// ```
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
@@ -649,8 +594,6 @@ impl<'a> UndoStackBuilder<'a> {
     /// If this limit is reached it will start popping of commands at the bottom of the stack when
     /// pushing new commands on to the stack. No limit is set by default which means it may grow
     /// indefinitely.
-    ///
-    /// The stack may remove multiple commands at a time to increase performance.
     ///
     /// # Examples
     /// ```
@@ -763,16 +706,6 @@ impl<'a> UndoStackBuilder<'a> {
     }
 
     /// Builds the `UndoStack`.
-    ///
-    /// # Examples
-    /// ```
-    /// # #![allow(unused_variables)]
-    /// # use undo::UndoStackBuilder;
-    /// let stack = UndoStackBuilder::new()
-    ///     .capacity(10)
-    ///     .limit(10)
-    ///     .build();
-    /// ```
     #[inline]
     pub fn build(self) -> UndoStack<'a> {
         let UndoStackBuilder {
@@ -796,11 +729,7 @@ impl<'a> fmt::Debug for UndoStackBuilder<'a> {
             .field("capacity", &self.capacity)
             .field("limit", &self.limit)
             .field("on_state_change",
-                   &if self.on_state_change.is_some() {
-                       "|_| { .. }"
-                   } else {
-                       "None"
-                   })
+                   &self.on_state_change.as_ref().map(|_| DebugFn))
             .finish()
     }
 }
