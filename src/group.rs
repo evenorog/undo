@@ -410,7 +410,7 @@ impl<'a> UndoGroup<'a> {
     /// Returns `Some(_)` if there is an active stack and returns `None` if not.
     ///
     /// # Errors
-    /// If an error occur when executing `redo` the error is returned as `Some(Err(_))`
+    /// If an error occur when executing `undo` the error is returned as `Some(Err(_))`
     /// and the state of the stack is left unchanged.
     ///
     /// # Examples
