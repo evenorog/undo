@@ -8,6 +8,10 @@ use {DebugFn, Key, Result, UndoCmd, UndoStack};
 /// An `UndoGroup` is useful when working with multiple stacks and only one of them should
 /// be active at a given time, eg. a text editor with multiple documents opened. However, if only
 /// a single stack is needed, it is easier to just use the stack directly.
+///
+/// When the active stack changes it calls the user defined method set in [`on_stack_change`].
+///
+/// [`on_stack_change`]: struct.UndoGroupBuilder.html#method.on_stack_change
 #[derive(Default)]
 pub struct UndoGroup<'a> {
     // The stacks in the group.
@@ -283,9 +287,11 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Calls [`push`] on the active `UndoStack`, if there is one.
+    /// Returns `Some(_)` if there is an active stack and returns `None` if not.
     ///
-    /// Returns `Some(Ok)` if everything went fine, `Some(Err)` if something went wrong, and `None`
-    /// if there is no active stack.
+    /// # Errors
+    /// If an error occur when executing `redo` the error is returned as `Some(Err(_))`
+    /// and the state of the stack is left unchanged.
     ///
     /// # Examples
     /// ```
@@ -336,9 +342,11 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Calls [`redo`] on the active `UndoStack`, if there is one.
+    /// Returns `Some(_)` if there is an active stack and returns `None` if not.
     ///
-    /// Returns `Some(Ok)` if everything went fine, `Some(Err)` if something went wrong, and `None`
-    /// if there is no active stack.
+    /// # Errors
+    /// If an error occur when executing `redo` the error is returned as `Some(Err(_))`
+    /// and the state of the stack is left unchanged.
     ///
     /// # Examples
     /// ```
@@ -399,9 +407,11 @@ impl<'a> UndoGroup<'a> {
     }
 
     /// Calls [`undo`] on the active `UndoStack`, if there is one.
+    /// Returns `Some(_)` if there is an active stack and returns `None` if not.
     ///
-    /// Returns `Some(Ok)` if everything went fine, `Some(Err)` if something went wrong, and `None`
-    /// if there is no active stack.
+    /// # Errors
+    /// If an error occur when executing `redo` the error is returned as `Some(Err(_))`
+    /// and the state of the stack is left unchanged.
     ///
     /// # Examples
     /// ```

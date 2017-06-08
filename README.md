@@ -28,7 +28,7 @@ while in `redo` you need to implement the merge method yourself.
 ## Examples
 ```toml
 [dependencies]
-undo = "0.8.0"
+undo = "0.8.1"
 ```
 
 ```rust

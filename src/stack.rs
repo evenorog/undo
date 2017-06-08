@@ -6,7 +6,7 @@ use {DebugFn, Result, UndoCmd};
 ///
 /// `UndoStack` uses dynamic dispatch so it can hold multiple types of commands at a given time.
 ///
-/// When its state changes to either dirty or clean, it calls the user defined methods
+/// When its state changes to either dirty or clean, it calls the user defined method
 /// set in [`on_state_change`]. This is useful if you want to trigger some
 /// event when the state changes, eg. enabling and disabling undo and redo buttons.
 ///
@@ -299,6 +299,10 @@ impl<'a> UndoStack<'a> {
     ///
     /// If `cmd`s id is equal to the top command on the stack, the two commands are merged.
     ///
+    /// # Errors
+    /// If an error occur when executing `redo` the error is returned
+    /// and the state of the stack is left unchanged.
+    ///
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
@@ -344,9 +348,9 @@ impl<'a> UndoStack<'a> {
     {
         let is_dirty = self.is_dirty();
         let len = self.idx;
+        cmd.redo()?;
         // Pop off all elements after len from stack.
         self.stack.truncate(len);
-        cmd.redo()?;
 
         match (cmd.id(), self.stack.back().and_then(|cmd| cmd.id())) {
             (Some(id1), Some(id2)) if id1 == id2 => {
@@ -380,6 +384,10 @@ impl<'a> UndoStack<'a> {
 
     /// Calls the [`redo`] method for the active `UndoCmd` and sets the next `UndoCmd` as the new
     /// active one.
+    ///
+    /// # Errors
+    /// If an error occur when executing `redo` the error is returned
+    /// and the state of the stack is left unchanged.
     ///
     /// # Examples
     /// ```
@@ -452,6 +460,10 @@ impl<'a> UndoStack<'a> {
     /// Calls the [`undo`] method for the active `UndoCmd` and sets the previous `UndoCmd` as the
     /// new active one.
     ///
+    /// # Errors
+    /// If an error occur when executing `undo` the error is returned
+    /// and the state of the stack is left unchanged.
+    ///
     /// # Examples
     /// ```
     /// # use undo::{self, UndoCmd, UndoStack};
@@ -502,8 +514,8 @@ impl<'a> UndoStack<'a> {
     pub fn undo(&mut self) -> Result {
         if self.idx > 0 {
             let is_clean = self.is_clean();
+            self.stack[self.idx - 1].undo()?;
             self.idx -= 1;
-            self.stack[self.idx].undo()?;
             // Check if stack went from clean to dirty.
             if is_clean && self.is_dirty() {
                 if let Some(ref mut f) = self.on_state_change {
@@ -594,53 +606,6 @@ impl<'a> UndoStackBuilder<'a> {
     /// If this limit is reached it will start popping of commands at the bottom of the stack when
     /// pushing new commands on to the stack. No limit is set by default which means it may grow
     /// indefinitely.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::{self, UndoCmd, UndoStackBuilder};
-    /// # #[derive(Clone, Copy, Debug)]
-    /// # struct PopCmd {
-    /// #   vec: *mut Vec<i32>,
-    /// #   e: Option<i32>,
-    /// # }
-    /// # impl UndoCmd for PopCmd {
-    /// #   fn redo(&mut self) -> undo::Result {
-    /// #       self.e = unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.pop()
-    /// #       };
-    /// #       Ok(())
-    /// #   }
-    /// #   fn undo(&mut self) -> undo::Result {
-    /// #       unsafe {
-    /// #           let ref mut vec = *self.vec;
-    /// #           vec.push(self.e.unwrap());
-    /// #       }
-    /// #       Ok(())
-    /// #   }
-    /// # }
-    /// # fn foo() -> undo::Result {
-    /// let mut vec = vec![1, 2, 3];
-    /// let mut stack = UndoStackBuilder::new()
-    ///     .limit(2)
-    ///     .build();
-    /// let cmd = PopCmd { vec: &mut vec, e: None };
-    ///
-    /// stack.push(cmd)?;
-    /// stack.push(cmd)?;
-    /// stack.push(cmd)?; // Pops off the first cmd.
-    ///
-    /// assert!(vec.is_empty());
-    ///
-    /// stack.undo()?;
-    /// stack.undo()?;
-    /// stack.undo()?; // Does nothing.
-    ///
-    /// assert_eq!(vec, vec![1, 2]);
-    /// # Ok(())
-    /// # }
-    /// # foo().unwrap();
-    /// ```
     #[inline]
     pub fn limit(mut self, limit: usize) -> UndoStackBuilder<'a> {
         self.limit = if limit == 0 { None } else { Some(limit) };
