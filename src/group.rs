@@ -86,6 +86,12 @@ impl<'a> UndoGroup<'a> {
         self.group.shrink_to_fit();
     }
 
+    /// Returns the number of stacks in the group.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.group.len()
+    }
+
     /// Adds an `UndoStack` to the group and returns an unique id for this stack.
     ///
     /// # Examples
