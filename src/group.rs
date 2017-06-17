@@ -31,6 +31,30 @@ impl<'a> UndoGroup<'a> {
         Default::default()
     }
 
+    /// Creates a configurator that can be used to configure the `UndoGroup`.
+    ///
+    /// The configurator can set the `capacity` and what should happen when the active stack
+    /// changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use undo::UndoGroup;
+    /// let _ = UndoGroup::config()
+    ///     .capacity(10)
+    ///     .on_stack_change(|is_clean| {
+    ///         match is_clean {
+    ///             Some(true) => { /* The new active stack is clean */ },
+    ///             Some(false) => { /* The new active stack is dirty */ },
+    ///             None => { /* No active stack */ },
+    ///         }
+    ///     })
+    ///     .finish();
+    /// ```
+    #[inline]
+    pub fn config() -> Config<'a> {
+        Default::default()
+    }
+
     /// Creates a new `UndoGroup` with the specified [capacity].
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
@@ -340,7 +364,8 @@ impl<'a> UndoGroup<'a> {
     /// [`push`]: struct.UndoStack.html#method.push
     #[inline]
     pub fn push<T>(&mut self, cmd: T) -> Option<Result>
-        where T: UndoCmd + 'a
+    where
+        T: UndoCmd + 'a,
     {
         self.active
             .and_then(|active| self.group.get_mut(&active))
@@ -542,47 +567,27 @@ impl<'a> fmt::Debug for UndoGroup<'a> {
             .field("group", &self.group)
             .field("active", &self.active)
             .field("key", &self.key)
-            .field("on_stack_change",
-                   &self.on_stack_change.as_ref().map(|_| DebugFn))
+            .field(
+                "on_stack_change",
+                &self.on_stack_change.as_ref().map(|_| DebugFn),
+            )
             .finish()
     }
 }
 
-/// Builder for `UndoGroup`.
-///
-/// # Examples
-/// ```
-/// # #![allow(unused_variables)]
-/// # use undo::UndoGroupBuilder;
-/// let group = UndoGroupBuilder::new()
-///     .capacity(10)
-///     .on_stack_change(|is_clean| {
-///         match is_clean {
-///             Some(true) => { /* The new active stack is clean */ },
-///             Some(false) => { /* The new active stack is dirty */ },
-///             None => { /* No active stack */ },
-///         }
-///     })
-///     .build();
-/// ```
+/// Configurator for `UndoGroup`.
 #[derive(Default)]
-pub struct UndoGroupBuilder<'a> {
+pub struct Config<'a> {
     capacity: usize,
     on_stack_change: Option<Box<FnMut(Option<bool>) + 'a>>,
 }
 
-impl<'a> UndoGroupBuilder<'a> {
-    /// Creates a new builder.
-    #[inline]
-    pub fn new() -> UndoGroupBuilder<'a> {
-        Default::default()
-    }
-
+impl<'a> Config<'a> {
     /// Sets the specified [capacity] for the group.
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> UndoGroupBuilder<'a> {
+    pub fn capacity(mut self, capacity: usize) -> Config<'a> {
         self.capacity = capacity;
         self
     }
@@ -592,9 +597,8 @@ impl<'a> UndoGroupBuilder<'a> {
     ///
     /// # Examples
     /// ```
-    /// # #![allow(unused_variables)]
-    /// # use undo::UndoGroupBuilder;
-    /// let group = UndoGroupBuilder::new()
+    /// # use undo::UndoGroup;
+    /// let _ = UndoGroup::config()
     ///     .on_stack_change(|is_clean| {
     ///         match is_clean {
     ///             Some(true) => { /* The new active stack is clean */ },
@@ -602,38 +606,37 @@ impl<'a> UndoGroupBuilder<'a> {
     ///             None => { /* No active stack */ },
     ///         }
     ///     })
-    ///     .build();
+    ///     .finish();
     /// ```
     #[inline]
-    pub fn on_stack_change<F>(mut self, f: F) -> UndoGroupBuilder<'a>
-        where F: FnMut(Option<bool>) + 'a
+    pub fn on_stack_change<F>(mut self, f: F) -> Config<'a>
+    where
+        F: FnMut(Option<bool>) + 'a,
     {
         self.on_stack_change = Some(Box::new(f));
         self
     }
 
-    /// Builds the `UndoGroup`.
+    /// Returns the `UndoGroup`.
     #[inline]
-    pub fn build(self) -> UndoGroup<'a> {
-        let UndoGroupBuilder {
-            capacity,
-            on_stack_change,
-        } = self;
+    pub fn finish(self) -> UndoGroup<'a> {
         UndoGroup {
-            group: FnvHashMap::with_capacity_and_hasher(capacity, Default::default()),
-            on_stack_change,
+            group: FnvHashMap::with_capacity_and_hasher(self.capacity, Default::default()),
+            on_stack_change: self.on_stack_change,
             ..Default::default()
         }
     }
 }
 
-impl<'a> fmt::Debug for UndoGroupBuilder<'a> {
+impl<'a> fmt::Debug for Config<'a> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("UndoStackBuilder")
+        f.debug_struct("Config")
             .field("capacity", &self.capacity)
-            .field("on_stack_change",
-                   &self.on_stack_change.as_ref().map(|_| DebugFn))
+            .field(
+                "on_stack_change",
+                &self.on_stack_change.as_ref().map(|_| DebugFn),
+            )
             .finish()
     }
 }
@@ -677,23 +680,27 @@ mod test {
         let b = group.add(UndoStack::new());
 
         group.set_active(a);
-        assert!(group
-                    .push(PopCmd {
-                              vec: &mut vec1,
-                              e: None,
-                          })
-                    .unwrap()
-                    .is_ok());
+        assert!(
+            group
+                .push(PopCmd {
+                    vec: &mut vec1,
+                    e: None,
+                })
+                .unwrap()
+                .is_ok()
+        );
         assert_eq!(vec1.len(), 2);
 
         group.set_active(b);
-        assert!(group
-                    .push(PopCmd {
-                              vec: &mut vec2,
-                              e: None,
-                          })
-                    .unwrap()
-                    .is_ok());
+        assert!(
+            group
+                .push(PopCmd {
+                    vec: &mut vec2,
+                    e: None,
+                })
+                .unwrap()
+                .is_ok()
+        );
         assert_eq!(vec2.len(), 2);
 
         group.set_active(a);
