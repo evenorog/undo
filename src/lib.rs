@@ -5,7 +5,7 @@
 //!
 //! The `UndoStack` has two states, clean and dirty. The stack is clean when no more commands can
 //! be redone, otherwise it is dirty. When it's state changes to either dirty or clean, it calls
-//! the user defined methods set in [`on_state_change`]. This is useful if you want to trigger some
+//! the user defined method set in [`on_state_change`]. This is useful if you want to trigger some
 //! event when the state changes, eg. enabling and disabling undo and redo buttons.
 //!
 //! It also supports [automatic merging][auto] of commands with the same id.
