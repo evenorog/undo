@@ -78,21 +78,19 @@
 //! [Dynamic]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
 //! [`redo`]: https://crates.io/crates/redo
 
-#![forbid(unstable_features)]
+#![forbid(unstable_features, bad_style)]
 #![deny(missing_docs,
         missing_debug_implementations,
         unused_import_braces,
         unused_qualifications)]
 
-// TODO: serde?
+// TODO: serde? groups?
 
 extern crate fnv;
 
-mod group;
 mod stack;
 
-pub use group::UndoGroup;
-pub use stack::UndoStack;
+pub use stack::Stack;
 
 use std::fmt;
 use std::result;

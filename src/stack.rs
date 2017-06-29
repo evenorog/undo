@@ -10,7 +10,7 @@ use {DebugFn, Result, UndoCmd};
 /// set when configuring the stack. This is useful if you want to trigger some
 /// event when the state changes, eg. enabling and disabling undo and redo buttons.
 #[derive(Default)]
-pub struct UndoStack<'a> {
+pub struct Stack<'a> {
     // All commands on the stack.
     stack: VecDeque<Box<UndoCmd + 'a>>,
     // Current position in the stack.
@@ -21,10 +21,10 @@ pub struct UndoStack<'a> {
     on_state_change: Option<Box<FnMut(bool) + 'a>>,
 }
 
-impl<'a> UndoStack<'a> {
+impl<'a> Stack<'a> {
     /// Creates a new `UndoStack`.
     #[inline]
-    pub fn new() -> UndoStack<'a> {
+    pub fn new() -> Stack<'a> {
         Default::default()
     }
 
@@ -103,8 +103,8 @@ impl<'a> UndoStack<'a> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn with_limit(limit: usize) -> UndoStack<'a> {
-        UndoStack {
+    pub fn with_limit(limit: usize) -> Stack<'a> {
+        Stack {
             limit: if limit == 0 { None } else { Some(limit) },
             ..Default::default()
         }
@@ -114,8 +114,8 @@ impl<'a> UndoStack<'a> {
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn with_capacity(capacity: usize) -> UndoStack<'a> {
-        UndoStack {
+    pub fn with_capacity(capacity: usize) -> Stack<'a> {
+        Stack {
             stack: VecDeque::with_capacity(capacity),
             ..Default::default()
         }
@@ -551,7 +551,7 @@ impl<'a> UndoStack<'a> {
     }
 }
 
-impl<'a> fmt::Debug for UndoStack<'a> {
+impl<'a> fmt::Debug for Stack<'a> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("UndoStack")
@@ -680,8 +680,8 @@ impl<'a> Config<'a> {
 
     /// Returns the `UndoStack`.
     #[inline]
-    pub fn finish(self) -> UndoStack<'a> {
-        UndoStack {
+    pub fn finish(self) -> Stack<'a> {
+        Stack {
             stack: VecDeque::with_capacity(self.capacity),
             limit: self.limit,
             on_state_change: self.on_state_change,
@@ -738,7 +738,7 @@ mod test {
 
         let x = Cell::new(0);
         let mut vec = vec![1, 2, 3];
-        let mut stack = UndoStack::config()
+        let mut stack = Stack::config()
             .on_state_change(|is_clean| if is_clean {
                 x.set(0);
             } else {
