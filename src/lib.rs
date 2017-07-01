@@ -53,6 +53,23 @@ pub trait Command<T> {
     }
 }
 
+impl<T> Command<T> for Box<Command<T>> {
+    #[inline]
+    fn redo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
+        (**self).redo(receiver)
+    }
+
+    #[inline]
+    fn undo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
+        (**self).undo(receiver)
+    }
+
+    #[inline]
+    fn id(&self) -> Option<u64> {
+        (**self).id()
+    }
+}
+
 impl<T> Debug for Command<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -60,5 +77,30 @@ impl<T> Debug for Command<T> {
             Some(id) => write!(f, "{}", id),
             None => write!(f, "_"),
         }
+    }
+}
+
+#[derive(Debug)]
+struct Merger<T> {
+    cmd1: Box<Command<T>>,
+    cmd2: Box<Command<T>>,
+}
+
+impl<T> Command<T> for Merger<T> {
+    #[inline]
+    fn redo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
+        self.cmd1.redo(receiver)?;
+        self.cmd2.redo(receiver)
+    }
+
+    #[inline]
+    fn undo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
+        self.cmd2.undo(receiver)?;
+        self.cmd1.undo(receiver)
+    }
+
+    #[inline]
+    fn id(&self) -> Option<u64> {
+        self.cmd1.id()
     }
 }

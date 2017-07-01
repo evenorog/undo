@@ -1,7 +1,7 @@
 use std::collections::vec_deque::{VecDeque, IntoIter};
 use std::error::Error;
 use std::fmt::{self, Debug, Formatter};
-use Command;
+use {Command, Merger};
 
 /// A record of commands.
 ///
@@ -58,7 +58,7 @@ use Command;
 /// # foo().unwrap();
 /// ```
 #[derive(Default)]
-pub struct Record<'a, T: 'static> {
+pub struct Record<'a, T> {
     commands: VecDeque<Box<Command<T>>>,
     receiver: T,
     idx: usize,
@@ -225,6 +225,7 @@ impl<'a, T> Record<'a, T> {
     pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<T>, (Box<Command<T>>, Box<Error>)>
     where
         C: Command<T> + 'static,
+        T: 'static,
     {
         let is_dirty = self.is_dirty();
         let len = self.idx;
@@ -314,6 +315,13 @@ impl<'a, T> Record<'a, T> {
     }
 }
 
+impl<'a, T> AsRef<T> for Record<'a, T> {
+    #[inline]
+    fn as_ref(&self) -> &T {
+        self.as_receiver()
+    }
+}
+
 impl<'a, T: Debug> Debug for Record<'a, T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -336,31 +344,6 @@ impl<T> Iterator for Commands<T> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
-    }
-}
-
-#[derive(Debug)]
-struct Merger<T> {
-    cmd1: Box<Command<T>>,
-    cmd2: Box<Command<T>>,
-}
-
-impl<T> Command<T> for Merger<T> {
-    #[inline]
-    fn redo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
-        self.cmd1.redo(receiver)?;
-        self.cmd2.redo(receiver)
-    }
-
-    #[inline]
-    fn undo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
-        self.cmd2.undo(receiver)?;
-        self.cmd1.undo(receiver)
-    }
-
-    #[inline]
-    fn id(&self) -> Option<u64> {
-        self.cmd1.id()
     }
 }
 
@@ -394,6 +377,46 @@ impl<'a, T> Config<'a, T> {
 
     /// Sets what should happen when the state changes.
     /// By default the `Record` does nothing when the state changes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::cell::Cell;
+    /// # use std::error::Error;
+    /// # use undo::{Command, Record};
+    /// # struct Add(char);
+    /// # impl Command<String> for Add {
+    /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #         s.push(self.0);
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #         self.0 = s.pop().expect("`String` is unexpectedly empty");
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> Result<(), Box<Error>> {
+    /// let x = Cell::new(0);
+    /// let mut record = Record::config("")
+    ///     .state_change(|is_clean| {
+    ///         if is_clean {
+    ///             x.set(1);
+    ///         } else {
+    ///             x.set(2);
+    ///         }
+    ///     })
+    ///     .finish();
+    ///
+    /// assert_eq!(x.get(), 0);
+    /// record.push(Add('a')).map_err(|(_, e)| e)?;
+    /// assert_eq!(x.get(), 0);
+    /// record.undo()?;
+    /// assert_eq!(x.get(), 2);
+    /// record.redo()?;
+    /// assert_eq!(x.get(), 1);
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
     #[inline]
     pub fn state_change<F>(mut self, f: F) -> Config<'a, T>
     where
