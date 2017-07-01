@@ -1,86 +1,16 @@
-//! An undo/redo library with dynamic dispatch, state handling and automatic command merging.
+//! An undo/redo library with dynamic dispatch and automatic command merging.
+//! It uses the [Command Pattern] where the user modifies a receiver by
+//! applying `Command`s on it.
 //!
-//! # About
-//! It uses the [Command Pattern] where the user implements the `UndoCmd` trait for each command.
+//! The library has currently two data structures that can be used to modify the receiver:
 //!
-//! The `UndoStack` has two states, clean and dirty. The stack is clean when no more commands can
-//! be redone, otherwise it is dirty. When it's state changes to either dirty or clean, it calls
-//! the user defined method set in [`on_state_change`]. This is useful if you want to trigger some
-//! event when the state changes, eg. enabling and disabling undo and redo buttons.
-//!
-//! It also supports [automatic merging][auto] of commands with the same id.
-//!
-//! # Redo vs Undo
-//! |                 | Redo             | Undo            |
-//! |-----------------|------------------|-----------------|
-//! | Dispatch        | [Static]         | [Dynamic]       |
-//! | State Handling  | Yes              | Yes             |
-//! | Command Merging | [Manual][manual] | [Auto][auto]    |
-//!
-//! Both supports command merging but `undo` will automatically merge commands with the same id
-//! while in `redo` you need to implement the merge method yourself.
-//!
-//! # Examples
-//!
-//! ```
-//! use undo::{self, UndoCmd, UndoStack};
-//!
-//! #[derive(Clone, Copy, Debug)]
-//! struct PopCmd {
-//!     vec: *mut Vec<i32>,
-//!     e: Option<i32>,
-//! }
-//!
-//! impl UndoCmd for PopCmd {
-//!     fn redo(&mut self) -> undo::Result {
-//!         self.e = unsafe {
-//!             let ref mut vec = *self.vec;
-//!             vec.pop()
-//!         };
-//!         Ok(())
-//!     }
-//!
-//!     fn undo(&mut self) -> undo::Result {
-//!         unsafe {
-//!             let ref mut vec = *self.vec;
-//!             vec.push(self.e.unwrap());
-//!         }
-//!         Ok(())
-//!     }
-//! }
-//!
-//! fn foo() -> undo::Result {
-//!     let mut vec = vec![1, 2, 3];
-//!     let mut stack = UndoStack::new();
-//!     let cmd = PopCmd { vec: &mut vec, e: None };
-//!
-//!     stack.push(cmd)?;
-//!     stack.push(cmd)?;
-//!     stack.push(cmd)?;
-//!
-//!     assert!(vec.is_empty());
-//!
-//!     stack.undo()?;
-//!     stack.undo()?;
-//!     stack.undo()?;
-//!
-//!     assert_eq!(vec.len(), 3);
-//!     Ok(())
-//! }
-//! # foo().unwrap();
-//! ```
+//! * A simple `Stack` that pushes and pops commands to modify the receiver.
+//! * A `Record` that can roll the state of the receiver forwards and backwards.
 //!
 //! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
-//! [`on_state_change`]: struct.UndoStackBuilder.html#method.on_state_change
-//! [auto]: trait.UndoCmd.html#method.id
-//! [manual]: https://docs.rs/redo/0.4.0/redo/trait.RedoCmd.html#method.merge
-//! [Static]: https://doc.rust-lang.org/stable/book/trait-objects.html#static-dispatch
-//! [Dynamic]: https://doc.rust-lang.org/stable/book/trait-objects.html#dynamic-dispatch
-//! [`redo`]: https://crates.io/crates/redo
 
 #![forbid(unstable_features, bad_style)]
-#![deny(missing_docs,
-        missing_debug_implementations,
+#![deny(missing_debug_implementations,
         unused_import_braces,
         unused_qualifications)]
 
@@ -88,34 +18,26 @@
 
 extern crate fnv;
 
+mod record;
 mod stack;
 
+pub use record::Record;
 pub use stack::Stack;
 
-use std::fmt;
-use std::result;
+use std::fmt::{self, Debug, Formatter};
 use std::error::Error;
 
-/// A key for an `UndoStack` in an `UndoGroup`.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct Key(u32);
-
-/// A specialized `Result` that does not carry any data on success.
-pub type Result = result::Result<(), Box<Error>>;
-
-/// Trait that defines the functionality of a command.
-///
-/// Every command needs to implement this trait to be able to be used with the `UndoStack`.
-pub trait UndoCmd: fmt::Debug {
+/// Base functionality for all commands.
+pub trait Command<T> {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self) -> Result;
+    fn redo(&mut self, receiver: &mut T) -> Result<(), Box<Error>>;
 
     /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`redo`]: trait.UndoCmd.html#tymethod.redo
-    fn undo(&mut self) -> Result;
+    fn undo(&mut self, receiver: &mut T) -> Result<(), Box<Error>>;
 
     /// Used for merging of `UndoCmd`s.
     ///
@@ -125,54 +47,18 @@ pub trait UndoCmd: fmt::Debug {
     /// editor where you might want to undo a whole word instead of each character.
     ///
     /// Default implementation returns `None`, which means the command will never be merged.
-    ///
-    /// # Examples
-    /// ```
-    /// use undo::{UndoCmd, UndoStack};
-    ///
-    /// #[derive(Debug)]
-    /// struct TxtCmd(char);
-    ///
-    /// impl UndoCmd for TxtCmd {
-    ///     fn redo(&mut self) -> undo::Result {
-    ///         Ok(())
-    ///     }
-    ///
-    ///     fn undo(&mut self) -> undo::Result {
-    ///         Ok(())
-    ///     }
-    ///
-    ///     fn id(&self) -> Option<u64> {
-    ///         // Merge cmd if not a space.
-    ///         if self.0 == ' ' {
-    ///             None
-    ///         } else {
-    ///             Some(1)
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// fn foo() -> undo::Result {
-    ///     let mut stack = UndoStack::new();
-    ///     stack.push(TxtCmd('a'))?;
-    ///     stack.push(TxtCmd('b'))?; // 'a' and 'b' is merged.
-    ///     stack.push(TxtCmd(' '))?;
-    ///     stack.push(TxtCmd('c'))?;
-    ///     stack.push(TxtCmd('d'))   // 'c' and 'd' is merged.
-    /// }
-    /// # foo().unwrap();
-    /// ```
     #[inline]
     fn id(&self) -> Option<u64> {
         None
     }
 }
 
-struct DebugFn;
-
-impl fmt::Debug for DebugFn {
+impl<T> Debug for Command<T> {
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "|_| {{ .. }}")
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self.id() {
+            Some(id) => write!(f, "{}", id),
+            None => write!(f, "_"),
+        }
     }
 }
