@@ -6,8 +6,9 @@ description = "An undo/redo library with dynamic dispatch and automatic command 
 documentation = "https://docs.rs/undo"
 repository = "https://github.com/evenorog/undo"
 readme = "README.md"
-license = "MIT"
+license = "MIT/Apache-2.0"
 keywords = ["undo", "redo"]
+categories = ["data-structures"]
 
 [dependencies]
 fnv = "1.0.5"
