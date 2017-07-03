@@ -221,7 +221,7 @@ impl<'a, T> Record<'a, T> {
     /// # foo().unwrap();
     /// ```
     ///
-    /// [`redo`]: trait.UndoCmd.html#tymethod.redo
+    /// [`redo`]: trait.Command.html#tymethod.redo
     pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<T>, (Box<Command<T>>, Box<Error>)>
     where
         C: Command<T> + 'static,
@@ -266,14 +266,14 @@ impl<'a, T> Record<'a, T> {
         Ok(Commands(iter))
     }
 
-    /// Calls the [`redo`] method for the active `UndoCmd` and sets the next `UndoCmd` as the new
+    /// Calls the [`redo`] method for the active `Command` and sets the next `Command` as the new
     /// active one.
     ///
     /// # Errors
     /// If an error occur when executing `redo` the error is returned
     /// and the state of the stack is left unchanged.
     ///
-    /// [`redo`]: trait.UndoCmd.html#tymethod.redo
+    /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
     pub fn redo(&mut self) -> Result<(), Box<Error>> {
         if self.idx < self.commands.len() {
@@ -290,14 +290,14 @@ impl<'a, T> Record<'a, T> {
         Ok(())
     }
 
-    /// Calls the [`undo`] method for the active `UndoCmd` and sets the previous `UndoCmd` as the
+    /// Calls the [`undo`] method for the active `Command` and sets the previous `Command` as the
     /// new active one.
     ///
     /// # Errors
     /// If an error occur when executing `undo` the error is returned
     /// and the state of the stack is left unchanged.
     ///
-    /// [`undo`]: trait.UndoCmd.html#tymethod.undo
+    /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Result<(), Box<Error>> {
         if self.idx > 0 {
@@ -365,7 +365,7 @@ impl<'a, T> Config<'a, T> {
         self
     }
 
-    /// Sets a limit on how many `UndoCmd`s can be stored in the stack.
+    /// Sets a limit on how many `Command`s can be stored in the stack.
     /// If this limit is reached it will start popping of commands at the bottom of the stack when
     /// pushing new commands on to the stack. No limit is set by default which means it may grow
     /// indefinitely.

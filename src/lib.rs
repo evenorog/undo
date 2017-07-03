@@ -1,13 +1,11 @@
 //! An undo/redo library with dynamic dispatch and automatic command merging.
-//! It uses the [Command Pattern] where the user modifies a receiver by
-//! applying `Command`s on it.
+//! It uses the [Command Pattern](https://en.wikipedia.org/wiki/Command_pattern)
+//! where the user modifies a receiver by applying `Command`s on it.
 //!
 //! The library has currently two data structures that can be used to modify the receiver:
 //!
 //! * A simple `Stack` that pushes and pops commands to modify the receiver.
 //! * A `Record` that can roll the state of the receiver forwards and backwards.
-//!
-//! [Command Pattern]: https://en.wikipedia.org/wiki/Command_pattern
 
 #![forbid(unstable_features, bad_style)]
 #![deny(missing_debug_implementations,
@@ -36,17 +34,15 @@ pub trait Command<T> {
     /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
-    /// [`redo`]: trait.UndoCmd.html#tymethod.redo
+    /// [`redo`]: trait.Command.html#tymethod.redo
     fn undo(&mut self, receiver: &mut T) -> Result<(), Box<Error>>;
 
-    /// Used for merging of `UndoCmd`s.
+    /// Used for automatic merging of `Command`s.
     ///
-    /// Two commands are merged together when a command is pushed on the `UndoStack`, and it has
+    /// Two commands are merged together when a command is pushed, and it has
     /// the same id as the top command already on the stack. When commands are merged together,
     /// undoing and redoing them are done in one step. An example where this is useful is a text
     /// editor where you might want to undo a whole word instead of each character.
-    ///
-    /// Default implementation returns `None`, which means the command will never be merged.
     #[inline]
     fn id(&self) -> Option<u64> {
         None
@@ -80,7 +76,6 @@ impl<T> Debug for Command<T> {
     }
 }
 
-#[derive(Debug)]
 struct Merger<T> {
     cmd1: Box<Command<T>>,
     cmd2: Box<Command<T>>,
