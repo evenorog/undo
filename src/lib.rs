@@ -16,7 +16,7 @@
 
 extern crate fnv;
 
-mod record;
+pub mod record;
 mod stack;
 
 pub use record::Record;

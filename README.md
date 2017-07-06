@@ -13,7 +13,7 @@ The library has currently two data structures that can be used to modify the rec
 * A simple `Stack` that pushes and pops commands to modify the receiver.
 * A `Record` that can roll the state of the receiver forwards and backwards.
 
-### License
+## License
 
 Licensed under either of
 
