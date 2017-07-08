@@ -175,13 +175,13 @@ impl<'a, T> Record<'a, T> {
         self.receiver
     }
 
-    /// Pushes `cmd` to the top of the stack and executes its [`redo`] method.
-    /// This pops off all other commands above the active command from the stack.
+    /// Pushes `cmd` to the top of the `Record` and executes its [`redo`] method.
+    /// The command is merged with the previous top command if [`merge`] does not return `None`.
     ///
-    /// If `cmd`s id is equal to the top command on the stack, the two commands are merged.
+    /// All commands above the active one are removed from the stack and returned as an iterator.
     ///
     /// # Errors
-    /// If an error occur when executing `redo` the error is returned
+    /// If an error occur when executing [`redo`] the error is returned together with the command,
     /// and the state of the stack is left unchanged.
     ///
     /// # Examples
@@ -232,7 +232,7 @@ impl<'a, T> Record<'a, T> {
         if let Err(e) = cmd.redo(&mut self.receiver) {
             return Err((Box::new(cmd), e));
         }
-        // Pop off all elements after len from stack.
+        // Pop off all elements after len from record.
         let iter = self.commands.split_off(len).into_iter();
         debug_assert_eq!(len, self.len());
 
@@ -257,7 +257,7 @@ impl<'a, T> Record<'a, T> {
         }
 
         debug_assert_eq!(self.idx, self.len());
-        // State is always clean after a push, check if it was dirty before.
+        // Record is always clean after a push, check if it was dirty before.
         if is_dirty {
             if let Some(ref mut f) = self.state_change {
                 f(true);
@@ -266,11 +266,11 @@ impl<'a, T> Record<'a, T> {
         Ok(Commands(iter))
     }
 
-    /// Calls the [`redo`] method for the active `Command` and sets the next `Command` as the new
+    /// Calls the [`redo`] method for the active `Command` and sets the next one as the new
     /// active one.
     ///
     /// # Errors
-    /// If an error occur when executing `redo` the error is returned
+    /// If an error occur when executing [`redo`] the error is returned
     /// and the state of the stack is left unchanged.
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
@@ -282,7 +282,7 @@ impl<'a, T> Record<'a, T> {
                 return Some(Err(e));
             }
             self.idx += 1;
-            // Check if stack went from dirty to clean.
+            // Check if record went from dirty to clean.
             if is_dirty && self.is_clean() {
                 if let Some(ref mut f) = self.state_change {
                     f(true);
@@ -294,11 +294,11 @@ impl<'a, T> Record<'a, T> {
         }
     }
 
-    /// Calls the [`undo`] method for the active `Command` and sets the previous `Command` as the
+    /// Calls the [`undo`] method for the active `Command` and sets the previous one as the
     /// new active one.
     ///
     /// # Errors
-    /// If an error occur when executing `undo` the error is returned
+    /// If an error occur when executing [`undo`] the error is returned
     /// and the state of the stack is left unchanged.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
@@ -311,7 +311,7 @@ impl<'a, T> Record<'a, T> {
                 self.idx += 1;
                 return Some(Err(e));
             }
-            // Check if stack went from clean to dirty.
+            // Check if record went from clean to dirty.
             if is_clean && self.is_dirty() {
                 if let Some(ref mut f) = self.state_change {
                     f(false);
