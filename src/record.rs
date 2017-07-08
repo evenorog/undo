@@ -41,15 +41,15 @@ use {Command, Merger};
 ///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
-///     record.undo()?;
-///     record.undo()?;
-///     record.undo()?;
+///     record.undo().unwrap()?;
+///     record.undo().unwrap()?;
+///     record.undo().unwrap()?;
 ///
 ///     assert_eq!(record.as_receiver(), "");
 ///
-///     record.redo()?;
-///     record.redo()?;
-///     record.redo()?;
+///     record.redo().unwrap()?;
+///     record.redo().unwrap()?;
+///     record.redo().unwrap()?;
 ///
 ///     assert_eq!(record.into_receiver(), "abc");
 ///
@@ -100,7 +100,7 @@ impl<'a, T> Record<'a, T> {
     /// let mut record = Record::config("")
     ///     .capacity(2)
     ///     .limit(2)
-    ///     .finish();
+    ///     .create();
     ///
     /// record.push(Add('a')).map_err(|(_, e)| e)?;
     /// record.push(Add('b')).map_err(|(_, e)| e)?;
@@ -108,11 +108,11 @@ impl<'a, T> Record<'a, T> {
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
-    /// record.undo()?;
-    /// record.undo()?;
-    /// record.undo()?;
+    /// record.undo().unwrap()?;
+    /// record.undo().unwrap()?;
+    /// assert!(record.undo().is_none());
     ///
-    /// assert_eq!(record.as_receiver(), "a");
+    /// assert_eq!(record.into_receiver(), "a");
     /// # Ok(())
     /// # }
     /// # foo().unwrap();
@@ -208,11 +208,11 @@ impl<'a, T> Record<'a, T> {
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
-    /// record.undo()?;
-    /// record.undo()?;
+    /// record.undo().unwrap()?;
+    /// record.undo().unwrap()?;
     /// let mut bc = record.push(Add('e')).map_err(|(_, e)| e)?;
     ///
-    /// assert_eq!(record.as_receiver(), "ae");
+    /// assert_eq!(record.into_receiver(), "ae");
     /// assert!(bc.next().is_some());
     /// assert!(bc.next().is_some());
     /// assert!(bc.next().is_none());
@@ -275,10 +275,12 @@ impl<'a, T> Record<'a, T> {
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
-    pub fn redo(&mut self) -> Result<(), Box<Error>> {
+    pub fn redo(&mut self) -> Option<Result<(), Box<Error>>> {
         if self.idx < self.commands.len() {
             let is_dirty = self.is_dirty();
-            self.commands[self.idx].redo(&mut self.receiver)?;
+            if let Err(e) = self.commands[self.idx].redo(&mut self.receiver) {
+                return Some(Err(e));
+            }
             self.idx += 1;
             // Check if stack went from dirty to clean.
             if is_dirty && self.is_clean() {
@@ -286,8 +288,10 @@ impl<'a, T> Record<'a, T> {
                     f(true);
                 }
             }
+            Some(Ok(()))
+        } else {
+            None
         }
-        Ok(())
     }
 
     /// Calls the [`undo`] method for the active `Command` and sets the previous `Command` as the
@@ -299,19 +303,24 @@ impl<'a, T> Record<'a, T> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Result<(), Box<Error>> {
+    pub fn undo(&mut self) -> Option<Result<(), Box<Error>>> {
         if self.idx > 0 {
             let is_clean = self.is_clean();
             self.idx -= 1;
-            self.commands[self.idx].undo(&mut self.receiver)?;
+            if let Err(e) = self.commands[self.idx].undo(&mut self.receiver) {
+                self.idx += 1;
+                return Some(Err(e));
+            }
             // Check if stack went from clean to dirty.
             if is_clean && self.is_dirty() {
                 if let Some(ref mut f) = self.state_change {
                     f(false);
                 }
             }
+            Some(Ok(()))
+        } else {
+            None
         }
-        Ok(())
     }
 }
 
@@ -404,14 +413,14 @@ impl<'a, T> Config<'a, T> {
     ///             x.set(2);
     ///         }
     ///     })
-    ///     .finish();
+    ///     .create();
     ///
     /// assert_eq!(x.get(), 0);
     /// record.push(Add('a')).map_err(|(_, e)| e)?;
     /// assert_eq!(x.get(), 0);
-    /// record.undo()?;
+    /// record.undo().unwrap()?;
     /// assert_eq!(x.get(), 2);
-    /// record.redo()?;
+    /// record.redo().unwrap()?;
     /// assert_eq!(x.get(), 1);
     /// # Ok(())
     /// # }
@@ -426,9 +435,9 @@ impl<'a, T> Config<'a, T> {
         self
     }
 
-    /// Returns the `Record`.
+    /// Creates the `Record`.
     #[inline]
-    pub fn finish(self) -> Record<'a, T> {
+    pub fn create(self) -> Record<'a, T> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: self.receiver,

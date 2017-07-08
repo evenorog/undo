@@ -12,8 +12,6 @@
         unused_import_braces,
         unused_qualifications)]
 
-// TODO: serde? groups?
-
 extern crate fnv;
 
 pub mod record;
