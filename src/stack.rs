@@ -60,7 +60,7 @@ pub struct Stack<R> {
 impl<R> Stack<R> {
     /// Creates a new `Stack`.
     #[inline]
-    pub fn new<U: Into<R>>(receiver: U) -> Stack<R> {
+    pub fn new<T: Into<R>>(receiver: T) -> Stack<R> {
         Stack {
             commands: Vec::new(),
             receiver: receiver.into(),
@@ -69,7 +69,7 @@ impl<R> Stack<R> {
 
     /// Creates a new `Stack` with the given `capacity`.
     #[inline]
-    pub fn with_capacity<U: Into<R>>(receiver: U, capacity: usize) -> Stack<R> {
+    pub fn with_capacity<T: Into<R>>(receiver: T, capacity: usize) -> Stack<R> {
         Stack {
             commands: Vec::with_capacity(capacity),
             receiver: receiver.into(),
