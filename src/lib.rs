@@ -24,16 +24,16 @@ use std::fmt::{self, Debug, Formatter};
 use std::error::Error;
 
 /// Base functionality for all commands.
-pub trait Command<T> {
+pub trait Command<R> {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self, receiver: &mut T) -> Result<(), Box<Error>>;
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<Error>>;
 
     /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
-    fn undo(&mut self, receiver: &mut T) -> Result<(), Box<Error>>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<Error>>;
 
     /// Used for automatic merging of `Command`s.
     ///
@@ -47,14 +47,14 @@ pub trait Command<T> {
     }
 }
 
-impl<T> Command<T> for Box<Command<T>> {
+impl<R> Command<R> for Box<Command<R>> {
     #[inline]
-    fn redo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<Error>> {
         (**self).redo(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<Error>> {
         (**self).undo(receiver)
     }
 
@@ -64,7 +64,7 @@ impl<T> Command<T> for Box<Command<T>> {
     }
 }
 
-impl<T> Debug for Command<T> {
+impl<R> Debug for Command<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self.id() {
@@ -74,20 +74,20 @@ impl<T> Debug for Command<T> {
     }
 }
 
-struct Merger<T> {
-    cmd1: Box<Command<T>>,
-    cmd2: Box<Command<T>>,
+struct Merger<R> {
+    cmd1: Box<Command<R>>,
+    cmd2: Box<Command<R>>,
 }
 
-impl<T> Command<T> for Merger<T> {
+impl<R> Command<R> for Merger<R> {
     #[inline]
-    fn redo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<Error>> {
         self.cmd1.redo(receiver)?;
         self.cmd2.redo(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut T) -> Result<(), Box<Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<Error>> {
         self.cmd2.undo(receiver)?;
         self.cmd1.undo(receiver)
     }

@@ -52,15 +52,15 @@ use {Command, Merger};
 /// # foo().unwrap();
 /// ```
 #[derive(Debug, Default)]
-pub struct Stack<T> {
-    commands: Vec<Box<Command<T>>>,
-    receiver: T,
+pub struct Stack<R> {
+    commands: Vec<Box<Command<R>>>,
+    receiver: R,
 }
 
-impl<T> Stack<T> {
+impl<R> Stack<R> {
     /// Creates a new `Stack`.
     #[inline]
-    pub fn new<U: Into<T>>(receiver: U) -> Stack<T> {
+    pub fn new<U: Into<R>>(receiver: U) -> Stack<R> {
         Stack {
             commands: Vec::new(),
             receiver: receiver.into(),
@@ -69,7 +69,7 @@ impl<T> Stack<T> {
 
     /// Creates a new `Stack` with the given `capacity`.
     #[inline]
-    pub fn with_capacity<U: Into<T>>(receiver: U, capacity: usize) -> Stack<T> {
+    pub fn with_capacity<U: Into<R>>(receiver: U, capacity: usize) -> Stack<R> {
         Stack {
             commands: Vec::with_capacity(capacity),
             receiver: receiver.into(),
@@ -96,13 +96,13 @@ impl<T> Stack<T> {
 
     /// Returns a reference to the `receiver`.
     #[inline]
-    pub fn as_receiver(&self) -> &T {
+    pub fn as_receiver(&self) -> &R {
         &self.receiver
     }
 
     /// Consumes the `Stack`, returning the `receiver`.
     #[inline]
-    pub fn into_receiver(self) -> T {
+    pub fn into_receiver(self) -> R {
         self.receiver
     }
 
@@ -114,9 +114,9 @@ impl<T> Stack<T> {
     ///
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
-    pub fn push<C>(&mut self, mut cmd: C) -> Result<(), (Box<Command<T>>, Box<Error>)>
-        where C: Command<T> + 'static,
-              T: 'static,
+    pub fn push<C>(&mut self, mut cmd: C) -> Result<(), (Box<Command<R>>, Box<Error>)>
+        where C: Command<R> + 'static,
+              R: 'static,
     {
         if let Err(e) = cmd.redo(&mut self.receiver) {
             return Err((Box::new(cmd), e));
@@ -143,7 +143,7 @@ impl<T> Stack<T> {
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
-    pub fn pop(&mut self) -> Option<Result<Box<Command<T>>, (Box<Command<T>>, Box<Error>)>> {
+    pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, (Box<Command<R>>, Box<Error>)>> {
         let mut cmd = match self.commands.pop() {
             Some(cmd) => cmd,
             None => return None,
@@ -155,9 +155,9 @@ impl<T> Stack<T> {
     }
 }
 
-impl<T> AsRef<T> for Stack<T> {
+impl<R> AsRef<R> for Stack<R> {
     #[inline]
-    fn as_ref(&self) -> &T {
+    fn as_ref(&self) -> &R {
         self.as_receiver()
     }
 }
