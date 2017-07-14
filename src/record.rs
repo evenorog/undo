@@ -69,7 +69,7 @@ pub struct Record<'a, R> {
 impl<'a, R> Record<'a, R> {
     /// Returns a new `Record`.
     #[inline]
-    pub fn new<U: Into<R>>(receiver: U) -> Record<'a, R> {
+    pub fn new<T: Into<R>>(receiver: T) -> Record<'a, R> {
         Record {
             commands: VecDeque::new(),
             receiver: receiver.into(),
@@ -118,7 +118,7 @@ impl<'a, R> Record<'a, R> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn config<U: Into<R>>(receiver: U) -> Config<'a, R> {
+    pub fn config<T: Into<R>>(receiver: T) -> Config<'a, R> {
         Config {
             receiver: receiver.into(),
             capacity: 0,
