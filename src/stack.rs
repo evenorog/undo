@@ -1,5 +1,4 @@
-use std::error::Error;
-use {Command, Merger};
+use {Command, Error, Merger};
 
 /// A stack of commands.
 ///
@@ -26,7 +25,7 @@ use {Command, Merger};
 ///     }
 /// }
 ///
-/// fn foo() -> Result<(), (Box<Command<String>>, Box<Error>)> {
+/// fn foo() -> Result<(), Box<Error>> {
 ///     let mut stack = Stack::default();
 ///
 ///     stack.push(Add('a'))?;
@@ -114,12 +113,12 @@ impl<R> Stack<R> {
     ///
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
-    pub fn push<C>(&mut self, mut cmd: C) -> Result<(), (Box<Command<R>>, Box<Error>)>
+    pub fn push<C>(&mut self, mut cmd: C) -> Result<(), Error<R>>
         where C: Command<R> + 'static,
               R: 'static,
     {
         if let Err(e) = cmd.redo(&mut self.receiver) {
-            return Err((Box::new(cmd), e));
+            return Err(Error(Box::new(cmd), e));
         }
         match (cmd.id(), self.commands.last().and_then(|last| last.id())) {
             (Some(id1), Some(id2)) if id1 == id2 => {
@@ -143,14 +142,14 @@ impl<R> Stack<R> {
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
-    pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, (Box<Command<R>>, Box<Error>)>> {
+    pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, Error<R>>> {
         let mut cmd = match self.commands.pop() {
             Some(cmd) => cmd,
             None => return None,
         };
         match cmd.undo(&mut self.receiver) {
             Ok(_) => Some(Ok(cmd)),
-            Err(e) => Some(Err((cmd, e))),
+            Err(e) => Some(Err(Error(cmd, e))),
         }
     }
 }

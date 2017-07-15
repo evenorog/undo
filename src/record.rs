@@ -1,7 +1,6 @@
 use std::collections::vec_deque::{VecDeque, IntoIter};
-use std::error::Error;
 use std::fmt::{self, Debug, Formatter};
-use {Command, Merger};
+use {Command, Error, Merger};
 
 /// A record of commands.
 ///
@@ -35,9 +34,9 @@ use {Command, Merger};
 /// fn foo() -> Result<(), Box<Error>> {
 ///     let mut record = Record::default();
 ///
-///     record.push(Add('a')).map_err(|(_, e)| e)?;
-///     record.push(Add('b')).map_err(|(_, e)| e)?;
-///     record.push(Add('c')).map_err(|(_, e)| e)?;
+///     record.push(Add('a'))?;
+///     record.push(Add('b'))?;
+///     record.push(Add('c'))?;
 ///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
@@ -102,9 +101,9 @@ impl<'a, R> Record<'a, R> {
     ///     .limit(2)
     ///     .create();
     ///
-    /// record.push(Add('a')).map_err(|(_, e)| e)?;
-    /// record.push(Add('b')).map_err(|(_, e)| e)?;
-    /// record.push(Add('c')).map_err(|(_, e)| e)?; // 'a' is removed from the record since limit is 2.
+    /// record.push(Add('a'))?;
+    /// record.push(Add('b'))?;
+    /// record.push(Add('c'))?; // 'a' is removed from the record since limit is 2.
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
@@ -202,15 +201,15 @@ impl<'a, R> Record<'a, R> {
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut record = Record::default();
     ///
-    /// record.push(Add('a')).map_err(|(_, e)| e)?;
-    /// record.push(Add('b')).map_err(|(_, e)| e)?;
-    /// record.push(Add('c')).map_err(|(_, e)| e)?;
+    /// record.push(Add('a'))?;
+    /// record.push(Add('b'))?;
+    /// record.push(Add('c'))?;
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
     /// record.undo().unwrap()?;
     /// record.undo().unwrap()?;
-    /// let mut bc = record.push(Add('e')).map_err(|(_, e)| e)?;
+    /// let mut bc = record.push(Add('e'))?;
     ///
     /// assert_eq!(record.into_receiver(), "ae");
     /// assert!(bc.next().is_some());
@@ -222,7 +221,7 @@ impl<'a, R> Record<'a, R> {
     /// ```
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
-    pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<R>, (Box<Command<R>>, Box<Error>)>
+    pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<R>, Error<R>>
     where
         C: Command<R> + 'static,
         R: 'static,
@@ -230,7 +229,7 @@ impl<'a, R> Record<'a, R> {
         let is_dirty = self.is_dirty();
         let len = self.idx;
         if let Err(e) = cmd.redo(&mut self.receiver) {
-            return Err((Box::new(cmd), e));
+            return Err(Error(Box::new(cmd), e));
         }
         // Pop off all elements after len from record.
         let iter = self.commands.split_off(len).into_iter();
@@ -275,20 +274,25 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), Box<Error>>> {
+    pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         if self.idx < self.commands.len() {
             let is_dirty = self.is_dirty();
-            if let Err(e) = self.commands[self.idx].redo(&mut self.receiver) {
-                return Some(Err(e));
-            }
-            self.idx += 1;
-            // Check if record went from dirty to clean.
-            if is_dirty && self.is_clean() {
-                if let Some(ref mut f) = self.state_change {
-                    f(true);
+            match self.commands[self.idx].redo(&mut self.receiver) {
+                Ok(_) => {
+                    self.idx += 1;
+                    // Check if record went from dirty to clean.
+                    if is_dirty && self.is_clean() {
+                        if let Some(ref mut f) = self.state_change {
+                            f(true);
+                        }
+                    }
+                    Some(Ok(()))
+                }
+                Err(e) => {
+                    let cmd = self.commands.remove(self.idx).unwrap();
+                    Some(Err(Error(cmd, e)))
                 }
             }
-            Some(Ok(()))
         } else {
             None
         }
@@ -303,21 +307,25 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), Box<Error>>> {
+    pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
         if self.idx > 0 {
             let is_clean = self.is_clean();
             self.idx -= 1;
-            if let Err(e) = self.commands[self.idx].undo(&mut self.receiver) {
-                self.idx += 1;
-                return Some(Err(e));
-            }
-            // Check if record went from clean to dirty.
-            if is_clean && self.is_dirty() {
-                if let Some(ref mut f) = self.state_change {
-                    f(false);
+            match self.commands[self.idx].undo(&mut self.receiver) {
+                Ok(_) => {
+                    // Check if record went from clean to dirty.
+                    if is_clean && self.is_dirty() {
+                        if let Some(ref mut f) = self.state_change {
+                            f(false);
+                        }
+                    }
+                    Some(Ok(()))
+                }
+                Err(e) => {
+                    let cmd = self.commands.remove(self.idx).unwrap();
+                    Some(Err(Error(cmd, e)))
                 }
             }
-            Some(Ok(()))
         } else {
             None
         }
@@ -416,7 +424,7 @@ impl<'a, R> Config<'a, R> {
     ///     .create();
     ///
     /// assert_eq!(x.get(), 0);
-    /// record.push(Add('a')).map_err(|(_, e)| e)?;
+    /// record.push(Add('a'))?;
     /// assert_eq!(x.get(), 0);
     /// record.undo().unwrap()?;
     /// assert_eq!(x.get(), 2);
