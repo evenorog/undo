@@ -18,7 +18,6 @@ pub mod record;
 mod stack;
 
 use std::fmt::{self, Debug, Display, Formatter};
-use std::error;
 
 pub use record::Record;
 pub use stack::Stack;
@@ -27,13 +26,13 @@ pub use stack::Stack;
 pub trait Command<R> {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>>;
 
     /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>>;
 
     /// Used for automatic merging of `Command`s.
     ///
@@ -49,12 +48,12 @@ pub trait Command<R> {
 
 impl<R> Command<R> for Box<Command<R>> {
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
         (**self).redo(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
         (**self).undo(receiver)
     }
 
@@ -81,13 +80,13 @@ struct Merger<R> {
 
 impl<R> Command<R> for Merger<R> {
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
         self.cmd1.redo(receiver)?;
         self.cmd2.redo(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
         self.cmd2.undo(receiver)?;
         self.cmd1.undo(receiver)
     }
@@ -100,7 +99,7 @@ impl<R> Command<R> for Merger<R> {
 
 /// Custom error kind that holds the error and the command that caused the error.
 #[derive(Debug)]
-pub struct Error<R>(pub Box<Command<R>>, pub Box<error::Error>);
+pub struct Error<R>(pub Box<Command<R>>, pub Box<std::error::Error>);
 
 impl<R> Display for Error<R> {
     #[inline]
@@ -109,7 +108,7 @@ impl<R> Display for Error<R> {
     }
 }
 
-impl<R> error::Error for Error<R>
+impl<R> std::error::Error for Error<R>
 where
     R: Debug,
 {
@@ -119,7 +118,7 @@ where
     }
 
     #[inline]
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&std::error::Error> {
         self.1.cause()
     }
 }
