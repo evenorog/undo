@@ -26,7 +26,7 @@ use {Command, Error, Merger};
 ///     }
 ///
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-///         self.0 = s.pop().expect("`String` is unexpectedly empty");
+///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
 ///         Ok(())
 ///     }
 /// }
@@ -91,7 +91,7 @@ impl<'a, R> Record<'a, R> {
     /// #         Ok(())
     /// #     }
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-    /// #         self.0 = s.pop().expect("`String` is unexpectedly empty");
+    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
     /// #     }
     /// # }
@@ -194,7 +194,7 @@ impl<'a, R> Record<'a, R> {
     /// #         Ok(())
     /// #     }
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-    /// #         self.0 = s.pop().expect("`String` is unexpectedly empty");
+    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
     /// #     }
     /// # }
@@ -407,7 +407,7 @@ impl<'a, R> Config<'a, R> {
     /// #         Ok(())
     /// #     }
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-    /// #         self.0 = s.pop().expect("`String` is unexpectedly empty");
+    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
     /// #     }
     /// # }
