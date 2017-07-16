@@ -269,8 +269,8 @@ impl<'a, R> Record<'a, R> {
     /// active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned
-    /// and the state of the stack is left unchanged.
+    /// If an error occur when executing [`redo`] the command that caused the error is removed from
+    /// the record and returned together with the error.
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
@@ -302,8 +302,8 @@ impl<'a, R> Record<'a, R> {
     /// new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned
-    /// and the state of the stack is left unchanged.
+    /// If an error occur when executing [`undo`] the command that caused the error is removed from
+    /// the record and returned together with the error.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
