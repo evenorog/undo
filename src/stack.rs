@@ -114,24 +114,27 @@ impl<R> Stack<R> {
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
     pub fn push<C>(&mut self, mut cmd: C) -> Result<(), Error<R>>
-        where C: Command<R> + 'static,
-              R: 'static,
+    where
+        C: Command<R> + 'static,
+        R: 'static,
     {
-        if let Err(e) = cmd.redo(&mut self.receiver) {
-            return Err(Error(Box::new(cmd), e));
-        }
-        match (cmd.id(), self.commands.last().and_then(|last| last.id())) {
-            (Some(id1), Some(id2)) if id1 == id2 => {
-                // Merge the command with the one on the top of the stack.
-                let cmd = Merger {
-                    cmd1: self.commands.pop().unwrap(),
-                    cmd2: Box::new(cmd),
-                };
-                self.commands.push(Box::new(cmd));
+        match cmd.redo(&mut self.receiver) {
+            Ok(_) => {
+                match (cmd.id(), self.commands.last().and_then(|last| last.id())) {
+                    (Some(id1), Some(id2)) if id1 == id2 => {
+                        // Merge the command with the one on the top of the stack.
+                        let cmd = Merger {
+                            cmd1: self.commands.pop().unwrap(),
+                            cmd2: Box::new(cmd),
+                        };
+                        self.commands.push(Box::new(cmd));
+                    }
+                    _ => self.commands.push(Box::new(cmd)),
+                }
+                Ok(())
             }
-            _ => self.commands.push(Box::new(cmd)),
+            Err(e) => Err(Error(Box::new(cmd), e)),
         }
-        Ok(())
     }
 
     /// Calls the top commands [`undo`] method and pops it off the stack.
@@ -143,14 +146,12 @@ impl<R> Stack<R> {
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
     pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, Error<R>>> {
-        let mut cmd = match self.commands.pop() {
-            Some(cmd) => cmd,
-            None => return None,
-        };
-        match cmd.undo(&mut self.receiver) {
-            Ok(_) => Some(Ok(cmd)),
-            Err(e) => Some(Err(Error(cmd, e))),
-        }
+        self.commands.pop().map(|mut cmd| match cmd.undo(
+            &mut self.receiver,
+        ) {
+            Ok(_) => Ok(cmd),
+            Err(e) => Err(Error(cmd, e)),
+        })
     }
 }
 

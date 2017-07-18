@@ -228,41 +228,43 @@ impl<'a, R> Record<'a, R> {
     {
         let is_dirty = self.is_dirty();
         let len = self.idx;
-        if let Err(e) = cmd.redo(&mut self.receiver) {
-            return Err(Error(Box::new(cmd), e));
-        }
-        // Pop off all elements after len from record.
-        let iter = self.commands.split_off(len).into_iter();
-        debug_assert_eq!(len, self.len());
+        match cmd.redo(&mut self.receiver) {
+            Ok(_) => {
+                // Pop off all elements after len from record.
+                let iter = self.commands.split_off(len).into_iter();
+                debug_assert_eq!(len, self.len());
 
-        match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
-            (Some(id1), Some(id2)) if id1 == id2 => {
-                // Merge the command with the one on the top of the stack.
-                let cmd = Merger {
-                    cmd1: self.commands.pop_back().unwrap(),
-                    cmd2: Box::new(cmd),
-                };
-                self.commands.push_back(Box::new(cmd));
-            }
-            _ => {
-                match self.limit {
-                    Some(limit) if len == limit => {
-                        self.commands.pop_front();
+                match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
+                    (Some(id1), Some(id2)) if id1 == id2 => {
+                        // Merge the command with the one on the top of the stack.
+                        let cmd = Merger {
+                            cmd1: self.commands.pop_back().unwrap(),
+                            cmd2: Box::new(cmd),
+                        };
+                        self.commands.push_back(Box::new(cmd));
                     }
-                    _ => self.idx += 1,
+                    _ => {
+                        match self.limit {
+                            Some(limit) if len == limit => {
+                                self.commands.pop_front();
+                            }
+                            _ => self.idx += 1,
+                        }
+                        self.commands.push_back(Box::new(cmd));
+                    }
                 }
-                self.commands.push_back(Box::new(cmd));
-            }
-        }
 
-        debug_assert_eq!(self.idx, self.len());
-        // Record is always clean after a push, check if it was dirty before.
-        if is_dirty {
-            if let Some(ref mut f) = self.state_change {
-                f(true);
+                debug_assert_eq!(self.idx, self.len());
+                // Record is always clean after a push, check if it was dirty before.
+                if is_dirty {
+                    if let Some(ref mut f) = self.state_change {
+                        f(true);
+                    }
+                }
+                Ok(Commands(iter))
             }
+            Err(e) => Err(Error(Box::new(cmd), e)),
         }
-        Ok(Commands(iter))
     }
 
     /// Calls the [`redo`] method for the active `Command` and sets the next one as the new
