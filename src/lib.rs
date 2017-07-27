@@ -46,6 +46,16 @@ pub trait Command<R> {
     }
 }
 
+impl<R> Debug for Command<R> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self.id() {
+            Some(id) => write!(f, "{}", id),
+            None => write!(f, "_"),
+        }
+    }
+}
+
 impl<R> Command<R> for Box<Command<R>> {
     #[inline]
     fn redo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
@@ -60,40 +70,6 @@ impl<R> Command<R> for Box<Command<R>> {
     #[inline]
     fn id(&self) -> Option<u64> {
         (**self).id()
-    }
-}
-
-impl<R> Debug for Command<R> {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self.id() {
-            Some(id) => write!(f, "{}", id),
-            None => write!(f, "_"),
-        }
-    }
-}
-
-struct Merger<R> {
-    cmd1: Box<Command<R>>,
-    cmd2: Box<Command<R>>,
-}
-
-impl<R> Command<R> for Merger<R> {
-    #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
-        self.cmd1.redo(receiver)?;
-        self.cmd2.redo(receiver)
-    }
-
-    #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
-        self.cmd2.undo(receiver)?;
-        self.cmd1.undo(receiver)
-    }
-
-    #[inline]
-    fn id(&self) -> Option<u64> {
-        self.cmd1.id()
     }
 }
 
@@ -120,5 +96,29 @@ where
     #[inline]
     fn cause(&self) -> Option<&std::error::Error> {
         self.1.cause()
+    }
+}
+
+struct Merger<R> {
+    cmd1: Box<Command<R>>,
+    cmd2: Box<Command<R>>,
+}
+
+impl<R> Command<R> for Merger<R> {
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
+        self.cmd1.redo(receiver)?;
+        self.cmd2.redo(receiver)
+    }
+
+    #[inline]
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
+        self.cmd2.undo(receiver)?;
+        self.cmd1.undo(receiver)
+    }
+
+    #[inline]
+    fn id(&self) -> Option<u64> {
+        self.cmd1.id()
     }
 }
