@@ -39,8 +39,7 @@ pub trait Command<R> {
     ///
     /// Two commands are merged together when a command is pushed, and it has
     /// the same id as the top command already on the stack. When commands are merged together,
-    /// undoing and redoing them are done in one step. An example where this is useful is a text
-    /// editor where you might want to undo a whole word instead of each character.
+    /// undoing and redoing them are done in one step.
     #[inline]
     fn id(&self) -> Option<u32> {
         None
