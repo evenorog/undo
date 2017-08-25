@@ -11,4 +11,4 @@ keywords = ["undo", "redo"]
 categories = ["data-structures"]
 
 [dependencies]
-fnv = "1.0.5"
+fnv = "1"
