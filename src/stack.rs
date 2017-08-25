@@ -1,4 +1,4 @@
-use {Command, Error, Merger};
+use {Command, CmdError, Merger};
 
 /// A stack of commands.
 ///
@@ -66,21 +66,6 @@ impl<R> Stack<R> {
         }
     }
 
-    /// Creates a new `Stack` with the given `capacity`.
-    #[inline]
-    pub fn with_capacity<T: Into<R>>(receiver: T, capacity: usize) -> Stack<R> {
-        Stack {
-            commands: Vec::with_capacity(capacity),
-            receiver: receiver.into(),
-        }
-    }
-
-    /// Returns the capacity of the `Stack`.
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.commands.capacity()
-    }
-
     /// Returns the number of `Command`s in the `Stack`.
     #[inline]
     pub fn len(&self) -> usize {
@@ -113,7 +98,7 @@ impl<R> Stack<R> {
     ///
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
-    pub fn push<C>(&mut self, mut cmd: C) -> Result<(), Error<R>>
+    pub fn push<C>(&mut self, mut cmd: C) -> Result<(), CmdError<R>>
     where
         C: Command<R> + 'static,
         R: 'static,
@@ -133,7 +118,7 @@ impl<R> Stack<R> {
                 }
                 Ok(())
             }
-            Err(e) => Err(Error(Box::new(cmd), e)),
+            Err(e) => Err(CmdError(Box::new(cmd), e)),
         }
     }
 
@@ -145,12 +130,12 @@ impl<R> Stack<R> {
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
-    pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, Error<R>>> {
+    pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, CmdError<R>>> {
         self.commands.pop().map(|mut cmd| match cmd.undo(
             &mut self.receiver,
         ) {
             Ok(_) => Ok(cmd),
-            Err(e) => Err(Error(cmd, e)),
+            Err(e) => Err(CmdError(cmd, e)),
         })
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::vec_deque::{VecDeque, IntoIter};
+use std::error::Error;
 use std::fmt::{self, Debug, Formatter};
-use {Command, Error, Merger};
+use {Command, CmdError, Merger};
 
 /// A record of commands.
 ///
@@ -132,12 +133,6 @@ impl<'a, R> Record<'a, R> {
         self.limit
     }
 
-    /// Returns the number of commands the stack can hold without reallocating.
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.commands.capacity()
-    }
-
     /// Returns the number of commands in the `Record`.
     #[inline]
     pub fn len(&self) -> usize {
@@ -221,7 +216,8 @@ impl<'a, R> Record<'a, R> {
     /// ```
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
-    pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<R>, Error<R>>
+    #[inline]
+    pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<R>, CmdError<R>>
     where
         C: Command<R> + 'static,
         R: 'static,
@@ -263,7 +259,7 @@ impl<'a, R> Record<'a, R> {
                 }
                 Ok(Commands(iter))
             }
-            Err(e) => Err(Error(Box::new(cmd), e)),
+            Err(e) => Err(CmdError(Box::new(cmd), e)),
         }
     }
 
@@ -276,7 +272,7 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn redo(&mut self) -> Option<Result<(), Box<Error>>> {
         if self.idx < self.commands.len() {
             let is_dirty = self.is_dirty();
             match self.commands[self.idx].redo(&mut self.receiver) {
@@ -290,10 +286,7 @@ impl<'a, R> Record<'a, R> {
                     }
                     Some(Ok(()))
                 }
-                Err(e) => {
-                    let cmd = self.commands.remove(self.idx).unwrap();
-                    Some(Err(Error(cmd, e)))
-                }
+                Err(e) => Some(Err(e)),
             }
         } else {
             None
@@ -309,12 +302,12 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn undo(&mut self) -> Option<Result<(), Box<Error>>> {
         if self.idx > 0 {
             let is_clean = self.is_clean();
-            self.idx -= 1;
-            match self.commands[self.idx].undo(&mut self.receiver) {
+            match self.commands[self.idx - 1].undo(&mut self.receiver) {
                 Ok(_) => {
+                    self.idx -= 1;
                     // Check if record went from clean to dirty.
                     if is_clean && self.is_dirty() {
                         if let Some(ref mut f) = self.state_change {
@@ -323,10 +316,7 @@ impl<'a, R> Record<'a, R> {
                     }
                     Some(Ok(()))
                 }
-                Err(e) => {
-                    let cmd = self.commands.remove(self.idx).unwrap();
-                    Some(Err(Error(cmd, e)))
-                }
+                Err(e) => Some(Err(e)),
             }
         } else {
             None

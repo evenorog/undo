@@ -17,6 +17,7 @@ extern crate fnv;
 pub mod record;
 mod stack;
 
+use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 
 pub use record::Record;
@@ -26,13 +27,13 @@ pub use stack::Stack;
 pub trait Command<R> {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>>;
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<Error>>;
 
     /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<Error>>;
 
     /// Used for automatic merging of `Command`s.
     ///
@@ -41,7 +42,7 @@ pub trait Command<R> {
     /// undoing and redoing them are done in one step. An example where this is useful is a text
     /// editor where you might want to undo a whole word instead of each character.
     #[inline]
-    fn id(&self) -> Option<u64> {
+    fn id(&self) -> Option<u32> {
         None
     }
 }
@@ -58,33 +59,33 @@ impl<R> Debug for Command<R> {
 
 impl<R> Command<R> for Box<Command<R>> {
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<Error>> {
         (**self).redo(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<Error>> {
         (**self).undo(receiver)
     }
 
     #[inline]
-    fn id(&self) -> Option<u64> {
+    fn id(&self) -> Option<u32> {
         (**self).id()
     }
 }
 
-/// Custom error kind that holds the error and the command that caused the error.
+/// An error kind that holds the error and the command that caused the error.
 #[derive(Debug)]
-pub struct Error<R>(pub Box<Command<R>>, pub Box<std::error::Error>);
+pub struct CmdError<R>(pub Box<Command<R>>, pub Box<Error>);
 
-impl<R> Display for Error<R> {
+impl<R> Display for CmdError<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.1)
     }
 }
 
-impl<R> std::error::Error for Error<R>
+impl<R> Error for CmdError<R>
 where
     R: Debug,
 {
@@ -94,7 +95,7 @@ where
     }
 
     #[inline]
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&Error> {
         self.1.cause()
     }
 }
@@ -106,19 +107,19 @@ struct Merger<R> {
 
 impl<R> Command<R> for Merger<R> {
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<Error>> {
         self.cmd1.redo(receiver)?;
         self.cmd2.redo(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<std::error::Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<Error>> {
         self.cmd2.undo(receiver)?;
         self.cmd1.undo(receiver)
     }
 
     #[inline]
-    fn id(&self) -> Option<u64> {
+    fn id(&self) -> Option<u32> {
         self.cmd1.id()
     }
 }
