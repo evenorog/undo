@@ -99,9 +99,8 @@ impl<R> Stack<R> {
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
     pub fn push<C>(&mut self, mut cmd: C) -> Result<(), CmdError<R>>
-    where
-        C: Command<R> + 'static,
-        R: 'static,
+        where C: Command<R> + 'static,
+              R: 'static
     {
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
@@ -131,12 +130,12 @@ impl<R> Stack<R> {
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
     pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, CmdError<R>>> {
-        self.commands.pop().map(|mut cmd| match cmd.undo(
-            &mut self.receiver,
-        ) {
-            Ok(_) => Ok(cmd),
-            Err(e) => Err(CmdError(cmd, e)),
-        })
+        self.commands
+            .pop()
+            .map(|mut cmd| match cmd.undo(&mut self.receiver) {
+                     Ok(_) => Ok(cmd),
+                     Err(e) => Err(CmdError(cmd, e)),
+                 })
     }
 }
 

@@ -85,8 +85,7 @@ impl<R> Display for CmdError<R> {
 }
 
 impl<R> Error for CmdError<R>
-where
-    R: Debug,
+    where R: Debug
 {
     #[inline]
     fn description(&self) -> &str {
