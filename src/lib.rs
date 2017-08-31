@@ -4,7 +4,7 @@
 //!
 //! The library has currently two data structures that can be used to modify the receiver:
 //!
-//! * A simple `Stack` that pushes and pops commands to modify the receiver.
+//! * A `Stack` that pushes and pops commands to modify the receiver.
 //! * A `Record` that can roll the state of the receiver forwards and backwards.
 
 #![forbid(unstable_features, bad_style)]
