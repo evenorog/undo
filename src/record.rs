@@ -1,7 +1,7 @@
 use std::collections::vec_deque::{VecDeque, IntoIter};
-use std::error::Error;
+use std::error;
 use std::fmt::{self, Debug, Formatter};
-use {Command, CmdError, Merger};
+use {Command, Error, Merger};
 
 /// A record of commands.
 ///
@@ -217,7 +217,7 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
-    pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<R>, CmdError<R>>
+    pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<R>, Error<R>>
         where C: Command<R> + 'static,
               R: 'static
     {
@@ -258,7 +258,7 @@ impl<'a, R> Record<'a, R> {
                 }
                 Ok(Commands(iter))
             }
-            Err(e) => Err(CmdError(Box::new(cmd), e)),
+            Err(e) => Err(Error(Box::new(cmd), e)),
         }
     }
 
@@ -271,7 +271,7 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), Box<Error>>> {
+    pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
         if self.idx < self.commands.len() {
             let is_dirty = self.is_dirty();
             match self.commands[self.idx].redo(&mut self.receiver) {
@@ -301,7 +301,7 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), Box<Error>>> {
+    pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
         if self.idx > 0 {
             let is_clean = self.is_clean();
             match self.commands[self.idx - 1].undo(&mut self.receiver) {

@@ -11,4 +11,3 @@ keywords = ["undo", "redo"]
 categories = ["data-structures"]
 
 [dependencies]
-fnv = "1"

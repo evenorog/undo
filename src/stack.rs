@@ -1,4 +1,4 @@
-use {Command, CmdError, Merger};
+use {Command, Error, Merger};
 
 /// A stack of commands.
 ///
@@ -98,7 +98,7 @@ impl<R> Stack<R> {
     ///
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
-    pub fn push<C>(&mut self, mut cmd: C) -> Result<(), CmdError<R>>
+    pub fn push<C>(&mut self, mut cmd: C) -> Result<(), Error<R>>
         where C: Command<R> + 'static,
               R: 'static
     {
@@ -117,7 +117,7 @@ impl<R> Stack<R> {
                 }
                 Ok(())
             }
-            Err(e) => Err(CmdError(Box::new(cmd), e)),
+            Err(e) => Err(Error(Box::new(cmd), e)),
         }
     }
 
@@ -129,12 +129,12 @@ impl<R> Stack<R> {
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
     #[inline]
-    pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, CmdError<R>>> {
+    pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, Error<R>>> {
         self.commands
             .pop()
             .map(|mut cmd| match cmd.undo(&mut self.receiver) {
                      Ok(_) => Ok(cmd),
-                     Err(e) => Err(CmdError(cmd, e)),
+                     Err(e) => Err(Error(cmd, e)),
                  })
     }
 }
