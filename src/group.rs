@@ -42,9 +42,6 @@ impl<K: Hash + Eq, V> Group<K, V> {
     /// Removes an item from the group.
     #[inline]
     pub fn remove(&mut self, k: &K) -> Option<V> {
-        if self.active.as_ref().map_or(false, |active| active == k) {
-            self.set(None);
-        }
         self.map.remove(k)
     }
 
