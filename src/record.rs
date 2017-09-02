@@ -63,7 +63,7 @@ pub struct Record<'a, R> {
     receiver: R,
     idx: usize,
     limit: Option<usize>,
-    state_change: Option<Box<FnMut(bool) + 'a>>,
+    state_handle: Option<Box<FnMut(bool) + 'a>>,
 }
 
 impl<'a, R> Record<'a, R> {
@@ -75,7 +75,7 @@ impl<'a, R> Record<'a, R> {
             receiver: receiver.into(),
             idx: 0,
             limit: None,
-            state_change: None,
+            state_handle: None,
         }
     }
 
@@ -123,7 +123,7 @@ impl<'a, R> Record<'a, R> {
             receiver: receiver.into(),
             capacity: 0,
             limit: None,
-            state_change: None,
+            state_handle: None,
         }
     }
 
@@ -252,7 +252,7 @@ impl<'a, R> Record<'a, R> {
                 debug_assert_eq!(self.idx, self.len());
                 // Record is always clean after a push, check if it was dirty before.
                 if is_dirty {
-                    if let Some(ref mut f) = self.state_change {
+                    if let Some(ref mut f) = self.state_handle {
                         f(true);
                     }
                 }
@@ -279,7 +279,7 @@ impl<'a, R> Record<'a, R> {
                     self.idx += 1;
                     // Check if record went from dirty to clean.
                     if is_dirty && self.is_clean() {
-                        if let Some(ref mut f) = self.state_change {
+                        if let Some(ref mut f) = self.state_handle {
                             f(true);
                         }
                     }
@@ -309,7 +309,7 @@ impl<'a, R> Record<'a, R> {
                     self.idx -= 1;
                     // Check if record went from clean to dirty.
                     if is_clean && self.is_dirty() {
-                        if let Some(ref mut f) = self.state_change {
+                        if let Some(ref mut f) = self.state_handle {
                             f(false);
                         }
                     }
@@ -360,7 +360,7 @@ pub struct Config<'a, R> {
     receiver: R,
     capacity: usize,
     limit: Option<usize>,
-    state_change: Option<Box<FnMut(bool) + 'a>>,
+    state_handle: Option<Box<FnMut(bool) + 'a>>,
 }
 
 impl<'a, R> Config<'a, R> {
@@ -405,7 +405,7 @@ impl<'a, R> Config<'a, R> {
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let x = Cell::new(0);
     /// let mut record = Record::config("")
-    ///     .state_change(|is_clean| {
+    ///     .state_handle(|is_clean| {
     ///         if is_clean {
     ///             x.set(1);
     ///         } else {
@@ -426,10 +426,10 @@ impl<'a, R> Config<'a, R> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn state_change<F>(mut self, f: F) -> Config<'a, R>
+    pub fn state_handle<F>(mut self, f: F) -> Config<'a, R>
         where F: FnMut(bool) + 'a
     {
-        self.state_change = Some(Box::new(f));
+        self.state_handle = Some(Box::new(f));
         self
     }
 
@@ -441,7 +441,7 @@ impl<'a, R> Config<'a, R> {
             receiver: self.receiver,
             idx: 0,
             limit: self.limit,
-            state_change: self.state_change,
+            state_handle: self.state_handle,
         }
     }
 }

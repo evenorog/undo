@@ -6,6 +6,8 @@
 //!
 //! * A `Stack` that pushes and pops commands to modify the receiver.
 //! * A `Record` that can roll the state of the receiver forwards and backwards.
+//!
+//! It also has a structure called `Group` that can be used to group multiple stacks or records together.
 
 #![forbid(unstable_features, bad_style)]
 #![deny(missing_debug_implementations,

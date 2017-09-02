@@ -13,6 +13,8 @@ The library has currently two data structures that can be used to modify the rec
 * A `Stack` that pushes and pops commands to modify the receiver.
 * A `Record` that can roll the state of the receiver forwards and backwards.
 
+It also has a structure called `Group` that can be used to group multiple stacks or records together.
+
 ## License
 
 Licensed under either of
