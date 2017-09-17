@@ -1,4 +1,4 @@
-use std::collections::vec_deque::{VecDeque, IntoIter};
+use std::collections::vec_deque::{IntoIter, VecDeque};
 use std::error;
 use std::fmt::{self, Debug, Formatter};
 use {Command, Error, Merger};
@@ -218,8 +218,9 @@ impl<'a, R> Record<'a, R> {
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
     pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<R>, Error<R>>
-        where C: Command<R> + 'static,
-              R: 'static
+    where
+        C: Command<R> + 'static,
+        R: 'static,
     {
         let is_dirty = self.is_dirty();
         let len = self.idx;
@@ -427,7 +428,8 @@ impl<'a, R> Config<'a, R> {
     /// ```
     #[inline]
     pub fn state_handle<F>(mut self, f: F) -> Config<'a, R>
-        where F: FnMut(bool) + 'a
+    where
+        F: FnMut(bool) + 'a,
     {
         self.state_handle = Some(Box::new(f));
         self
