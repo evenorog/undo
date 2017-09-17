@@ -99,8 +99,9 @@ impl<R> Stack<R> {
     /// [`redo`]: ../trait.Command.html#tymethod.redo
     #[inline]
     pub fn push<C>(&mut self, mut cmd: C) -> Result<(), Error<R>>
-        where C: Command<R> + 'static,
-              R: 'static
+    where
+        C: Command<R> + 'static,
+        R: 'static,
     {
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
@@ -133,9 +134,9 @@ impl<R> Stack<R> {
         self.commands
             .pop()
             .map(|mut cmd| match cmd.undo(&mut self.receiver) {
-                     Ok(_) => Ok(cmd),
-                     Err(e) => Err(Error(cmd, e)),
-                 })
+                Ok(_) => Ok(cmd),
+                Err(e) => Err(Error(cmd, e)),
+            })
     }
 }
 

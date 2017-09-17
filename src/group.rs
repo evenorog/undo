@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::error;
 use std::hash::Hash;
 use record::Commands;
-use {Command, Error, Stack, Record};
+use {Command, Error, Record, Stack};
 
 /// A group of either stacks or records.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -48,9 +48,7 @@ impl<K: Hash + Eq, V> Group<K, V> {
     /// Gets the current active item in the group.
     #[inline]
     pub fn get(&self) -> Option<&V> {
-        self.active
-            .as_ref()
-            .and_then(|active| self.map.get(&active))
+        self.active.as_ref().and_then(|active| self.map.get(active))
     }
 
     /// Sets the current active item in the group.
@@ -72,8 +70,9 @@ impl<K: Hash + Eq, R> Group<K, Stack<R>> {
     /// [`push`]: stack/struct.Stack.html#method.push
     #[inline]
     pub fn push<C>(&mut self, cmd: C) -> Option<Result<(), Error<R>>>
-        where C: Command<R> + 'static,
-              R: 'static
+    where
+        C: Command<R> + 'static,
+        R: 'static,
     {
         let map = &mut self.map;
         self.active
@@ -101,8 +100,9 @@ impl<'a, K: Hash + Eq, R> Group<K, Record<'a, R>> {
     /// [`push`]: record/struct.Record.html#method.push
     #[inline]
     pub fn push<C>(&mut self, cmd: C) -> Option<Result<Commands<R>, Error<R>>>
-        where C: Command<R> + 'static,
-              R: 'static
+    where
+        C: Command<R> + 'static,
+        R: 'static,
     {
         let map = &mut self.map;
         self.active

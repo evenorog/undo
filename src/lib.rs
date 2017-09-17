@@ -7,12 +7,11 @@
 //! * A `Stack` that pushes and pops commands to modify the receiver.
 //! * A `Record` that can roll the state of the receiver forwards and backwards.
 //!
-//! It also has a structure called `Group` that can be used to group multiple stacks or records together.
+//! It also has a structure called `Group` that can be used
+//! to group multiple stacks or records together.
 
 #![forbid(unstable_features, bad_style)]
-#![deny(missing_debug_implementations,
-        unused_import_braces,
-        unused_qualifications)]
+#![deny(missing_debug_implementations, unused_import_braces, unused_qualifications)]
 
 mod group;
 pub mod record;
@@ -51,14 +50,11 @@ pub trait Command<R> {
 impl<R> Debug for Command<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self.id() {
-            Some(id) => write!(f, "{}", id),
-            None => write!(f, "_"),
-        }
+        f.debug_tuple("Command").field(&self.id()).finish()
     }
 }
 
-impl<R> Command<R> for Box<Command<R>> {
+impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     #[inline]
     fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
         (**self).redo(receiver)
@@ -86,9 +82,7 @@ impl<R> Display for Error<R> {
     }
 }
 
-impl<R> error::Error for Error<R>
-    where R: Debug
-{
+impl<R: Debug> error::Error for Error<R> {
     #[inline]
     fn description(&self) -> &str {
         self.1.description()
