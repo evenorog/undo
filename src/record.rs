@@ -63,7 +63,7 @@ pub struct Record<'a, R> {
     receiver: R,
     idx: usize,
     limit: Option<usize>,
-    state_handle: Option<Box<FnMut(bool) + 'a>>,
+    state_handle: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
 impl<'a, R> Record<'a, R> {
@@ -97,7 +97,7 @@ impl<'a, R> Record<'a, R> {
     /// #     }
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
-    /// let mut record = Record::config("")
+    /// let mut record = Record::configure("")
     ///     .capacity(2)
     ///     .limit(2)
     ///     .create();
@@ -118,7 +118,7 @@ impl<'a, R> Record<'a, R> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn config<T: Into<R>>(receiver: T) -> Config<'a, R> {
+    pub fn configure<T: Into<R>>(receiver: T) -> Config<'a, R> {
         Config {
             receiver: receiver.into(),
             capacity: 0,
@@ -361,7 +361,7 @@ pub struct Config<'a, R> {
     receiver: R,
     capacity: usize,
     limit: Option<usize>,
-    state_handle: Option<Box<FnMut(bool) + 'a>>,
+    state_handle: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
 impl<'a, R> Config<'a, R> {
@@ -389,39 +389,19 @@ impl<'a, R> Config<'a, R> {
     ///
     /// # Examples
     /// ```
-    /// # use std::cell::Cell;
     /// # use std::error::Error;
-    /// # use undo::{Command, Record};
-    /// # struct Add(char);
-    /// # impl Command<String> for Add {
-    /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-    /// #         s.push(self.0);
-    /// #         Ok(())
-    /// #     }
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
-    /// #         Ok(())
-    /// #     }
-    /// # }
+    /// # use undo::Record;
     /// # fn foo() -> Result<(), Box<Error>> {
-    /// let x = Cell::new(0);
-    /// let mut record = Record::config("")
+    /// let mut x = 0;
+    /// Record::<String>::configure("")
     ///     .state_handle(|is_clean| {
     ///         if is_clean {
-    ///             x.set(1);
+    ///             x = 1;
     ///         } else {
-    ///             x.set(2);
+    ///             x = 2;
     ///         }
     ///     })
     ///     .create();
-    ///
-    /// assert_eq!(x.get(), 0);
-    /// record.push(Add('a'))?;
-    /// assert_eq!(x.get(), 0);
-    /// record.undo().unwrap()?;
-    /// assert_eq!(x.get(), 2);
-    /// record.redo().unwrap()?;
-    /// assert_eq!(x.get(), 1);
     /// # Ok(())
     /// # }
     /// # foo().unwrap();
@@ -429,7 +409,7 @@ impl<'a, R> Config<'a, R> {
     #[inline]
     pub fn state_handle<F>(mut self, f: F) -> Config<'a, R>
     where
-        F: FnMut(bool) + 'a,
+        F: FnMut(bool) + Send + Sync + 'a,
     {
         self.state_handle = Some(Box::new(f));
         self
