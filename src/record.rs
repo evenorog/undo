@@ -1,6 +1,7 @@
 use std::collections::vec_deque::{IntoIter, VecDeque};
 use std::error;
 use std::fmt::{self, Debug, Formatter};
+use std::marker::PhantomData;
 use {Command, Error, Merger};
 
 /// A record of commands.
@@ -97,10 +98,10 @@ impl<'a, R> Record<'a, R> {
     /// #     }
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
-    /// let mut record = Record::configure("")
+    /// let mut record = Record::configure()
     ///     .capacity(2)
     ///     .limit(2)
-    ///     .create();
+    ///     .default();
     ///
     /// record.push(Add('a'))?;
     /// record.push(Add('b'))?;
@@ -118,9 +119,9 @@ impl<'a, R> Record<'a, R> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn configure<T: Into<R>>(receiver: T) -> Config<'a, R> {
+    pub fn configure() -> Config<'a, R> {
         Config {
-            receiver: receiver.into(),
+            receiver: PhantomData,
             capacity: 0,
             limit: None,
             state_handle: None,
@@ -358,7 +359,7 @@ impl<R> Iterator for Commands<R> {
 
 /// Configurator for `Record`.
 pub struct Config<'a, R> {
-    receiver: R,
+    receiver: PhantomData<R>,
     capacity: usize,
     limit: Option<usize>,
     state_handle: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
@@ -390,10 +391,22 @@ impl<'a, R> Config<'a, R> {
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use undo::Record;
+    /// # use undo::{Command, Record};
+    /// # #[derive(Debug)]
+    /// # struct Add(char);
+    /// # impl Command<String> for Add {
+    /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #         s.push(self.0);
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #         Ok(())
+    /// #     }
+    /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut x = 0;
-    /// Record::<String>::configure("")
+    /// let mut record = Record::configure()
     ///     .state_handle(|is_clean| {
     ///         if is_clean {
     ///             x = 1;
@@ -401,7 +414,8 @@ impl<'a, R> Config<'a, R> {
     ///             x = 2;
     ///         }
     ///     })
-    ///     .create();
+    ///     .default();
+    /// # record.push(Add('a'))?;
     /// # Ok(())
     /// # }
     /// # foo().unwrap();
@@ -417,14 +431,21 @@ impl<'a, R> Config<'a, R> {
 
     /// Creates the `Record`.
     #[inline]
-    pub fn create(self) -> Record<'a, R> {
+    pub fn create<T: Into<R>>(self, receiver: T) -> Record<'a, R> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
-            receiver: self.receiver,
+            receiver: receiver.into(),
             idx: 0,
             limit: self.limit,
             state_handle: self.state_handle,
         }
+    }
+}
+
+impl<'a, R: Default> Config<'a, R> {
+    #[inline]
+    pub fn default(self) -> Record<'a, R> {
+        self.create(R::default())
     }
 }
 
