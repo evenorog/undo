@@ -4,16 +4,14 @@
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 
-An undo/redo library with dynamic dispatch and automatic command merging.
-It uses the [Command Pattern](https://en.wikipedia.org/wiki/Command_pattern) 
-where the user modifies a receiver by applying `Command`s on it.
+An undo-redo library with dynamic dispatch and automatic command merging.
+It uses the [command pattern](https://en.wikipedia.org/wiki/Command_pattern) 
+where the user modifies a receiver by applying commands on it.
 
 The library has currently two data structures that can be used to modify the receiver:
 
-* A `Stack` that pushes and pops commands to modify the receiver.
-* A `Record` that can roll the state of the receiver forwards and backwards.
-
-It also has a structure called `Group` that can be used to group multiple stacks or records together.
+* A stack that can push and pop commands to modify the receiver.
+* A record that can roll the state of the receiver forwards and backwards.
 
 ## License
 
