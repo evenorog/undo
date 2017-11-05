@@ -332,6 +332,13 @@ impl<'a, R> AsRef<R> for Record<'a, R> {
     }
 }
 
+impl<'a, R> From<R> for Record<'a, R> {
+    #[inline]
+    fn from(receiver: R) -> Self {
+        Record::new(receiver)
+    }
+}
+
 impl<'a, R: Debug> Debug for Record<'a, R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
