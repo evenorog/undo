@@ -19,6 +19,7 @@ use {Command, Error, Merger};
 /// use std::error::Error;
 /// use undo::{Command, Record};
 ///
+/// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
@@ -86,6 +87,7 @@ impl<'a, R> Record<'a, R> {
     /// ```
     /// # use std::error::Error;
     /// # use undo::{Command, Record};
+    /// # #[derive(Debug)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
@@ -183,6 +185,7 @@ impl<'a, R> Record<'a, R> {
     /// ```
     /// # use std::error::Error;
     /// # use undo::{Command, Record};
+    /// # #[derive(Debug)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {

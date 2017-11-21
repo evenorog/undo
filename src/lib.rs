@@ -8,7 +8,7 @@
 //! * A record that can roll the state of the receiver forwards and backwards.
 
 #![forbid(unstable_features, bad_style)]
-#![deny(missing_debug_implementations, unused_import_braces, unused_qualifications)]
+#![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
 
 mod group;
 pub mod record;
@@ -22,7 +22,7 @@ pub use record::Record;
 pub use stack::Stack;
 
 /// Base functionality for all commands.
-pub trait Command<R> {
+pub trait Command<R>: Debug {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
     fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
@@ -41,13 +41,6 @@ pub trait Command<R> {
     #[inline]
     fn id(&self) -> Option<u32> {
         None
-    }
-}
-
-impl<R> Debug for Command<R> {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_tuple("Command").field(&self.id()).finish()
     }
 }
 
@@ -94,6 +87,16 @@ impl<R: Debug> error::Error for Error<R> {
 struct Merger<R> {
     cmd1: Box<Command<R>>,
     cmd2: Box<Command<R>>,
+}
+
+impl<R> Debug for Merger<R> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Merger")
+            .field("cmd1", &self.cmd1)
+            .field("cmd2", &self.cmd2)
+            .finish()
+    }
 }
 
 impl<R> Command<R> for Merger<R> {

@@ -11,6 +11,7 @@ use {Command, Error, Merger};
 /// use std::error::Error;
 /// use undo::{Command, Stack};
 ///
+/// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {

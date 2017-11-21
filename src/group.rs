@@ -21,6 +21,15 @@ impl<K: Hash + Eq, V> Group<K, V> {
         }
     }
 
+    /// Returns a new `Group` with the given capacity.
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Group<K, V> {
+        Group {
+            map: HashMap::with_capacity(capacity),
+            active: None,
+        }
+    }
+
     /// Returns the number of items in the group.
     #[inline]
     pub fn len(&self) -> usize {
