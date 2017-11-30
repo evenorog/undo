@@ -30,6 +30,12 @@ impl<K: Hash + Eq, V> Group<K, V> {
         }
     }
 
+    /// Returns the capacity of the `Group`.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.map.capacity()
+    }
+
     /// Returns the number of items in the group.
     #[inline]
     pub fn len(&self) -> usize {
@@ -104,6 +110,22 @@ impl<K: Hash + Eq, R> Group<K, Stack<R>> {
 }
 
 impl<'a, K: Hash + Eq, R> Group<K, Record<'a, R>> {
+    /// Calls the [`is_clean`] method on the active `Record`.
+    ///
+    /// [`is_clean`]: record/struct.Record.html#method.is_clean
+    #[inline]
+    pub fn is_clean(&self) -> Option<bool> {
+        self.get().map(|record| record.is_clean())
+    }
+
+    /// Calls the [`is_dirty`] method on the active `Record`.
+    ///
+    /// [`is_dirty`]: record/struct.Record.html#method.is_dirty
+    #[inline]
+    pub fn is_dirty(&self) -> Option<bool> {
+        self.is_clean().map(|is_clean| !is_clean)
+    }
+
     /// Calls the [`push`] method on the active `Record`.
     ///
     /// [`push`]: record/struct.Record.html#method.push

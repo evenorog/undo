@@ -130,6 +130,12 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
+    /// Returns the capacity of the `Record`.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.commands.capacity()
+    }
+
     /// Returns the limit of the `Record`, or `None` if it has no limit.
     #[inline]
     pub fn limit(&self) -> Option<usize> {
@@ -148,13 +154,13 @@ impl<'a, R> Record<'a, R> {
         self.commands.is_empty()
     }
 
-    /// Returns `true` if the state of the stack is clean, `false` otherwise.
+    /// Returns `true` if the state of the record is clean, `false` otherwise.
     #[inline]
     pub fn is_clean(&self) -> bool {
-        self.idx == self.commands.len()
+        self.idx == self.len()
     }
 
-    /// Returns `true` if the state of the stack is dirty, `false` otherwise.
+    /// Returns `true` if the state of the record is dirty, `false` otherwise.
     #[inline]
     pub fn is_dirty(&self) -> bool {
         !self.is_clean()
@@ -277,7 +283,7 @@ impl<'a, R> Record<'a, R> {
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        if self.idx < self.commands.len() {
+        if self.idx < self.len() {
             let is_dirty = self.is_dirty();
             match self.commands[self.idx].redo(&mut self.receiver) {
                 Ok(_) => {
