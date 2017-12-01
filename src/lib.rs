@@ -11,14 +11,14 @@
 #![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
 
 mod group;
-pub mod record;
+mod record;
 mod stack;
 
 use std::error;
 use std::fmt::{self, Debug, Display, Formatter};
 
 pub use group::Group;
-pub use record::Record;
+pub use record::{Commands, Record, RecordBuilder};
 pub use stack::Stack;
 
 /// Base functionality for all commands.
@@ -61,6 +61,40 @@ impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     }
 }
 
+struct Merger<R> {
+    cmd1: Box<Command<R>>,
+    cmd2: Box<Command<R>>,
+}
+
+impl<R> Command<R> for Merger<R> {
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        self.cmd1.redo(receiver)?;
+        self.cmd2.redo(receiver)
+    }
+
+    #[inline]
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        self.cmd2.undo(receiver)?;
+        self.cmd1.undo(receiver)
+    }
+
+    #[inline]
+    fn id(&self) -> Option<u32> {
+        self.cmd1.id()
+    }
+}
+
+impl<R> Debug for Merger<R> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Merger")
+            .field("cmd1", &self.cmd1)
+            .field("cmd2", &self.cmd2)
+            .finish()
+    }
+}
+
 /// An error kind that holds the error and the command that caused the error.
 #[derive(Debug)]
 pub struct Error<R>(pub Box<Command<R>>, pub Box<error::Error>);
@@ -81,39 +115,5 @@ impl<R: Debug> error::Error for Error<R> {
     #[inline]
     fn cause(&self) -> Option<&error::Error> {
         self.1.cause()
-    }
-}
-
-struct Merger<R> {
-    cmd1: Box<Command<R>>,
-    cmd2: Box<Command<R>>,
-}
-
-impl<R> Debug for Merger<R> {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Merger")
-            .field("cmd1", &self.cmd1)
-            .field("cmd2", &self.cmd2)
-            .finish()
-    }
-}
-
-impl<R> Command<R> for Merger<R> {
-    #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
-        self.cmd1.redo(receiver)?;
-        self.cmd2.redo(receiver)
-    }
-
-    #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
-        self.cmd2.undo(receiver)?;
-        self.cmd1.undo(receiver)
-    }
-
-    #[inline]
-    fn id(&self) -> Option<u32> {
-        self.cmd1.id()
     }
 }
