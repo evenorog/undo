@@ -29,7 +29,7 @@ use {Command, Error, Merger};
 ///     }
 ///
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+///         self.0 = s.pop().ok_or("`s` is empty")?;
 ///         Ok(())
 ///     }
 /// }
@@ -179,7 +179,7 @@ impl<'a, R> Record<'a, R> {
     }
 
     /// Pushes `cmd` to the top of the `Record` and executes its [`redo`] method.
-    /// The command is merged with the previous top command if [`merge`] does not return `None`.
+    /// The command is merged with the previous top command if they have the same `id`.
     ///
     /// All commands above the active one are removed from the stack and returned as an iterator.
     ///
