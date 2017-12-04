@@ -2,9 +2,8 @@ use {Command, Error, Merger};
 
 /// A stack of commands.
 ///
-/// The `Stack` is the simplest data structure and works by pushing and
-/// popping off `Command`s that modifies the `receiver`.
-/// Unlike the `Record`, it does not have a special state that can be used for callbacks.
+/// The stack is the simplest data structure and works by pushing and
+/// popping off commands that modifies the `receiver`.
 ///
 /// # Examples
 /// ```
@@ -58,7 +57,7 @@ pub struct Stack<R> {
 }
 
 impl<R> Stack<R> {
-    /// Creates a new `Stack`.
+    /// Creates a new stack.
     #[inline]
     pub fn new<T: Into<R>>(receiver: T) -> Stack<R> {
         Stack {
@@ -67,13 +66,13 @@ impl<R> Stack<R> {
         }
     }
 
-    /// Returns the number of `Command`s in the `Stack`.
+    /// Returns the number of commands in the stack.
     #[inline]
     pub fn len(&self) -> usize {
         self.commands.len()
     }
 
-    /// Returns `true` if the `Stack` is empty.
+    /// Returns `true` if the stack is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
@@ -85,19 +84,20 @@ impl<R> Stack<R> {
         &self.receiver
     }
 
-    /// Consumes the `Stack`, returning the `receiver`.
+    /// Consumes the stack, returning the `receiver`.
     #[inline]
     pub fn into_receiver(self) -> R {
         self.receiver
     }
 
-    /// Pushes `cmd` on the stack and executes its [`redo`] method. The command is merged with
-    /// the previous top `Command` if their `id` is equal.
+    /// Pushes the command on the stack and executes its [`redo`] method.
+    /// The command is merged with the previous top command if their [`id`] is equal.
     ///
     /// # Errors
-    /// If an error occur when executing `redo`, the error is returned together with the `Command`.
+    /// If an error occur when executing [`redo`], the error is returned together with the command.
     ///
-    /// [`redo`]: ../trait.Command.html#tymethod.redo
+    /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`id`]: trait.Command.html#method.id
     #[inline]
     pub fn push<C>(&mut self, mut cmd: C) -> Result<(), Error<R>>
     where
@@ -127,9 +127,9 @@ impl<R> Stack<R> {
     /// Returns `None` if the stack is empty.
     ///
     /// # Errors
-    /// If an error occur when executing `undo` the error is returned together with the `Command`.
+    /// If an error occur when executing [`undo`] the error is returned together with the command.
     ///
-    /// [`undo`]: ../trait.Command.html#tymethod.undo
+    /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     pub fn pop(&mut self) -> Option<Result<Box<Command<R>>, Error<R>>> {
         self.commands
@@ -141,10 +141,10 @@ impl<R> Stack<R> {
     }
 }
 
-impl<R> AsRef<R> for Stack<R> {
+impl<T, R: AsRef<T>> AsRef<T> for Stack<R> {
     #[inline]
-    fn as_ref(&self) -> &R {
-        self.as_receiver()
+    fn as_ref(&self) -> &T {
+        self.receiver.as_ref()
     }
 }
 

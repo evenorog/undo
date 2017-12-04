@@ -12,7 +12,7 @@ pub struct Group<K: Hash + Eq, V> {
 }
 
 impl<K: Hash + Eq, V> Group<K, V> {
-    /// Returns a new `Group`.
+    /// Returns a new group.
     #[inline]
     pub fn new() -> Group<K, V> {
         Group {
@@ -21,7 +21,7 @@ impl<K: Hash + Eq, V> Group<K, V> {
         }
     }
 
-    /// Returns a new `Group` with the given capacity.
+    /// Returns a new group with the given capacity.
     #[inline]
     pub fn with_capacity(capacity: usize) -> Group<K, V> {
         Group {
@@ -30,7 +30,7 @@ impl<K: Hash + Eq, V> Group<K, V> {
         }
     }
 
-    /// Returns the capacity of the `Group`.
+    /// Returns the capacity of the group.
     #[inline]
     pub fn capacity(&self) -> usize {
         self.map.capacity()
@@ -80,7 +80,7 @@ impl<K: Hash + Eq, V> Group<K, V> {
 }
 
 impl<K: Hash + Eq, R> Group<K, Stack<R>> {
-    /// Calls the [`push`] method on the active `Stack`.
+    /// Calls the [`push`] method on the active stack.
     ///
     /// [`push`]: stack/struct.Stack.html#method.push
     #[inline]
@@ -96,7 +96,7 @@ impl<K: Hash + Eq, R> Group<K, Stack<R>> {
             .map(move |stack| stack.push(cmd))
     }
 
-    /// Calls the [`pop`] method on the active `Stack`.
+    /// Calls the [`pop`] method on the active stack.
     ///
     /// [`pop`]: stack/struct.Stack.html#method.pop
     #[inline]
@@ -110,7 +110,7 @@ impl<K: Hash + Eq, R> Group<K, Stack<R>> {
 }
 
 impl<'a, K: Hash + Eq, R> Group<K, Record<'a, R>> {
-    /// Calls the [`is_clean`] method on the active `Record`.
+    /// Calls the [`is_clean`] method on the active record.
     ///
     /// [`is_clean`]: record/struct.Record.html#method.is_clean
     #[inline]
@@ -118,7 +118,7 @@ impl<'a, K: Hash + Eq, R> Group<K, Record<'a, R>> {
         self.get().map(|record| record.is_clean())
     }
 
-    /// Calls the [`is_dirty`] method on the active `Record`.
+    /// Calls the [`is_dirty`] method on the active record.
     ///
     /// [`is_dirty`]: record/struct.Record.html#method.is_dirty
     #[inline]
@@ -126,7 +126,7 @@ impl<'a, K: Hash + Eq, R> Group<K, Record<'a, R>> {
         self.is_clean().map(|is_clean| !is_clean)
     }
 
-    /// Calls the [`push`] method on the active `Record`.
+    /// Calls the [`push`] method on the active record.
     ///
     /// [`push`]: record/struct.Record.html#method.push
     #[inline]
@@ -142,7 +142,7 @@ impl<'a, K: Hash + Eq, R> Group<K, Record<'a, R>> {
             .map(move |record| record.push(cmd))
     }
 
-    /// Calls the [`redo`] method on the active `Record`.
+    /// Calls the [`redo`] method on the active record.
     ///
     /// [`redo`]: record/struct.Record.html#method.redo
     #[inline]
@@ -154,7 +154,7 @@ impl<'a, K: Hash + Eq, R> Group<K, Record<'a, R>> {
             .and_then(|record| record.redo())
     }
 
-    /// Calls the [`undo`] method on the active `Record`.
+    /// Calls the [`undo`] method on the active record.
     ///
     /// [`undo`]: record/struct.Record.html#method.undo
     #[inline]

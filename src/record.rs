@@ -6,13 +6,13 @@ use {Command, Error, Merger};
 
 /// A record of commands.
 ///
-/// The `Record` works mostly like a `Stack`, but it stores the commands
+/// The record works mostly like a stack, but it stores the commands
 /// instead of returning them when undoing. This means it can roll the
 /// receivers state backwards and forwards by using the undo and redo methods.
-/// In addition, the `Record` has an internal state that is either clean or dirty.
-/// A clean state means that the `Record` does not have any `Command`s to redo,
-/// while a dirty state means that it does. The user can give the `Record` a function
-/// that is called each time the state changes by using the `config` constructor.
+/// In addition, the record has an internal state that is either clean or dirty.
+/// A clean state means that the record does not have any commands to redo,
+/// while a dirty state means that it does. The user can give the record a function
+/// that is called each time the state changes by using the [`builder`].
 ///
 /// # Examples
 /// ```
@@ -59,67 +59,31 @@ use {Command, Error, Merger};
 /// }
 /// # foo().unwrap();
 /// ```
+///
+/// [`builder`]: struct.RecordBuilder.html
 #[derive(Default)]
 pub struct Record<'a, R> {
     commands: VecDeque<Box<Command<R>>>,
     receiver: R,
-    idx: usize,
+    cursor: usize,
     limit: Option<usize>,
     callback: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
 impl<'a, R> Record<'a, R> {
-    /// Returns a new `Record`.
+    /// Returns a new record.
     #[inline]
     pub fn new<T: Into<R>>(receiver: T) -> Record<'a, R> {
         Record {
             commands: VecDeque::new(),
             receiver: receiver.into(),
-            idx: 0,
+            cursor: 0,
             limit: None,
             callback: None,
         }
     }
 
-    /// Returns a builder for a `Record`.
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::error::Error;
-    /// # use undo::{Command, Record};
-    /// # #[derive(Debug)]
-    /// # struct Add(char);
-    /// # impl Command<String> for Add {
-    /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-    /// #         s.push(self.0);
-    /// #         Ok(())
-    /// #     }
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
-    /// #         Ok(())
-    /// #     }
-    /// # }
-    /// # fn foo() -> Result<(), Box<Error>> {
-    /// let mut record = Record::builder()
-    ///     .capacity(2)
-    ///     .limit(2)
-    ///     .default();
-    ///
-    /// record.push(Add('a'))?;
-    /// record.push(Add('b'))?;
-    /// record.push(Add('c'))?; // 'a' is removed from the record since limit is 2.
-    ///
-    /// assert_eq!(record.as_receiver(), "abc");
-    ///
-    /// record.undo().unwrap()?;
-    /// record.undo().unwrap()?;
-    /// assert!(record.undo().is_none());
-    ///
-    /// assert_eq!(record.into_receiver(), "a");
-    /// # Ok(())
-    /// # }
-    /// # foo().unwrap();
-    /// ```
+    /// Returns a builder for a record.
     #[inline]
     pub fn builder() -> RecordBuilder<'a, R> {
         RecordBuilder {
@@ -130,25 +94,25 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
-    /// Returns the capacity of the `Record`.
+    /// Returns the capacity of the record.
     #[inline]
     pub fn capacity(&self) -> usize {
         self.commands.capacity()
     }
 
-    /// Returns the limit of the `Record`, or `None` if it has no limit.
+    /// Returns the limit of the record, or `None` if it has no limit.
     #[inline]
     pub fn limit(&self) -> Option<usize> {
         self.limit
     }
 
-    /// Returns the number of commands in the `Record`.
+    /// Returns the number of commands in the record.
     #[inline]
     pub fn len(&self) -> usize {
         self.commands.len()
     }
 
-    /// Returns `true` if the `Record` is empty.
+    /// Returns `true` if the record is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
@@ -157,7 +121,7 @@ impl<'a, R> Record<'a, R> {
     /// Returns `true` if the state of the record is clean, `false` otherwise.
     #[inline]
     pub fn is_clean(&self) -> bool {
-        self.idx == self.len()
+        self.cursor == self.len()
     }
 
     /// Returns `true` if the state of the record is dirty, `false` otherwise.
@@ -172,14 +136,14 @@ impl<'a, R> Record<'a, R> {
         &self.receiver
     }
 
-    /// Consumes the `Record`, returning the `receiver`.
+    /// Consumes the record, returning the `receiver`.
     #[inline]
     pub fn into_receiver(self) -> R {
         self.receiver
     }
 
-    /// Pushes `cmd` to the top of the `Record` and executes its [`redo`] method.
-    /// The command is merged with the previous top command if they have the same `id`.
+    /// Pushes the command to the top of the record and executes its [`redo`] method.
+    /// The command is merged with the previous top command if they have the same [`id`].
     ///
     /// All commands above the active one are removed from the stack and returned as an iterator.
     ///
@@ -226,16 +190,18 @@ impl<'a, R> Record<'a, R> {
     /// ```
     ///
     /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`id`]: trait.Command.html#method.id
     #[inline]
     pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<R>, Error<R>>
     where
         C: Command<R> + 'static,
         R: 'static,
     {
-        let is_dirty = self.is_dirty();
-        let len = self.idx;
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
+                let is_dirty = self.is_dirty();
+                let len = self.cursor;
+
                 // Pop off all elements after len from record.
                 let iter = self.commands.split_off(len).into_iter();
                 debug_assert_eq!(len, self.len());
@@ -254,13 +220,13 @@ impl<'a, R> Record<'a, R> {
                             Some(limit) if len == limit => {
                                 self.commands.pop_front();
                             }
-                            _ => self.idx += 1,
+                            _ => self.cursor += 1,
                         }
                         self.commands.push_back(Box::new(cmd));
                     }
                 }
 
-                debug_assert_eq!(self.idx, self.len());
+                debug_assert_eq!(self.cursor, self.len());
                 // Record is always clean after a push, check if it was dirty before.
                 if is_dirty {
                     if let Some(ref mut f) = self.callback {
@@ -273,8 +239,8 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
-    /// Calls the [`redo`] method for the active `Command` and sets the next one as the new
-    /// active one.
+    /// Calls the [`redo`] method for the active command and sets the next one as the
+    /// new active one.
     ///
     /// # Errors
     /// If an error occur when executing [`redo`] the
@@ -283,11 +249,11 @@ impl<'a, R> Record<'a, R> {
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        if self.idx < self.len() {
-            let is_dirty = self.is_dirty();
-            match self.commands[self.idx].redo(&mut self.receiver) {
+        if self.cursor < self.len() {
+            match self.commands[self.cursor].redo(&mut self.receiver) {
                 Ok(_) => {
-                    self.idx += 1;
+                    let is_dirty = self.is_dirty();
+                    self.cursor += 1;
                     // Check if record went from dirty to clean.
                     if is_dirty && self.is_clean() {
                         if let Some(ref mut f) = self.callback {
@@ -303,7 +269,7 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
-    /// Calls the [`undo`] method for the active `Command` and sets the previous one as the
+    /// Calls the [`undo`] method for the active command and sets the previous one as the
     /// new active one.
     ///
     /// # Errors
@@ -313,11 +279,11 @@ impl<'a, R> Record<'a, R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        if self.idx > 0 {
-            let is_clean = self.is_clean();
-            match self.commands[self.idx - 1].undo(&mut self.receiver) {
+        if self.cursor > 0 {
+            match self.commands[self.cursor - 1].undo(&mut self.receiver) {
                 Ok(_) => {
-                    self.idx -= 1;
+                    let is_clean = self.is_clean();
+                    self.cursor -= 1;
                     // Check if record went from clean to dirty.
                     if is_clean && self.is_dirty() {
                         if let Some(ref mut f) = self.callback {
@@ -334,10 +300,10 @@ impl<'a, R> Record<'a, R> {
     }
 }
 
-impl<'a, R> AsRef<R> for Record<'a, R> {
+impl<'a, T, R: AsRef<T>> AsRef<T> for Record<'a, R> {
     #[inline]
-    fn as_ref(&self) -> &R {
-        self.as_receiver()
+    fn as_ref(&self) -> &T {
+        self.receiver.as_ref()
     }
 }
 
@@ -354,7 +320,7 @@ impl<'a, R: Debug> Debug for Record<'a, R> {
         f.debug_struct("Record")
             .field("commands", &self.commands)
             .field("receiver", &self.receiver)
-            .field("idx", &self.idx)
+            .field("idx", &self.cursor)
             .field("limit", &self.limit)
             .finish()
     }
@@ -391,10 +357,48 @@ impl<'a, R> RecordBuilder<'a, R> {
         self
     }
 
-    /// Sets a limit on how many `Command`s can be stored in the stack.
+    /// Sets a limit on how many commands can be stored in the stack.
     /// If this limit is reached it will start popping of commands at the bottom of the stack when
     /// pushing new commands on to the stack. No limit is set by default which means it may grow
     /// indefinitely.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::error::Error;
+    /// # use undo::{Command, Record};
+    /// # #[derive(Debug)]
+    /// # struct Add(char);
+    /// # impl Command<String> for Add {
+    /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #         s.push(self.0);
+    /// #         Ok(())
+    /// #     }
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # fn foo() -> Result<(), Box<Error>> {
+    /// let mut record = Record::builder()
+    ///     .capacity(2)
+    ///     .limit(2)
+    ///     .default();
+    ///
+    /// record.push(Add('a'))?;
+    /// record.push(Add('b'))?;
+    /// record.push(Add('c'))?; // 'a' is removed from the record since limit is 2.
+    ///
+    /// assert_eq!(record.as_receiver(), "abc");
+    ///
+    /// record.undo().unwrap()?;
+    /// record.undo().unwrap()?;
+    /// assert!(record.undo().is_none());
+    ///
+    /// assert_eq!(record.into_receiver(), "a");
+    /// # Ok(())
+    /// # }
+    /// # foo().unwrap();
+    /// ```
     #[inline]
     pub fn limit(mut self, limit: usize) -> RecordBuilder<'a, R> {
         self.limit = if limit == 0 { None } else { Some(limit) };
@@ -402,7 +406,7 @@ impl<'a, R> RecordBuilder<'a, R> {
     }
 
     /// Sets what should happen when the state changes.
-    /// By default the `Record` does nothing when the state changes.
+    /// By default the record does nothing when the state changes.
     ///
     /// # Examples
     /// ```
@@ -445,13 +449,13 @@ impl<'a, R> RecordBuilder<'a, R> {
         self
     }
 
-    /// Creates the `Record`.
+    /// Creates the record.
     #[inline]
     pub fn build<T: Into<R>>(self, receiver: T) -> Record<'a, R> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: receiver.into(),
-            idx: 0,
+            cursor: 0,
             limit: self.limit,
             callback: self.callback,
         }
@@ -459,7 +463,7 @@ impl<'a, R> RecordBuilder<'a, R> {
 }
 
 impl<'a, R: Default> RecordBuilder<'a, R> {
-    /// Creates the `Record` with a default receiver.
+    /// Creates the record with a default `receiver`.
     #[inline]
     pub fn default(self) -> Record<'a, R> {
         self.build(R::default())

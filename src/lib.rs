@@ -33,11 +33,56 @@ pub trait Command<R>: Debug {
     /// [`redo`]: trait.Command.html#tymethod.redo
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
-    /// Used for automatic merging of `Command`s.
+    /// Used for automatic merging of commands.
     ///
     /// Two commands are merged together when a command is pushed, and it has
     /// the same id as the top command already on the stack. When commands are merged together,
     /// undoing and redoing them are done in one step.
+    ///
+    /// # Examples
+    /// ```
+    /// use std::error::Error;
+    /// use undo::{Command, Record};
+    ///
+    /// #[derive(Debug)]
+    /// struct Add(char);
+    ///
+    /// impl Command<String> for Add {
+    ///     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    ///         s.push(self.0);
+    ///         Ok(())
+    ///     }
+    ///
+    ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    ///         self.0 = s.pop().ok_or("`s` is empty")?;
+    ///         Ok(())
+    ///     }
+    ///
+    ///     fn id(&self) -> Option<u32> {
+    ///         Some(1)
+    ///     }
+    /// }
+    ///
+    /// fn foo() -> Result<(), Box<Error>> {
+    ///     let mut record = Record::default();
+    ///
+    ///     record.push(Add('a'))?;
+    ///     record.push(Add('b'))?;
+    ///     record.push(Add('c'))?; // 'a', 'b', and 'c' are merged.
+    ///
+    ///     assert_eq!(record.len(), 1);
+    ///     assert_eq!(record.as_receiver(), "abc");
+    ///
+    ///     record.undo().unwrap()?;
+    ///     assert_eq!(record.as_receiver(), "");
+    ///
+    ///     record.redo().unwrap()?;
+    ///     assert_eq!(record.into_receiver(), "abc");
+    ///
+    ///     Ok(())
+    /// }
+    /// # foo().unwrap();
+    /// ```
     #[inline]
     fn id(&self) -> Option<u32> {
         None
