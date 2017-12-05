@@ -141,10 +141,10 @@ impl<R> Stack<R> {
     }
 }
 
-impl<T, R: AsRef<T>> AsRef<T> for Stack<R> {
+impl<R> AsRef<R> for Stack<R> {
     #[inline]
-    fn as_ref(&self) -> &T {
-        self.receiver.as_ref()
+    fn as_ref(&self) -> &R {
+        self.as_receiver()
     }
 }
 

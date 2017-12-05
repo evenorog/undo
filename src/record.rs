@@ -300,10 +300,10 @@ impl<'a, R> Record<'a, R> {
     }
 }
 
-impl<'a, T, R: AsRef<T>> AsRef<T> for Record<'a, R> {
+impl<'a, R> AsRef<R> for Record<'a, R> {
     #[inline]
-    fn as_ref(&self) -> &T {
-        self.receiver.as_ref()
+    fn as_ref(&self) -> &R {
+        self.as_receiver()
     }
 }
 
