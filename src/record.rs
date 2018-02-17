@@ -66,7 +66,7 @@ pub struct Record<'a, R> {
     commands: VecDeque<Box<Command<R>>>,
     receiver: R,
     cursor: usize,
-    limit: Option<usize>,
+    limit: usize,
     callback: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
@@ -78,7 +78,7 @@ impl<'a, R> Record<'a, R> {
             commands: VecDeque::new(),
             receiver: receiver.into(),
             cursor: 0,
-            limit: None,
+            limit: 0,
             callback: None,
         }
     }
@@ -89,7 +89,7 @@ impl<'a, R> Record<'a, R> {
         RecordBuilder {
             receiver: PhantomData,
             capacity: 0,
-            limit: None,
+            limit: 0,
             callback: None,
         }
     }
@@ -103,7 +103,7 @@ impl<'a, R> Record<'a, R> {
     /// Returns the limit of the record, or `None` if it has no limit.
     #[inline]
     pub fn limit(&self) -> Option<usize> {
-        self.limit
+        if self.limit == 0 { None } else { Some(self.limit) }
     }
 
     /// Returns the number of commands in the record.
@@ -216,11 +216,10 @@ impl<'a, R> Record<'a, R> {
                         self.commands.push_back(Box::new(cmd));
                     }
                     _ => {
-                        match self.limit {
-                            Some(limit) if len == limit => {
-                                self.commands.pop_front();
-                            }
-                            _ => self.cursor += 1,
+                        if self.limit != 0 && self.limit == len {
+                            self.commands.pop_front();
+                        } else {
+                            self.cursor += 1;
                         }
                         self.commands.push_back(Box::new(cmd));
                     }
@@ -343,7 +342,7 @@ impl<R> Iterator for Commands<R> {
 pub struct RecordBuilder<'a, R> {
     receiver: PhantomData<R>,
     capacity: usize,
-    limit: Option<usize>,
+    limit: usize,
     callback: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
 }
 
@@ -401,7 +400,7 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// ```
     #[inline]
     pub fn limit(mut self, limit: usize) -> RecordBuilder<'a, R> {
-        self.limit = if limit == 0 { None } else { Some(limit) };
+        self.limit = limit;
         self
     }
 
