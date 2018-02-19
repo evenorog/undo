@@ -4,6 +4,23 @@ use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use {Command, Error, Merger};
 
+/// Used to represent the state the record or the receiver can be in.
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub enum Signal {
+    /// The record can redo.
+    Redo,
+    /// The record can not redo.
+    NoRedo,
+    /// The record can undo.
+    Undo,
+    /// The record can not undo.
+    NoUndo,
+    /// The receiver is in a saved state.
+    Saved,
+    /// The receiver is not in a saved state.
+    Unsaved,
+}
+
 /// A record of commands.
 ///
 /// The record works mostly like a stack, but it stores the commands
@@ -67,7 +84,8 @@ pub struct Record<'a, R> {
     receiver: R,
     cursor: usize,
     limit: usize,
-    callback: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
+    saved: Option<usize>,
+    signals: Option<Box<FnMut(Signal) + Send + Sync + 'a>>,
 }
 
 impl<'a, R> Record<'a, R> {
@@ -79,7 +97,8 @@ impl<'a, R> Record<'a, R> {
             receiver: receiver.into(),
             cursor: 0,
             limit: 0,
-            callback: None,
+            saved: None,
+            signals: None,
         }
     }
 
@@ -90,8 +109,35 @@ impl<'a, R> Record<'a, R> {
             receiver: PhantomData,
             capacity: 0,
             limit: 0,
-            callback: None,
+            signals: None,
         }
+    }
+
+    /// Marks the receiver as being in a saved state.
+    #[inline]
+    pub fn set_saved(&mut self, is_saved: bool) {
+        self.saved = match self.saved {
+            Some(saved) if is_saved && saved != self.cursor => {
+                if let Some(ref mut f) = self.signals {
+                    f(Signal::Saved);
+                }
+                Some(self.cursor)
+            },
+            Some(saved) if is_saved => Some(saved),
+            Some(_) => {
+                if let Some(ref mut f) = self.signals {
+                    f(Signal::Unsaved);
+                }
+                None
+            },
+            None => None,
+        };
+    }
+
+    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
+    #[inline]
+    pub fn is_saved(&self) -> bool {
+        self.saved.map_or(false, |saved| saved == self.cursor)
     }
 
     /// Returns the capacity of the record.
@@ -116,18 +162,6 @@ impl<'a, R> Record<'a, R> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
-    }
-
-    /// Returns `true` if the state of the record is clean, `false` otherwise.
-    #[inline]
-    pub fn is_clean(&self) -> bool {
-        self.cursor == self.len()
-    }
-
-    /// Returns `true` if the state of the record is dirty, `false` otherwise.
-    #[inline]
-    pub fn is_dirty(&self) -> bool {
-        !self.is_clean()
     }
 
     /// Returns a reference to the `receiver`.
@@ -199,15 +233,16 @@ impl<'a, R> Record<'a, R> {
     {
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
-                let is_dirty = self.is_dirty();
-                let len = self.cursor;
+                let cursor = self.cursor;
+                let was_dirty = cursor != self.len();
+                let was_saved = self.is_saved();
 
-                // Pop off all elements after len from record.
-                let iter = self.commands.split_off(len).into_iter();
-                debug_assert_eq!(len, self.len());
+                // Pop off all elements after cursor from record.
+                let iter = self.commands.split_off(cursor).into_iter();
+                debug_assert_eq!(cursor, self.len());
 
                 match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
-                    (Some(id1), Some(id2)) if id1 == id2 => {
+                    (Some(id1), Some(id2)) if id1 == id2 && !was_saved => {
                         // Merge the command with the one on the top of the stack.
                         let cmd = Merger {
                             cmd1: self.commands.pop_back().unwrap(),
@@ -216,8 +251,13 @@ impl<'a, R> Record<'a, R> {
                         self.commands.push_back(Box::new(cmd));
                     }
                     _ => {
-                        if self.limit != 0 && self.limit == len {
-                            self.commands.pop_front();
+                        if self.limit != 0 && self.limit == cursor {
+                            let _ = self.commands.pop_front();
+                            self.saved = match self.saved {
+                                Some(0) => None,
+                                Some(saved) => Some(saved - 1),
+                                None => None,
+                            };
                         } else {
                             self.cursor += 1;
                         }
@@ -226,10 +266,18 @@ impl<'a, R> Record<'a, R> {
                 }
 
                 debug_assert_eq!(self.cursor, self.len());
-                // Record is always clean after a push, check if it was dirty before.
-                if is_dirty {
-                    if let Some(ref mut f) = self.callback {
-                        f(true);
+                if let Some(ref mut f) = self.signals {
+                    // Record is always clean after a push, check if it was dirty before.
+                    if was_dirty {
+                        f(Signal::NoRedo);
+                    }
+                    // Check if the stack was empty before pushing the command.
+                    if cursor == 0 {
+                        f(Signal::Undo);
+                    }
+                    // Check if record went from saved to unsaved.
+                    if was_saved {
+                        f(Signal::Unsaved);
                     }
                 }
                 Ok(Commands(iter))
@@ -251,12 +299,27 @@ impl<'a, R> Record<'a, R> {
         if self.cursor < self.len() {
             match self.commands[self.cursor].redo(&mut self.receiver) {
                 Ok(_) => {
-                    let is_dirty = self.is_dirty();
+                    let was_dirty = self.cursor != self.len();
+                    let was_saved = self.is_saved();
                     self.cursor += 1;
-                    // Check if record went from dirty to clean.
-                    if is_dirty && self.is_clean() {
-                        if let Some(ref mut f) = self.callback {
-                            f(true);
+                    let is_clean = self.cursor == self.len();
+                    let is_saved = self.is_saved();
+                    if let Some(ref mut f) = self.signals {
+                        // Check if record went from dirty to clean.
+                        if was_dirty && is_clean {
+                            f(Signal::NoRedo);
+                        }
+                        // Check if the stack was empty before pushing the command.
+                        if self.cursor == 1 {
+                            f(Signal::Undo);
+                        }
+                        // Check if record went from saved to unsaved.
+                        if was_saved {
+                            f(Signal::Unsaved);
+                        }
+                        // Check if record went from unsaved to saved.
+                        if is_saved {
+                            f(Signal::Saved);
                         }
                     }
                     Some(Ok(()))
@@ -281,12 +344,27 @@ impl<'a, R> Record<'a, R> {
         if self.cursor > 0 {
             match self.commands[self.cursor - 1].undo(&mut self.receiver) {
                 Ok(_) => {
-                    let is_clean = self.is_clean();
+                    let was_clean = self.cursor == self.len();
+                    let was_saved = self.is_saved();
                     self.cursor -= 1;
-                    // Check if record went from clean to dirty.
-                    if is_clean && self.is_dirty() {
-                        if let Some(ref mut f) = self.callback {
-                            f(false);
+                    let is_dirty = self.cursor != self.len();
+                    let is_saved = self.is_saved();
+                    if let Some(ref mut f) = self.signals {
+                        // Check if record went from clean to dirty.
+                        if was_clean && is_dirty {
+                            f(Signal::Redo);
+                        }
+                        // Check if the stack was not empty before pushing the command.
+                        if self.cursor == 0 {
+                            f(Signal::NoUndo);
+                        }
+                        // Check if record went from saved to unsaved.
+                        if was_saved {
+                            f(Signal::Unsaved);
+                        }
+                        // Check if record went from unsaved to saved.
+                        if is_saved {
+                            f(Signal::Saved);
                         }
                     }
                     Some(Ok(()))
@@ -319,8 +397,9 @@ impl<'a, R: Debug> Debug for Record<'a, R> {
         f.debug_struct("Record")
             .field("commands", &self.commands)
             .field("receiver", &self.receiver)
-            .field("idx", &self.cursor)
+            .field("cursor", &self.cursor)
             .field("limit", &self.limit)
+            .field("saved", &self.saved)
             .finish()
     }
 }
@@ -343,7 +422,7 @@ pub struct RecordBuilder<'a, R> {
     receiver: PhantomData<R>,
     capacity: usize,
     limit: usize,
-    callback: Option<Box<FnMut(bool) + Send + Sync + 'a>>,
+    signals: Option<Box<FnMut(Signal) + Send + Sync + 'a>>,
 }
 
 impl<'a, R> RecordBuilder<'a, R> {
@@ -404,13 +483,13 @@ impl<'a, R> RecordBuilder<'a, R> {
         self
     }
 
-    /// Sets what should happen when the state changes.
-    /// By default the record does nothing when the state changes.
+    /// Decides how different signals should be handled when the state changes.
+    /// By default the record does nothing.
     ///
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use undo::{Command, Record};
+    /// # use undo::{Command, Record, Signal::*};
     /// # #[derive(Debug)]
     /// # struct Add(char);
     /// # impl Command<String> for Add {
@@ -424,13 +503,16 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// #     }
     /// # }
     /// # fn foo() -> Result<(), Box<Error>> {
-    /// let mut x = 0;
-    /// let mut record = Record::builder()
-    ///     .callback(|is_clean| {
-    ///         if is_clean {
-    ///             x = 1;
-    ///         } else {
-    ///             x = 2;
+    /// # let mut record =
+    /// Record::builder()
+    ///     .signals(|signal| {
+    ///         match signal {
+    ///             Redo => println!("The record can redo."),
+    ///             NoRedo => println!("The record can not redo."),
+    ///             Undo => println!("The record can undo."),
+    ///             NoUndo => println!("The record can not undo."),
+    ///             Saved => println!("The receiver is in a saved state."),
+    ///             Unsaved => println!("The receiver is not in a saved state."),
     ///         }
     ///     })
     ///     .default();
@@ -440,11 +522,11 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// # foo().unwrap();
     /// ```
     #[inline]
-    pub fn callback<F>(mut self, f: F) -> RecordBuilder<'a, R>
+    pub fn signals<F>(mut self, f: F) -> RecordBuilder<'a, R>
     where
-        F: FnMut(bool) + Send + Sync + 'a,
+        F: FnMut(Signal) + Send + Sync + 'a,
     {
-        self.callback = Some(Box::new(f));
+        self.signals = Some(Box::new(f));
         self
     }
 
@@ -456,7 +538,8 @@ impl<'a, R> RecordBuilder<'a, R> {
             receiver: receiver.into(),
             cursor: 0,
             limit: self.limit,
-            callback: self.callback,
+            saved: None,
+            signals: self.signals,
         }
     }
 }

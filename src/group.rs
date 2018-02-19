@@ -122,22 +122,6 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Stack<R>, S> {
 }
 
 impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<K, Record<'a, R>, S> {
-    /// Calls the [`is_clean`] method on the active record.
-    ///
-    /// [`is_clean`]: record/struct.Record.html#method.is_clean
-    #[inline]
-    pub fn is_clean(&self) -> Option<bool> {
-        self.get().map(|record| record.is_clean())
-    }
-
-    /// Calls the [`is_dirty`] method on the active record.
-    ///
-    /// [`is_dirty`]: record/struct.Record.html#method.is_dirty
-    #[inline]
-    pub fn is_dirty(&self) -> Option<bool> {
-        self.is_clean().map(|is_clean| !is_clean)
-    }
-
     /// Calls the [`push`] method on the active record.
     ///
     /// [`push`]: record/struct.Record.html#method.push

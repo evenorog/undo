@@ -18,7 +18,7 @@ use std::error;
 use std::fmt::{self, Debug, Display, Formatter};
 
 pub use group::Group;
-pub use record::{Commands, Record, RecordBuilder};
+pub use record::{Commands, Record, RecordBuilder, Signal};
 pub use stack::Stack;
 
 /// Base functionality for all commands.
