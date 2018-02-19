@@ -1,31 +1,43 @@
-use std::collections::HashMap;
+use std::collections::hash_map::{HashMap, RandomState};
 use std::error;
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 use record::Commands;
 use {Command, Error, Record, Stack};
 
 /// A group of either stacks or records.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Group<K: Hash + Eq, V> {
-    map: HashMap<K, V>,
+pub struct Group<K: Hash + Eq, V, S = RandomState> where S: BuildHasher {
+    map: HashMap<K, V, S>,
     active: Option<K>,
 }
 
-impl<K: Hash + Eq, V> Group<K, V> {
+impl<K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
     /// Returns a new group.
     #[inline]
-    pub fn new() -> Group<K, V> {
-        Group {
-            map: HashMap::new(),
-            active: None,
-        }
+    pub fn new() -> Group<K, V, RandomState> {
+        Default::default()
     }
 
     /// Returns a new group with the given capacity.
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Group<K, V> {
+    pub fn with_capacity(capacity: usize) -> Group<K, V, RandomState> {
+        Group::with_capacity_and_hasher(capacity, Default::default())
+    }
+
+    /// Returns a new group with the given hasher.
+    #[inline]
+    pub fn with_hasher(hash_builder: S) -> Group<K, V, S> {
         Group {
-            map: HashMap::with_capacity(capacity),
+            map: HashMap::with_hasher(hash_builder),
+            active: None,
+        }
+    }
+
+    /// Returns a new group with the given capacity and hasher.
+    #[inline]
+    pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Group<K, V, S> {
+        Group {
+            map: HashMap::with_capacity_and_hasher(capacity, hash_builder),
             active: None,
         }
     }
@@ -79,7 +91,7 @@ impl<K: Hash + Eq, V> Group<K, V> {
     }
 }
 
-impl<K: Hash + Eq, R> Group<K, Stack<R>> {
+impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Stack<R>, S> {
     /// Calls the [`push`] method on the active stack.
     ///
     /// [`push`]: stack/struct.Stack.html#method.push
@@ -109,7 +121,7 @@ impl<K: Hash + Eq, R> Group<K, Stack<R>> {
     }
 }
 
-impl<'a, K: Hash + Eq, R> Group<K, Record<'a, R>> {
+impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<K, Record<'a, R>, S> {
     /// Calls the [`is_clean`] method on the active record.
     ///
     /// [`is_clean`]: record/struct.Record.html#method.is_clean
@@ -167,9 +179,9 @@ impl<'a, K: Hash + Eq, R> Group<K, Record<'a, R>> {
     }
 }
 
-impl<K: Hash + Eq, V> Default for Group<K, V> {
+impl<K: Hash + Eq, V, S: BuildHasher + Default> Default for Group<K, V, S> {
     #[inline]
-    fn default() -> Group<K, V> {
-        Group::new()
+    fn default() -> Group<K, V, S> {
+        Group::with_hasher(Default::default())
     }
 }
