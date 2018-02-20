@@ -241,6 +241,13 @@ impl<'a, R> Record<'a, R> {
                 let iter = self.commands.split_off(cursor).into_iter();
                 debug_assert_eq!(cursor, self.len());
 
+                // Check if the saved state was popped off.
+                if let Some(saved) = self.saved {
+                    if saved > cursor {
+                        self.saved = None;
+                    }
+                }
+
                 match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
                     (Some(id1), Some(id2)) if id1 == id2 && !was_saved => {
                         // Merge the command with the one on the top of the stack.
