@@ -567,7 +567,7 @@ impl<'a, R: Default> RecordBuilder<'a, R> {
 impl<'a, R: Debug> Debug for RecordBuilder<'a, R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Config")
+        f.debug_struct("RecordBuilder")
             .field("receiver", &self.receiver)
             .field("capacity", &self.capacity)
             .field("limit", &self.limit)

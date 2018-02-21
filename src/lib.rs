@@ -17,7 +17,7 @@ mod stack;
 use std::error;
 use std::fmt::{self, Debug, Display, Formatter};
 
-pub use group::Group;
+pub use group::{Group, GroupBuilder};
 pub use record::{Commands, Record, RecordBuilder, Signal};
 pub use stack::Stack;
 
