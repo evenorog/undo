@@ -7,18 +7,16 @@ use {Command, Error, Merger};
 /// Used to represent the state the record or the receiver can be in.
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
-    /// The record can redo.
-    Redo,
-    /// The record can not redo.
-    NoRedo,
-    /// The record can undo.
-    Undo,
-    /// The record can not undo.
-    NoUndo,
-    /// The receiver is in a saved state.
-    Saved,
-    /// The receiver is not in a saved state.
-    Unsaved,
+    /// Says if the record can redo.
+    Redo(bool),
+    /// Says if the record can undo.
+    Undo(bool),
+    /// Says if the receiver is in a saved state.
+    Saved(bool),
+    /// Says if the active command has changed.
+    ///
+    /// The command numbers starts at `1`, e.g. the values are always `index + 1`.
+    Active { old: usize, new: usize },
 }
 
 /// A record of commands.
@@ -158,7 +156,7 @@ impl<'a, R> Record<'a, R> {
         self.saved = match self.saved {
             Some(saved) if saved != self.cursor => {
                 if let Some(ref mut f) = self.signals {
-                    f(Signal::Saved);
+                    f(Signal::Saved(true));
                 }
                 Some(self.cursor)
             },
@@ -174,7 +172,7 @@ impl<'a, R> Record<'a, R> {
         self.saved = None;
         if was_saved {
             if let Some(ref mut f) = self.signals {
-                f(Signal::Unsaved);
+                f(Signal::Saved(false));
             }
         }
     }
@@ -283,17 +281,19 @@ impl<'a, R> Record<'a, R> {
 
                 debug_assert_eq!(self.cursor, self.len());
                 if let Some(ref mut f) = self.signals {
+                    // We emit the index signal even if the commands might have been merged.
+                    f(Signal::Active { old: cursor, new: self.cursor });
                     // Record is always clean after a push, check if it was dirty before.
                     if was_dirty {
-                        f(Signal::NoRedo);
+                        f(Signal::Redo(false));
                     }
                     // Check if the stack was empty before pushing the command.
                     if cursor == 0 {
-                        f(Signal::Undo);
+                        f(Signal::Undo(true));
                     }
                     // Check if receiver went from saved to unsaved.
                     if was_saved {
-                        f(Signal::Unsaved);
+                        f(Signal::Saved(false));
                     }
                 }
                 Ok(Commands(iter))
@@ -312,28 +312,31 @@ impl<'a, R> Record<'a, R> {
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        if self.cursor < self.len() {
-            match self.commands[self.cursor].redo(&mut self.receiver) {
+        let cursor = self.cursor;
+        if cursor < self.len() {
+            match self.commands[cursor].redo(&mut self.receiver) {
                 Ok(_) => {
-                    let was_dirty = self.cursor != self.len();
+                    let was_dirty = cursor != self.len();
                     let was_saved = self.is_saved();
                     self.cursor += 1;
                     let is_clean = self.cursor == self.len();
                     let is_saved = self.is_saved();
                     if let Some(ref mut f) = self.signals {
+                        // Cursor has always changed at this point.
+                        f(Signal::Active { old: cursor, new: self.cursor });
                         // Check if record went from dirty to clean.
                         if was_dirty && is_clean {
-                            f(Signal::NoRedo);
+                            f(Signal::Redo(false));
                         }
                         // Check if the stack was empty before pushing the command.
                         if self.cursor == 1 {
-                            f(Signal::Undo);
+                            f(Signal::Undo(true));
                         }
                         // Check if receiver went from saved to unsaved, or unsaved to saved.
                         if was_saved {
-                            f(Signal::Unsaved);
+                            f(Signal::Saved(false));
                         } else if is_saved {
-                            f(Signal::Saved);
+                            f(Signal::Saved(true));
                         }
                     }
                     Some(Ok(()))
@@ -355,28 +358,31 @@ impl<'a, R> Record<'a, R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        if self.cursor > 0 {
-            match self.commands[self.cursor - 1].undo(&mut self.receiver) {
+        let cursor = self.cursor;
+        if cursor > 0 {
+            match self.commands[cursor - 1].undo(&mut self.receiver) {
                 Ok(_) => {
-                    let was_clean = self.cursor == self.len();
+                    let was_clean = cursor == self.len();
                     let was_saved = self.is_saved();
                     self.cursor -= 1;
                     let is_dirty = self.cursor != self.len();
                     let is_saved = self.is_saved();
                     if let Some(ref mut f) = self.signals {
+                        // Cursor has always changed at this point.
+                        f(Signal::Active { old: cursor, new: self.cursor });
                         // Check if record went from clean to dirty.
                         if was_clean && is_dirty {
-                            f(Signal::Redo);
+                            f(Signal::Redo(true));
                         }
                         // Check if the stack was not empty before pushing the command.
                         if self.cursor == 0 {
-                            f(Signal::NoUndo);
+                            f(Signal::Undo(false));
                         }
                         // Check if receiver went from saved to unsaved, or unsaved to saved.
                         if was_saved {
-                            f(Signal::Unsaved);
+                            f(Signal::Saved(false));
                         } else if is_saved {
-                            f(Signal::Saved);
+                            f(Signal::Saved(true));
                         }
                     }
                     Some(Ok(()))
@@ -519,12 +525,15 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// Record::builder()
     ///     .signals(|signal| {
     ///         match signal {
-    ///             Signal::Redo => println!("The record can redo."),
-    ///             Signal::NoRedo => println!("The record can not redo."),
-    ///             Signal::Undo => println!("The record can undo."),
-    ///             Signal::NoUndo => println!("The record can not undo."),
-    ///             Signal::Saved => println!("The receiver is in a saved state."),
-    ///             Signal::Unsaved => println!("The receiver is not in a saved state."),
+    ///             Signal::Redo(true) => println!("The record can redo."),
+    ///             Signal::Redo(false) => println!("The record can not redo."),
+    ///             Signal::Undo(true) => println!("The record can undo."),
+    ///             Signal::Undo(false) => println!("The record can not undo."),
+    ///             Signal::Saved(true) => println!("The receiver is in a saved state."),
+    ///             Signal::Saved(false) => println!("The receiver is not in a saved state."),
+    ///             Signal::Active { old, new } => {
+    ///                 println!("The active command has changed from {} to {}.", old, new);
+    ///             }
     ///         }
     ///     })
     ///     .default();
