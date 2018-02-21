@@ -1,43 +1,46 @@
 use std::collections::hash_map::{HashMap, RandomState};
 use std::error;
+use std::fmt::{self, Debug, Formatter};
 use std::hash::{BuildHasher, Hash};
 use {Command, Commands, Error, Record, Stack};
 
 /// A group of either stacks or records.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Group<K: Hash + Eq, V, S = RandomState> where S: BuildHasher {
+pub struct Group<'a, K: Hash + Eq, V, S = RandomState> where S: BuildHasher {
     map: HashMap<K, V, S>,
     active: Option<K>,
+    signals: Option<Box<FnMut(&K) + Send + Sync + 'a>>,
 }
 
-impl<K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
+impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<'a, K, V, S> {
     /// Returns a new group.
     #[inline]
-    pub fn new() -> Group<K, V, RandomState> {
+    pub fn new() -> Group<'a, K, V, RandomState> {
         Default::default()
     }
 
     /// Returns a new group with the given capacity.
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Group<K, V, RandomState> {
+    pub fn with_capacity(capacity: usize) -> Group<'a, K, V, RandomState> {
         Group::with_capacity_and_hasher(capacity, Default::default())
     }
 
     /// Returns a new group with the given hasher.
     #[inline]
-    pub fn with_hasher(hash_builder: S) -> Group<K, V, S> {
+    pub fn with_hasher(hash_builder: S) -> Group<'a, K, V, S> {
         Group {
             map: HashMap::with_hasher(hash_builder),
             active: None,
+            signals: None,
         }
     }
 
     /// Returns a new group with the given capacity and hasher.
     #[inline]
-    pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Group<K, V, S> {
+    pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Group<'a, K, V, S> {
         Group {
             map: HashMap::with_capacity_and_hasher(capacity, hash_builder),
             active: None,
+            signals: None,
         }
     }
 
@@ -84,13 +87,16 @@ impl<K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
             Some(ref k) if !self.map.contains_key(k) => false,
             k => {
                 self.active = k;
+                if let (Some(k), Some(f)) = (self.active.as_ref(), self.signals.as_mut()) {
+                    f(k);
+                }
                 true
             }
         }
     }
 }
 
-impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Stack<R>, S> {
+impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Stack<R>, S> {
     /// Calls the [`push`] method on the active stack.
     ///
     /// [`push`]: stack/struct.Stack.html#method.push
@@ -120,7 +126,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Stack<R>, S> {
     }
 }
 
-impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<K, Record<'a, R>, S> {
+impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
     /// Calls the [`push`] method on the active record.
     ///
     /// [`push`]: record/struct.Record.html#method.push
@@ -162,9 +168,19 @@ impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<K, Record<'a, R>, S> {
     }
 }
 
-impl<K: Hash + Eq, V, S: BuildHasher + Default> Default for Group<K, V, S> {
+impl<'a, K: Hash + Eq + Debug, V: Debug, S: BuildHasher> Debug for Group<'a, K, V, S> {
     #[inline]
-    fn default() -> Group<K, V, S> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Group")
+            .field("map", &self.map)
+            .field("active", &self.active)
+            .finish()
+    }
+}
+
+impl<'a, K: Hash + Eq, V, S: BuildHasher + Default> Default for Group<'a, K, V, S> {
+    #[inline]
+    fn default() -> Group<'a, K, V, S> {
         Group::with_hasher(Default::default())
     }
 }
