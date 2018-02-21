@@ -291,7 +291,7 @@ impl<'a, R> Record<'a, R> {
                     if cursor == 0 {
                         f(Signal::Undo);
                     }
-                    // Check if record went from saved to unsaved.
+                    // Check if receiver went from saved to unsaved.
                     if was_saved {
                         f(Signal::Unsaved);
                     }
@@ -329,12 +329,10 @@ impl<'a, R> Record<'a, R> {
                         if self.cursor == 1 {
                             f(Signal::Undo);
                         }
-                        // Check if record went from saved to unsaved.
+                        // Check if receiver went from saved to unsaved, or unsaved to saved.
                         if was_saved {
                             f(Signal::Unsaved);
-                        }
-                        // Check if record went from unsaved to saved.
-                        if is_saved {
+                        } else if is_saved {
                             f(Signal::Saved);
                         }
                     }
@@ -374,12 +372,10 @@ impl<'a, R> Record<'a, R> {
                         if self.cursor == 0 {
                             f(Signal::NoUndo);
                         }
-                        // Check if record went from saved to unsaved.
+                        // Check if receiver went from saved to unsaved, or unsaved to saved.
                         if was_saved {
                             f(Signal::Unsaved);
-                        }
-                        // Check if record went from unsaved to saved.
-                        if is_saved {
+                        } else if is_saved {
                             f(Signal::Saved);
                         }
                     }
