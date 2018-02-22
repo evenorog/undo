@@ -15,7 +15,7 @@ pub enum Signal {
     Saved(bool),
     /// Says if the active command has changed.
     ///
-    /// The command numbers starts at `1`, e.g. the values are always `index + 1`.
+    /// The cursors starts at `1`, e.g. they are always `index + 1`.
     Active { old: usize, new: usize },
 }
 
@@ -24,9 +24,8 @@ pub enum Signal {
 /// The record works mostly like a stack, but it stores the commands
 /// instead of returning them when undoing. This means it can roll the
 /// receivers state backwards and forwards by using the undo and redo methods.
-/// In addition, the record has an internal state that is either clean or dirty.
-/// A clean state means that the record does not have any commands to redo,
-/// while a dirty state means that it does. The user can give the record a function
+/// In addition, the record can notify the user about changes to the stack or
+/// the receiver through [signals]. The user can give the record a function
 /// that is called each time the state changes by using the [`builder`].
 ///
 /// # Examples
@@ -76,6 +75,7 @@ pub enum Signal {
 /// ```
 ///
 /// [`builder`]: struct.RecordBuilder.html
+/// [signals]: enum.Signal.html
 #[derive(Default)]
 pub struct Record<'a, R> {
     commands: VecDeque<Box<Command<R>>>,
