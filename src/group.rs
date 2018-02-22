@@ -1,6 +1,6 @@
 use std::collections::hash_map::{HashMap, RandomState};
 use std::error;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use {Command, Commands, Error, Record, Stack};
@@ -185,6 +185,20 @@ impl<'a, K: Hash + Eq + Debug, V: Debug, S: BuildHasher> Debug for Group<'a, K, 
             .field("map", &self.map)
             .field("active", &self.active)
             .finish()
+    }
+}
+
+impl<'a, K: Hash + Eq + Display, V: Display> Display for Group<'a, K, V> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        for (key, item) in &self.map {
+            if self.active.as_ref().map_or(false, |a| a == key) {
+                writeln!(f, "-> {}.", item)?;
+            } else {
+                writeln!(f, "   {}.", item)?;
+            }
+        }
+        Ok(())
     }
 }
 

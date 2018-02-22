@@ -1,6 +1,6 @@
 use std::collections::vec_deque::{IntoIter, VecDeque};
 use std::error;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::marker::PhantomData;
 use {Command, Error, Merger};
 
@@ -31,6 +31,7 @@ pub enum Signal {
 /// # Examples
 /// ```
 /// use std::error::Error;
+/// use std::fmt::{self, Display, Formatter};
 /// use undo::{Command, Record};
 ///
 /// #[derive(Debug)]
@@ -45,6 +46,12 @@ pub enum Signal {
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
 ///         self.0 = s.pop().ok_or("`s` is empty")?;
 ///         Ok(())
+///     }
+/// }
+///
+/// impl Display for Add {
+///     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+///         write!(f, "Add `{}`", self.0)
 ///     }
 /// }
 ///
@@ -195,19 +202,30 @@ impl<'a, R> Record<'a, R> {
     /// # Examples
     /// ```
     /// # use std::error::Error;
+    /// # use std::fmt::{self, Display, Formatter};
     /// # use undo::{Command, Record};
+    /// #
     /// # #[derive(Debug)]
     /// # struct Add(char);
+    /// #
     /// # impl Command<String> for Add {
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
+    /// #
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
     /// #     }
     /// # }
+    /// #
+    /// # impl Display for Add {
+    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    /// #         write!(f, "Add `{}`", self.0)
+    /// #     }
+    /// # }
+    /// #
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut record = Record::default();
     ///
@@ -281,7 +299,7 @@ impl<'a, R> Record<'a, R> {
 
                 debug_assert_eq!(self.cursor, self.len());
                 if let Some(ref mut f) = self.signals {
-                    // We emit the index signal even if the commands might have been merged.
+                    // We emit this signal even if the commands might have been merged.
                     f(Signal::Active { old: cursor, new: self.cursor });
                     // Record is always clean after a push, check if it was dirty before.
                     if was_dirty {
@@ -312,39 +330,39 @@ impl<'a, R> Record<'a, R> {
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        let cursor = self.cursor;
-        if cursor < self.len() {
-            match self.commands[cursor].redo(&mut self.receiver) {
-                Ok(_) => {
-                    let was_dirty = cursor != self.len();
-                    let was_saved = self.is_saved();
-                    self.cursor += 1;
-                    let is_clean = self.cursor == self.len();
-                    let is_saved = self.is_saved();
-                    if let Some(ref mut f) = self.signals {
-                        // Cursor has always changed at this point.
-                        f(Signal::Active { old: cursor, new: self.cursor });
-                        // Check if record went from dirty to clean.
-                        if was_dirty && is_clean {
-                            f(Signal::Redo(false));
-                        }
-                        // Check if the stack was empty before pushing the command.
-                        if self.cursor == 1 {
-                            f(Signal::Undo(true));
-                        }
-                        // Check if receiver went from saved to unsaved, or unsaved to saved.
-                        if was_saved {
-                            f(Signal::Saved(false));
-                        } else if is_saved {
-                            f(Signal::Saved(true));
-                        }
+        if self.cursor >= self.len() {
+            return None;
+        }
+
+        match self.commands[self.cursor].redo(&mut self.receiver) {
+            Ok(_) => {
+                let was_dirty = self.cursor != self.len();
+                let was_saved = self.is_saved();
+                let old = self.cursor;
+                self.cursor += 1;
+                let is_clean = self.cursor == self.len();
+                let is_saved = self.is_saved();
+                if let Some(ref mut f) = self.signals {
+                    // Cursor has always changed at this point.
+                    f(Signal::Active { old, new: self.cursor });
+                    // Check if record went from dirty to clean.
+                    if was_dirty && is_clean {
+                        f(Signal::Redo(false));
                     }
-                    Some(Ok(()))
+                    // Check if the stack was empty before pushing the command.
+                    if self.cursor == 1 {
+                        f(Signal::Undo(true));
+                    }
+                    // Check if receiver went from saved to unsaved, or unsaved to saved.
+                    if was_saved {
+                        f(Signal::Saved(false));
+                    } else if is_saved {
+                        f(Signal::Saved(true));
+                    }
                 }
-                Err(e) => Some(Err(e)),
+                Some(Ok(()))
             }
-        } else {
-            None
+            Err(e) => Some(Err(e)),
         }
     }
 
@@ -358,39 +376,39 @@ impl<'a, R> Record<'a, R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        let cursor = self.cursor;
-        if cursor > 0 {
-            match self.commands[cursor - 1].undo(&mut self.receiver) {
-                Ok(_) => {
-                    let was_clean = cursor == self.len();
-                    let was_saved = self.is_saved();
-                    self.cursor -= 1;
-                    let is_dirty = self.cursor != self.len();
-                    let is_saved = self.is_saved();
-                    if let Some(ref mut f) = self.signals {
-                        // Cursor has always changed at this point.
-                        f(Signal::Active { old: cursor, new: self.cursor });
-                        // Check if record went from clean to dirty.
-                        if was_clean && is_dirty {
-                            f(Signal::Redo(true));
-                        }
-                        // Check if the stack was not empty before pushing the command.
-                        if self.cursor == 0 {
-                            f(Signal::Undo(false));
-                        }
-                        // Check if receiver went from saved to unsaved, or unsaved to saved.
-                        if was_saved {
-                            f(Signal::Saved(false));
-                        } else if is_saved {
-                            f(Signal::Saved(true));
-                        }
+        if self.cursor == 0 {
+            return None;
+        }
+
+        match self.commands[self.cursor - 1].undo(&mut self.receiver) {
+            Ok(_) => {
+                let was_clean = self.cursor == self.len();
+                let was_saved = self.is_saved();
+                let old = self.cursor;
+                self.cursor -= 1;
+                let is_dirty = self.cursor != self.len();
+                let is_saved = self.is_saved();
+                if let Some(ref mut f) = self.signals {
+                    // Cursor has always changed at this point.
+                    f(Signal::Active { old, new: self.cursor });
+                    // Check if record went from clean to dirty.
+                    if was_clean && is_dirty {
+                        f(Signal::Redo(true));
                     }
-                    Some(Ok(()))
+                    // Check if the stack was not empty before pushing the command.
+                    if self.cursor == 0 {
+                        f(Signal::Undo(false));
+                    }
+                    // Check if receiver went from saved to unsaved, or unsaved to saved.
+                    if was_saved {
+                        f(Signal::Saved(false));
+                    } else if is_saved {
+                        f(Signal::Saved(true));
+                    }
                 }
-                Err(e) => Some(Err(e)),
+                Some(Ok(()))
             }
-        } else {
-            None
+            Err(e) => Some(Err(e)),
         }
     }
 }
@@ -419,6 +437,20 @@ impl<'a, R: Debug> Debug for Record<'a, R> {
             .field("limit", &self.limit)
             .field("saved", &self.saved)
             .finish()
+    }
+}
+
+impl<'a, R> Display for Record<'a, R> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        for (idx, cmd) in self.commands.iter().rev().enumerate() {
+            if idx + 1 == self.cursor {
+                writeln!(f, "-> {}.", cmd)?;
+            } else {
+                writeln!(f, "   {}.", cmd)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -461,19 +493,30 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// # Examples
     /// ```
     /// # use std::error::Error;
+    /// # use std::fmt::{self, Display, Formatter};
     /// # use undo::{Command, Record};
+    /// #
     /// # #[derive(Debug)]
     /// # struct Add(char);
+    /// #
     /// # impl Command<String> for Add {
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
+    /// #
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
     /// #     }
     /// # }
+    /// #
+    /// # impl Display for Add {
+    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    /// #         write!(f, "Add `{}`", self.0)
+    /// #     }
+    /// # }
+    /// #
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut record = Record::builder()
     ///     .capacity(2)
@@ -507,19 +550,30 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// # Examples
     /// ```
     /// # use std::error::Error;
+    /// # use std::fmt::{self, Display, Formatter};
     /// # use undo::{Command, Record, Signal};
+    /// #
     /// # #[derive(Debug)]
     /// # struct Add(char);
+    /// #
     /// # impl Command<String> for Add {
     /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
+    /// #
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
     /// #     }
     /// # }
+    /// #
+    /// # impl Display for Add {
+    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    /// #         write!(f, "Add `{}`", self.0)
+    /// #     }
+    /// # }
+    /// #
     /// # fn foo() -> Result<(), Box<Error>> {
     /// # let mut record =
     /// Record::builder()

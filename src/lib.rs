@@ -22,7 +22,7 @@ pub use record::{Commands, Record, RecordBuilder, Signal};
 pub use stack::Stack;
 
 /// Base functionality for all commands.
-pub trait Command<R>: Debug {
+pub trait Command<R>: Debug + Display {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
     fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
@@ -42,6 +42,7 @@ pub trait Command<R>: Debug {
     /// # Examples
     /// ```
     /// use std::error::Error;
+    /// use std::fmt::{self, Display, Formatter};
     /// use undo::{Command, Record};
     ///
     /// #[derive(Debug)]
@@ -60,6 +61,12 @@ pub trait Command<R>: Debug {
     ///
     ///     fn id(&self) -> Option<u32> {
     ///         Some(1)
+    ///     }
+    /// }
+    ///
+    /// impl Display for Add {
+    ///     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    ///         write!(f, "Add `{}`", self.0)
     ///     }
     /// }
     ///
@@ -137,6 +144,13 @@ impl<R> Debug for Merger<R> {
             .field("cmd1", &self.cmd1)
             .field("cmd2", &self.cmd2)
             .finish()
+    }
+}
+
+impl<R> Display for Merger<R> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{} + {}", self.cmd1, self.cmd2)
     }
 }
 
