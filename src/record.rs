@@ -266,7 +266,7 @@ impl<'a, R> Record<'a, R> {
                     }
                     _ => {
                         if self.limit != 0 && self.limit == cursor {
-                            let _ = self.commands.pop_front();
+                            let _ = self.commands.pop_front().unwrap();
                             self.saved = match self.saved {
                                 Some(0) => None,
                                 Some(saved) => Some(saved - 1),

@@ -225,6 +225,19 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> GroupBuilder<'a, K, V, S> {
     }
 
     /// Decides what should happen when the active stack changes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use undo::*;
+    /// # let _: Group<u8, u8> =
+    /// Group::builder()
+    ///     .signals(|k| match k {
+    ///         Some(k) => println!("The new active stack is {}.", k),
+    ///         None => println!("No active stack."),
+    ///     })
+    ///     .build();
+    /// ```
     #[inline]
     pub fn signals<F>(mut self, f: F) -> GroupBuilder<'a, K, V, S>
     where
