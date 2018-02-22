@@ -15,7 +15,7 @@ pub enum Signal {
     Saved(bool),
     /// Says if the active command has changed.
     ///
-    /// The cursors starts at `1`, e.g. they are always `index + 1`.
+    /// `old` and `new` starts at `1`, e.g. they are always `index + 1`.
     Active { old: usize, new: usize },
 }
 
@@ -44,7 +44,7 @@ pub enum Signal {
 ///     }
 ///
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-///         self.0 = s.pop().ok_or("`s` is empty")?;
+///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
 ///         Ok(())
 ///     }
 /// }
@@ -203,7 +203,7 @@ impl<'a, R> Record<'a, R> {
     /// ```
     /// # use std::error::Error;
     /// # use std::fmt::{self, Display, Formatter};
-    /// # use undo::{Command, Record};
+    /// # use undo::*;
     /// #
     /// # #[derive(Debug)]
     /// # struct Add(char);
@@ -476,7 +476,7 @@ pub struct RecordBuilder<'a, R> {
 }
 
 impl<'a, R> RecordBuilder<'a, R> {
-    /// Sets the specified [capacity] for the stack.
+    /// Sets the specified [capacity] for the record.
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
@@ -485,16 +485,17 @@ impl<'a, R> RecordBuilder<'a, R> {
         self
     }
 
-    /// Sets a limit on how many commands can be stored in the stack.
-    /// If this limit is reached it will start popping of commands at the bottom of the stack when
-    /// pushing new commands on to the stack. No limit is set by default which means it may grow
-    /// indefinitely.
+    /// Sets the `limit` for the record.
+    ///
+    /// If this limit is reached it will start popping of commands at the beginning
+    /// of the record when pushing new commands on to the stack. No limit is set by
+    /// default which means it may grow indefinitely.
     ///
     /// # Examples
     /// ```
     /// # use std::error::Error;
     /// # use std::fmt::{self, Display, Formatter};
-    /// # use undo::{Command, Record};
+    /// # use undo::*;
     /// #
     /// # #[derive(Debug)]
     /// # struct Add(char);
@@ -551,7 +552,7 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// ```
     /// # use std::error::Error;
     /// # use std::fmt::{self, Display, Formatter};
-    /// # use undo::{Command, Record, Signal};
+    /// # use undo::*;
     /// #
     /// # #[derive(Debug)]
     /// # struct Add(char);

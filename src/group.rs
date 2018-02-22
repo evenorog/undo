@@ -241,7 +241,6 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> GroupBuilder<'a, K, V, S> {
     /// Decides what should happen when the active stack changes.
     ///
     /// # Examples
-    ///
     /// ```
     /// # use undo::*;
     /// # let _: Group<u8, u8> =

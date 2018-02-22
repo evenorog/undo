@@ -55,7 +55,7 @@ pub trait Command<R>: Debug + Display {
     ///     }
     ///
     ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-    ///         self.0 = s.pop().ok_or("`s` is empty")?;
+    ///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     ///         Ok(())
     ///     }
     ///
