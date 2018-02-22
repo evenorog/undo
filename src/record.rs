@@ -445,9 +445,9 @@ impl<'a, R> Display for Record<'a, R> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         for (idx, cmd) in self.commands.iter().rev().enumerate() {
             if idx + 1 == self.cursor {
-                writeln!(f, "-> {}.", cmd)?;
+                writeln!(f, " -> {}.", cmd)?;
             } else {
-                writeln!(f, "   {}.", cmd)?;
+                writeln!(f, "    {}.", cmd)?;
             }
         }
         Ok(())

@@ -167,9 +167,9 @@ impl<R> Display for Stack<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         if let Some(cmd) = self.commands.last() {
-            writeln!(f, "-> {}.", cmd)?;
+            writeln!(f, " -> {}.", cmd)?;
             for cmd in self.commands.iter().rev().skip(1) {
-                writeln!(f, "   {}.", cmd)?;
+                writeln!(f, "    {}.", cmd)?;
             }
         }
         Ok(())

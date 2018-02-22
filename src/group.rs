@@ -193,9 +193,9 @@ impl<'a, K: Hash + Eq + Display, V: Display> Display for Group<'a, K, V> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         for (key, item) in &self.map {
             if self.active.as_ref().map_or(false, |a| a == key) {
-                writeln!(f, "-> {}.", item)?;
+                writeln!(f, " -> {}:\n    {}", key, item)?;
             } else {
-                writeln!(f, "   {}.", item)?;
+                writeln!(f, "    {}:\n    {}", key, item)?;
             }
         }
         Ok(())
