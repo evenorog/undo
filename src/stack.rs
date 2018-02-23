@@ -1,7 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 use {Command, Error, Merger};
 
-/// A stack of commands.
+/// The command stack.
 ///
 /// The stack is the simplest data structure and works by pushing and
 /// popping off commands that modifies the `receiver`.

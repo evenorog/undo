@@ -26,7 +26,7 @@ pub enum Signal {
     Active { old: usize, new: usize },
 }
 
-/// A record of commands.
+/// The command record.
 ///
 /// The record works mostly like a stack, but it stores the commands
 /// instead of returning them when undoing. This means it can roll the

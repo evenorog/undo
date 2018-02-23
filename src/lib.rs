@@ -36,7 +36,7 @@ pub trait Command<R>: Debug + Display {
     /// Used for automatic merging of commands.
     ///
     /// Two commands are merged together when a command is pushed, and it has
-    /// the same id as the top command already on the stack. When commands are merged together,
+    /// the same id as the top command already on the stack or record. When commands are merged together,
     /// undoing and redoing them are done in one step.
     ///
     /// # Examples
