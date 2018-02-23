@@ -4,7 +4,14 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::marker::PhantomData;
 use {Command, Error, Merger};
 
-/// Used to represent the state the record or the receiver can be in.
+/// The signals sent when the record or the receiver changes.
+///
+/// When one of these states changes in the record or the receiver, they will send a corresponding
+/// signal to the user. For example, if the record can no longer redo any commands, it sends a
+/// `Signal::Redo(false)` signal to tell the user. The signals can be handled in the [`signals`]
+/// method.
+///
+/// [`signals`]: struct.RecordBuilder.html#method.signals
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the record can redo.
