@@ -131,15 +131,6 @@ impl<'a, R> Record<'a, R> {
         self.commands.capacity()
     }
 
-    /// Returns the limit of the record, or `None` if it has no limit.
-    #[inline]
-    pub fn limit(&self) -> Option<usize> {
-        match self.limit {
-            0 => None,
-            v => Some(v),
-        }
-    }
-
     /// Returns the number of commands in the record.
     #[inline]
     pub fn len(&self) -> usize {
@@ -152,16 +143,25 @@ impl<'a, R> Record<'a, R> {
         self.commands.is_empty()
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns the limit of the record, or `None` if it has no limit.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
-        &self.receiver
+    pub fn limit(&self) -> Option<usize> {
+        match self.limit {
+            0 => None,
+            v => Some(v),
+        }
     }
 
-    /// Consumes the record, returning the `receiver`.
+    /// Returns `true` if the record can undo.
     #[inline]
-    pub fn into_receiver(self) -> R {
-        self.receiver
+    pub fn can_undo(&self) -> bool {
+        self.cursor > 0
+    }
+
+    /// Returns `true` if the record can redo.
+    #[inline]
+    pub fn can_redo(&self) -> bool {
+        self.cursor < self.len()
     }
 
     /// Marks the receiver as currently being in a saved state.
@@ -265,17 +265,18 @@ impl<'a, R> Record<'a, R> {
     {
         match cmd.redo(&mut self.receiver) {
             Ok(_) => {
-                let cursor = self.cursor;
-                let was_dirty = cursor != self.len();
+                let old = self.cursor;
+                let could_undo = self.can_undo();
+                let could_redo = self.can_redo();
                 let was_saved = self.is_saved();
 
                 // Pop off all elements after cursor from record.
-                let iter = self.commands.split_off(cursor).into_iter();
-                debug_assert_eq!(cursor, self.len());
+                let iter = self.commands.split_off(self.cursor).into_iter();
+                debug_assert_eq!(self.cursor, self.len());
 
                 // Check if the saved state was popped off.
                 if let Some(saved) = self.saved {
-                    if saved > cursor {
+                    if saved > self.cursor {
                         self.saved = None;
                     }
                 }
@@ -290,7 +291,7 @@ impl<'a, R> Record<'a, R> {
                         self.commands.push_back(Box::new(cmd));
                     }
                     _ => {
-                        if self.limit != 0 && self.limit == cursor {
+                        if self.limit != 0 && self.limit == self.cursor {
                             let _ = self.commands.pop_front().unwrap();
                             self.saved = match self.saved {
                                 Some(0) => None,
@@ -307,13 +308,13 @@ impl<'a, R> Record<'a, R> {
                 debug_assert_eq!(self.cursor, self.len());
                 if let Some(ref mut f) = self.signals {
                     // We emit this signal even if the commands might have been merged.
-                    f(Signal::Active { old: cursor, new: self.cursor });
-                    // Record is always clean after a push, check if it was dirty before.
-                    if was_dirty {
+                    f(Signal::Active { old, new: self.cursor });
+                    // Record can never redo after a push, check if you could redo before.
+                    if could_redo {
                         f(Signal::Redo(false));
                     }
-                    // Check if the stack was empty before pushing the command.
-                    if cursor == 0 {
+                    // Record can always undo after a push, check if you could not undo before.
+                    if !could_undo {
                         f(Signal::Undo(true));
                     }
                     // Check if receiver went from saved to unsaved.
@@ -327,6 +328,49 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
+    /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] the error is returned and the state is left unchanged.
+    ///
+    /// [`undo`]: trait.Command.html#tymethod.undo
+    #[inline]
+    pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
+        if !self.can_undo() {
+            return None;
+        }
+
+        match self.commands[self.cursor - 1].undo(&mut self.receiver) {
+            Ok(_) => {
+                let was_saved = self.is_saved();
+                let old = self.cursor;
+                self.cursor -= 1;
+                let len = self.len();
+                let is_saved = self.is_saved();
+                if let Some(ref mut f) = self.signals {
+                    // Cursor has always changed at this point.
+                    f(Signal::Active { old, new: self.cursor });
+                    // Check if the records ability to redo changed.
+                    if old == len {
+                        f(Signal::Redo(true));
+                    }
+                    // Check if the records ability to undo changed.
+                    if old == 1 {
+                        f(Signal::Undo(false));
+                    }
+                    // Check if receiver went from saved to unsaved, or unsaved to saved.
+                    if was_saved {
+                        f(Signal::Saved(false));
+                    } else if is_saved {
+                        f(Signal::Saved(true));
+                    }
+                }
+                Some(Ok(()))
+            }
+            Err(e) => Some(Err(e)),
+        }
+    }
+
     /// Calls the [`redo`] method for the active command and sets the next one as the
     /// new active one.
     ///
@@ -337,27 +381,26 @@ impl<'a, R> Record<'a, R> {
     /// [`redo`]: trait.Command.html#tymethod.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        if self.cursor >= self.len() {
+        if !self.can_redo() {
             return None;
         }
 
         match self.commands[self.cursor].redo(&mut self.receiver) {
             Ok(_) => {
-                let was_dirty = self.cursor != self.len();
                 let was_saved = self.is_saved();
                 let old = self.cursor;
                 self.cursor += 1;
-                let is_clean = self.cursor == self.len();
+                let len = self.len();
                 let is_saved = self.is_saved();
                 if let Some(ref mut f) = self.signals {
                     // Cursor has always changed at this point.
                     f(Signal::Active { old, new: self.cursor });
-                    // Check if record went from dirty to clean.
-                    if was_dirty && is_clean {
+                    // Check if the records ability to redo changed.
+                    if old == len - 1 {
                         f(Signal::Redo(false));
                     }
-                    // Check if the stack was empty before pushing the command.
-                    if self.cursor == 1 {
+                    // Check if the records ability to undo changed.
+                    if old == 0 {
                         f(Signal::Undo(true));
                     }
                     // Check if receiver went from saved to unsaved, or unsaved to saved.
@@ -373,50 +416,16 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
-    /// Calls the [`undo`] method for the active command and sets the previous one as the
-    /// new active one.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`undo`] the
-    /// error is returned and the state is left unchanged.
-    ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// Returns a reference to the `receiver`.
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        if self.cursor == 0 {
-            return None;
-        }
+    pub fn as_receiver(&self) -> &R {
+        &self.receiver
+    }
 
-        match self.commands[self.cursor - 1].undo(&mut self.receiver) {
-            Ok(_) => {
-                let was_clean = self.cursor == self.len();
-                let was_saved = self.is_saved();
-                let old = self.cursor;
-                self.cursor -= 1;
-                let is_dirty = self.cursor != self.len();
-                let is_saved = self.is_saved();
-                if let Some(ref mut f) = self.signals {
-                    // Cursor has always changed at this point.
-                    f(Signal::Active { old, new: self.cursor });
-                    // Check if record went from clean to dirty.
-                    if was_clean && is_dirty {
-                        f(Signal::Redo(true));
-                    }
-                    // Check if the stack was not empty before pushing the command.
-                    if self.cursor == 0 {
-                        f(Signal::Undo(false));
-                    }
-                    // Check if receiver went from saved to unsaved, or unsaved to saved.
-                    if was_saved {
-                        f(Signal::Saved(false));
-                    } else if is_saved {
-                        f(Signal::Saved(true));
-                    }
-                }
-                Some(Ok(()))
-            }
-            Err(e) => Some(Err(e)),
-        }
+    /// Consumes the record, returning the `receiver`.
+    #[inline]
+    pub fn into_receiver(self) -> R {
+        self.receiver
     }
 }
 

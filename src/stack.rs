@@ -86,18 +86,6 @@ impl<R> Stack<R> {
         self.commands.is_empty()
     }
 
-    /// Returns a reference to the `receiver`.
-    #[inline]
-    pub fn as_receiver(&self) -> &R {
-        &self.receiver
-    }
-
-    /// Consumes the stack, returning the `receiver`.
-    #[inline]
-    pub fn into_receiver(self) -> R {
-        self.receiver
-    }
-
     /// Pushes the command on the stack and executes its [`redo`] method.
     /// The command is merged with the previous top command if their [`id`] is equal.
     ///
@@ -146,6 +134,18 @@ impl<R> Stack<R> {
                 Ok(_) => Ok(cmd),
                 Err(e) => Err(Error(cmd, e)),
             })
+    }
+
+    /// Returns a reference to the `receiver`.
+    #[inline]
+    pub fn as_receiver(&self) -> &R {
+        &self.receiver
+    }
+
+    /// Consumes the stack, returning the `receiver`.
+    #[inline]
+    pub fn into_receiver(self) -> R {
+        self.receiver
     }
 }
 
