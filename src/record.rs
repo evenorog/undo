@@ -395,10 +395,8 @@ impl<'a, R> Record<'a, R> {
                         f(Signal::Undo(false));
                     }
                     // Check if the receiver went from saved to unsaved, or unsaved to saved.
-                    if was_saved {
-                        f(Signal::Saved(false));
-                    } else if is_saved {
-                        f(Signal::Saved(true));
+                    if was_saved != is_saved {
+                        f(Signal::Saved(is_saved));
                     }
                 }
                 Some(Ok(()))
@@ -440,10 +438,8 @@ impl<'a, R> Record<'a, R> {
                         f(Signal::Undo(true));
                     }
                     // Check if the receiver went from saved to unsaved, or unsaved to saved.
-                    if was_saved {
-                        f(Signal::Saved(false));
-                    } else if is_saved {
-                        f(Signal::Saved(true));
+                    if was_saved != is_saved {
+                        f(Signal::Saved(is_saved));
                     }
                 }
                 Some(Ok(()))

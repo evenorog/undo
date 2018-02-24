@@ -86,6 +86,14 @@ impl<R> Stack<R> {
         self.commands.is_empty()
     }
 
+    /// Removes all commands from the stack without undoing them.
+    ///
+    /// This resets the stack back to its initial state while leaving the receiver unmodified.
+    #[inline]
+    pub fn clear(&mut self) {
+        self.commands.clear();
+    }
+
     /// Pushes the command on the stack and executes its [`redo`] method.
     /// The command is merged with the previous top command if their [`id`] is equal.
     ///
