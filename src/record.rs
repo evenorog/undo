@@ -90,7 +90,6 @@ pub enum Signal {
 ///
 /// [`builder`]: struct.RecordBuilder.html
 /// [signals]: enum.Signal.html
-#[derive(Default)]
 pub struct Record<'a, R> {
     commands: VecDeque<Box<Command<R>>>,
     receiver: R,
@@ -482,6 +481,13 @@ impl<'a, R> Record<'a, R> {
     #[inline]
     pub fn into_receiver(self) -> R {
         self.receiver
+    }
+}
+
+impl<'a, R: Default> Default for Record<'a, R> {
+    #[inline]
+    fn default() -> Record<'a, R> {
+        Record::new(R::default())
     }
 }
 
