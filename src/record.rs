@@ -448,6 +448,30 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
+    /// Returns the string of the command which will be undone in the next call to [`undo`].
+    ///
+    /// [`undo`]: struct.Record.html#method.undo
+    #[inline]
+    pub fn to_undo_string(&self) -> Option<String> {
+        if self.can_undo() {
+            Some(self.commands[self.cursor - 1].to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Returns the string of the command which will be redone in the next call to [`redo`].
+    ///
+    /// [`redo`]: struct.Record.html#method.redo
+    #[inline]
+    pub fn to_redo_string(&self) -> Option<String> {
+        if self.can_redo() {
+            Some(self.commands[self.cursor].to_string())
+        } else {
+            None
+        }
+    }
+
     /// Returns a reference to the `receiver`.
     #[inline]
     pub fn as_receiver(&self) -> &R {
