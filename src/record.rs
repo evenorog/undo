@@ -109,7 +109,7 @@ impl<'a, R> Record<'a, R> {
             receiver: receiver.into(),
             cursor: 0,
             limit: 0,
-            saved: None,
+            saved: Some(0),
             signals: None,
         }
     }
@@ -167,16 +167,14 @@ impl<'a, R> Record<'a, R> {
     /// Marks the receiver as currently being in a saved state.
     #[inline]
     pub fn set_saved(&mut self) {
-        self.saved = match self.saved {
-            Some(saved) if saved != self.cursor => {
-                if let Some(ref mut f) = self.signals {
-                    f(Signal::Saved(true));
-                }
-                Some(self.cursor)
-            },
-            Some(saved) => Some(saved),
-            None => None,
-        };
+        let was_saved = self.is_saved();
+        self.saved = Some(self.cursor);
+        if let Some(ref mut f) = self.signals {
+            // Check if the receiver went from unsaved to saved.
+            if !was_saved {
+                f(Signal::Saved(true));
+            }
+        }
     }
 
     /// Marks the receiver as no longer being in a saved state.
@@ -184,8 +182,9 @@ impl<'a, R> Record<'a, R> {
     pub fn set_unsaved(&mut self) {
         let was_saved = self.is_saved();
         self.saved = None;
-        if was_saved {
-            if let Some(ref mut f) = self.signals {
+        if let Some(ref mut f) = self.signals {
+            // Check if the receiver went from saved to unsaved.
+            if was_saved {
                 f(Signal::Saved(false));
             }
         }
@@ -195,6 +194,43 @@ impl<'a, R> Record<'a, R> {
     #[inline]
     pub fn is_saved(&self) -> bool {
         self.saved.map_or(false, |saved| saved == self.cursor)
+    }
+
+    /// Removes all commands from the record without undoing them.
+    ///
+    /// This resets the record back to its initial state and emits the appropriate signals,
+    /// while leaving the receiver unmodified.
+    #[inline]
+    pub fn clear(&mut self) {
+        if self.is_empty() {
+            return;
+        }
+
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        let was_saved = self.is_saved();
+
+        self.commands.clear();
+        let old = self.cursor;
+        self.cursor = 0;
+        self.saved = Some(0);
+
+        if let Some(ref mut f) = self.signals {
+            // Since we do an early return if the record is empty, we know old can not be 0.
+            f(Signal::Active { old, new: 0 });
+            // Record can never undo after being cleared, check if you could undo before.
+            if could_undo {
+                f(Signal::Undo(false));
+            }
+            // Record can never redo after being cleared, check if you could redo before.
+            if could_redo {
+                f(Signal::Redo(false));
+            }
+            // Check if the receiver went from unsaved to saved.
+            if !was_saved {
+                f(Signal::Saved(true));
+            }
+        }
     }
 
     /// Pushes the command to the top of the record and executes its [`redo`] method.
@@ -317,7 +353,7 @@ impl<'a, R> Record<'a, R> {
                     if !could_undo {
                         f(Signal::Undo(true));
                     }
-                    // Check if receiver went from saved to unsaved.
+                    // Check if the receiver went from saved to unsaved.
                     if was_saved {
                         f(Signal::Saved(false));
                     }
@@ -358,7 +394,7 @@ impl<'a, R> Record<'a, R> {
                     if old == 1 {
                         f(Signal::Undo(false));
                     }
-                    // Check if receiver went from saved to unsaved, or unsaved to saved.
+                    // Check if the receiver went from saved to unsaved, or unsaved to saved.
                     if was_saved {
                         f(Signal::Saved(false));
                     } else if is_saved {
@@ -403,7 +439,7 @@ impl<'a, R> Record<'a, R> {
                     if old == 0 {
                         f(Signal::Undo(true));
                     }
-                    // Check if receiver went from saved to unsaved, or unsaved to saved.
+                    // Check if the receiver went from saved to unsaved, or unsaved to saved.
                     if was_saved {
                         f(Signal::Saved(false));
                     } else if is_saved {
@@ -630,7 +666,7 @@ impl<'a, R> RecordBuilder<'a, R> {
             receiver: receiver.into(),
             cursor: 0,
             limit: self.limit,
-            saved: None,
+            saved: Some(0),
             signals: self.signals,
         }
     }
