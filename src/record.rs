@@ -521,11 +521,11 @@ impl<'a, R: Debug> Debug for Record<'a, R> {
 impl<'a, R> Display for Record<'a, R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        for (idx, cmd) in self.commands.iter().rev().enumerate() {
+        for (idx, cmd) in self.commands.iter().enumerate().rev() {
             if idx + 1 == self.cursor {
-                writeln!(f, " -> {}.", cmd)?;
+                writeln!(f, "* {}", cmd)?;
             } else {
-                writeln!(f, "    {}.", cmd)?;
+                writeln!(f, "  {}", cmd)?;
             }
         }
         Ok(())

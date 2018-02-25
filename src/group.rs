@@ -12,13 +12,15 @@ pub struct Group<'a, K: Hash + Eq, V, S = RandomState> where S: BuildHasher {
     signals: Option<Box<FnMut(Option<&K>) + Send + Sync + 'a>>,
 }
 
-impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<'a, K, V, S> {
+impl<'a, K: Hash + Eq, V> Group<'a, K, V, RandomState> {
     /// Returns a new group.
     #[inline]
     pub fn new() -> Group<'a, K, V, RandomState> {
         Default::default()
     }
+}
 
+impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<'a, K, V, S> {
     /// Returns a builder for a group.
     #[inline]
     pub fn builder() -> GroupBuilder<'a, K, V, S> {
@@ -209,9 +211,9 @@ impl<'a, K: Hash + Eq + Display, V: Display> Display for Group<'a, K, V> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         for (key, item) in &self.map {
             if self.active.as_ref().map_or(false, |a| a == key) {
-                writeln!(f, " -> {}:\n    {}", key, item)?;
+                writeln!(f, "* {}:\n{}", key, item)?;
             } else {
-                writeln!(f, "    {}:\n    {}", key, item)?;
+                writeln!(f, "  {}:\n{}", key, item)?;
             }
         }
         Ok(())
