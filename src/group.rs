@@ -176,6 +176,22 @@ impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
     pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
         self.get_mut().and_then(|record| record.undo())
     }
+
+    /// Calls the [`to_undo_string`] method on the active record.
+    ///
+    /// [`to_undo_string`]: record/struct.Record.html#method.to_undo_string
+    #[inline]
+    pub fn to_undo_string(&self) -> Option<String> {
+        self.get().and_then(|record| record.to_undo_string())
+    }
+
+    /// Calls the [`to_redo_string`] method on the active record.
+    ///
+    /// [`to_redo_string`]: record/struct.Record.html#method.to_redo_string
+    #[inline]
+    pub fn to_redo_string(&self) -> Option<String> {
+        self.get().and_then(|record| record.to_redo_string())
+    }
 }
 
 impl<'a, K: Hash + Eq + Debug, V: Debug, S: BuildHasher> Debug for Group<'a, K, V, S> {
