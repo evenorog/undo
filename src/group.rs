@@ -94,11 +94,11 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<'a, K, V, S> {
     #[inline]
     pub fn unset(&mut self) {
         if self.active.is_some() {
+            self.active = None;
             if let Some(ref mut f) = self.signals {
                 f(None);
             }
         }
-        self.active = None;
     }
 }
 
