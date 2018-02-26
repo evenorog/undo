@@ -201,22 +201,20 @@ impl<'a, R> Record<'a, R> {
     /// while leaving the receiver unmodified.
     #[inline]
     pub fn clear(&mut self) {
-        if self.is_empty() {
-            return;
-        }
-
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
 
-        self.commands.clear();
         let old = self.cursor;
+        self.commands.clear();
         self.cursor = 0;
         self.saved = Some(0);
 
         if let Some(ref mut f) = self.signals {
             // Since we do an early return if the record is empty, we know old can not be 0.
-            f(Signal::Active { old, new: 0 });
+            if old != 0 {
+                f(Signal::Active { old, new: 0 });
+            }
             // Record can never undo after being cleared, check if you could undo before.
             if could_undo {
                 f(Signal::Undo(false));
