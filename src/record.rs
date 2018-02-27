@@ -211,7 +211,7 @@ impl<'a, R> Record<'a, R> {
         self.saved = Some(0);
 
         if let Some(ref mut f) = self.signals {
-            // Since we do an early return if the record is empty, we know old can not be 0.
+            // Emit signal if the cursor has changed.
             if old != 0 {
                 f(Signal::Active { old, new: 0 });
             }
@@ -540,6 +540,11 @@ impl<R> Iterator for Commands<R> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
     }
 }
 
