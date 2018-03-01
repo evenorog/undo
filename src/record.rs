@@ -14,15 +14,23 @@ use {Command, Error, Merger};
 /// [`signals`]: struct.RecordBuilder.html#method.signals
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
-    /// Says if the record can redo.
-    Redo(bool),
     /// Says if the record can undo.
+    ///
+    /// This signal will be emitted when the records ability to undo changes.
     Undo(bool),
+    /// Says if the record can redo.
+    ///
+    /// This signal will be emitted when the records ability to redo changes.
+    Redo(bool),
     /// Says if the receiver is in a saved state.
+    ///
+    /// This signal will be emitted when the record enters or leaves its receivers saved state.
     Saved(bool),
     /// Says if the active command has changed.
     ///
-    /// `old` and `new` starts at `1`, e.g. they are always `index + 1`.
+    /// This signal will be emitted when the records active command has changed. This includes
+    /// when two commands have been merged, in which case `old == new`.
+    /// The `old` and `new` fields are always `index + 1`.
     Active { old: usize, new: usize },
 }
 
@@ -661,10 +669,10 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// Record::builder()
     ///     .signals(|signal| {
     ///         match signal {
-    ///             Signal::Redo(true) => println!("The record can redo."),
-    ///             Signal::Redo(false) => println!("The record can not redo."),
     ///             Signal::Undo(true) => println!("The record can undo."),
     ///             Signal::Undo(false) => println!("The record can not undo."),
+    ///             Signal::Redo(true) => println!("The record can redo."),
+    ///             Signal::Redo(false) => println!("The record can not redo."),
     ///             Signal::Saved(true) => println!("The receiver is in a saved state."),
     ///             Signal::Saved(false) => println!("The receiver is not in a saved state."),
     ///             Signal::Active { old, new } => {
