@@ -16,7 +16,7 @@ use {Command, Error, Merger};
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+///     fn exec(&mut self, s: &mut String) -> Result<(), Box<Error>> {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
@@ -94,13 +94,13 @@ impl<R> Stack<R> {
         self.commands.clear();
     }
 
-    /// Pushes the command on the stack and executes its [`redo`] method.
+    /// Pushes the command on the stack and executes its [`exec`] method.
     /// The command is merged with the previous top command if their [`id`] is equal.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`], the error is returned together with the command.
+    /// If an error occur when executing [`exec`], the error is returned together with the command.
     ///
-    /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`exec`]: trait.Command.html#tymethod.exec
     /// [`id`]: trait.Command.html#method.id
     #[inline]
     pub fn push<C>(&mut self, mut cmd: C) -> Result<(), Error<R>>
@@ -108,7 +108,7 @@ impl<R> Stack<R> {
         C: Command<R> + 'static,
         R: 'static,
     {
-        match cmd.redo(&mut self.receiver) {
+        match cmd.exec(&mut self.receiver) {
             Ok(_) => {
                 match (cmd.id(), self.commands.last().and_then(|last| last.id())) {
                     (Some(id1), Some(id2)) if id1 == id2 => {

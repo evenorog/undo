@@ -151,24 +151,16 @@ impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
         self.get().map(|stack| stack.is_saved())
     }
 
-    /// Calls the [`push`] method on the active record.
+    /// Calls the [`exec`] method on the active record.
     ///
-    /// [`push`]: record/struct.Record.html#method.push
+    /// [`exec`]: record/struct.Record.html#method.exec
     #[inline]
-    pub fn push<C>(&mut self, cmd: C) -> Option<Result<Commands<R>, Error<R>>>
+    pub fn exec<C>(&mut self, cmd: C) -> Option<Result<Commands<R>, Error<R>>>
         where
             C: Command<R> + 'static,
             R: 'static,
     {
-        self.get_mut().map(move |record| record.push(cmd))
-    }
-
-    /// Calls the [`redo`] method on the active record.
-    ///
-    /// [`redo`]: record/struct.Record.html#method.redo
-    #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
-        self.get_mut().and_then(|record| record.redo())
+        self.get_mut().map(move |record| record.exec(cmd))
     }
 
     /// Calls the [`undo`] method on the active record.
@@ -177,6 +169,14 @@ impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
     #[inline]
     pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
         self.get_mut().and_then(|record| record.undo())
+    }
+
+    /// Calls the [`redo`] method on the active record.
+    ///
+    /// [`redo`]: record/struct.Record.html#method.redo
+    #[inline]
+    pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
+        self.get_mut().and_then(|record| record.redo())
     }
 
     /// Calls the [`to_undo_string`] method on the active record.

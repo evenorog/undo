@@ -53,7 +53,7 @@ pub enum Signal {
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+///     fn exec(&mut self, s: &mut String) -> Result<(), Box<Error>> {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
@@ -73,9 +73,9 @@ pub enum Signal {
 /// fn foo() -> Result<(), Box<Error>> {
 ///     let mut record = Record::default();
 ///
-///     record.push(Add('a'))?;
-///     record.push(Add('b'))?;
-///     record.push(Add('c'))?;
+///     record.exec(Add('a'))?;
+///     record.exec(Add('b'))?;
+///     record.exec(Add('c'))?;
 ///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
@@ -238,13 +238,13 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
-    /// Pushes the command to the top of the record and executes its [`redo`] method.
+    /// Pushes the command to the top of the record and executes its [`exec`] method.
     /// The command is merged with the previous top command if they have the same [`id`].
     ///
     /// All commands above the active one are removed from the stack and returned as an iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned together with the command,
+    /// If an error occur when executing [`exec`] the error is returned together with the command,
     /// and the state of the stack is left unchanged.
     ///
     /// # Examples
@@ -257,7 +257,7 @@ impl<'a, R> Record<'a, R> {
     /// # struct Add(char);
     /// #
     /// # impl Command<String> for Add {
-    /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #     fn exec(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
@@ -277,15 +277,15 @@ impl<'a, R> Record<'a, R> {
     /// # fn foo() -> Result<(), Box<Error>> {
     /// let mut record = Record::default();
     ///
-    /// record.push(Add('a'))?;
-    /// record.push(Add('b'))?;
-    /// record.push(Add('c'))?;
+    /// record.exec(Add('a'))?;
+    /// record.exec(Add('b'))?;
+    /// record.exec(Add('c'))?;
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
     /// record.undo().unwrap()?;
     /// record.undo().unwrap()?;
-    /// let mut bc = record.push(Add('e'))?;
+    /// let mut bc = record.exec(Add('e'))?;
     ///
     /// assert_eq!(record.into_receiver(), "ae");
     /// assert!(bc.next().is_some());
@@ -296,15 +296,15 @@ impl<'a, R> Record<'a, R> {
     /// # foo().unwrap();
     /// ```
     ///
-    /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`exec`]: trait.Command.html#tymethod.exec
     /// [`id`]: trait.Command.html#method.id
     #[inline]
-    pub fn push<C>(&mut self, mut cmd: C) -> Result<Commands<R>, Error<R>>
+    pub fn exec<C>(&mut self, mut cmd: C) -> Result<Commands<R>, Error<R>>
     where
         C: Command<R> + 'static,
         R: 'static,
     {
-        match cmd.redo(&mut self.receiver) {
+        match cmd.exec(&mut self.receiver) {
             Ok(_) => {
                 let old = self.cursor;
                 let could_undo = self.can_undo();
@@ -350,11 +350,11 @@ impl<'a, R> Record<'a, R> {
                 if let Some(ref mut f) = self.signals {
                     // We emit this signal even if the commands might have been merged.
                     f(Signal::Active { old, new: self.cursor });
-                    // Record can never redo after a push, check if you could redo before.
+                    // Record can never redo after executing a command, check if you could redo before.
                     if could_redo {
                         f(Signal::Redo(false));
                     }
-                    // Record can always undo after a push, check if you could not undo before.
+                    // Record can always undo after executing a command, check if you could not undo before.
                     if !could_undo {
                         f(Signal::Undo(true));
                     }
@@ -410,21 +410,21 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
-    /// Calls the [`redo`] method for the active command and sets the next one as the
+    /// Calls the [`exec`] method for the active command and sets the next one as the
     /// new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the
+    /// If an error occur when executing [`exec`] the
     /// error is returned and the state is left unchanged.
     ///
-    /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`exec`]: trait.Command.html#tymethod.exec
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
         if !self.can_redo() {
             return None;
         }
 
-        match self.commands[self.cursor].redo(&mut self.receiver) {
+        match self.commands[self.cursor].exec(&mut self.receiver) {
             Ok(_) => {
                 let was_saved = self.is_saved();
                 let old = self.cursor;
@@ -590,7 +590,7 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// # struct Add(char);
     /// #
     /// # impl Command<String> for Add {
-    /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #     fn exec(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
@@ -613,9 +613,9 @@ impl<'a, R> RecordBuilder<'a, R> {
     ///     .limit(2)
     ///     .default();
     ///
-    /// record.push(Add('a'))?;
-    /// record.push(Add('b'))?;
-    /// record.push(Add('c'))?; // 'a' is removed from the record since limit is 2.
+    /// record.exec(Add('a'))?;
+    /// record.exec(Add('b'))?;
+    /// record.exec(Add('c'))?; // 'a' is removed from the record since limit is 2.
     ///
     /// assert_eq!(record.as_receiver(), "abc");
     ///
@@ -647,7 +647,7 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// # struct Add(char);
     /// #
     /// # impl Command<String> for Add {
-    /// #     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #     fn exec(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
@@ -681,7 +681,7 @@ impl<'a, R> RecordBuilder<'a, R> {
     ///         }
     ///     })
     ///     .default();
-    /// # record.push(Add('a'))?;
+    /// # record.exec(Add('a'))?;
     /// # Ok(())
     /// # }
     /// # foo().unwrap();

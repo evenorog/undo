@@ -25,12 +25,12 @@ pub use stack::Stack;
 pub trait Command<R>: Debug + Display {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
-    /// Restores the state as it was before [`redo`] was called and returns `Ok` if everything
+    /// Restores the state as it was before [`exec`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
-    /// [`redo`]: trait.Command.html#tymethod.redo
+    /// [`exec`]: trait.Command.html#tymethod.exec
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
     /// Used for automatic merging of commands.
@@ -49,7 +49,7 @@ pub trait Command<R>: Debug + Display {
     /// struct Add(char);
     ///
     /// impl Command<String> for Add {
-    ///     fn redo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    ///     fn exec(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     ///         s.push(self.0);
     ///         Ok(())
     ///     }
@@ -73,16 +73,18 @@ pub trait Command<R>: Debug + Display {
     /// fn foo() -> Result<(), Box<Error>> {
     ///     let mut record = Record::default();
     ///
-    ///     record.push(Add('a'))?;
-    ///     record.push(Add('b'))?;
-    ///     record.push(Add('c'))?; // 'a', 'b', and 'c' are merged.
-    ///
+    ///     // 'a', 'b', and 'c' are merged.
+    ///     record.exec(Add('a'))?;
+    ///     record.exec(Add('b'))?;
+    ///     record.exec(Add('c'))?;
     ///     assert_eq!(record.len(), 1);
     ///     assert_eq!(record.as_receiver(), "abc");
     ///
+    ///     // Calling `undo` once will undo all merged commands.
     ///     record.undo().unwrap()?;
     ///     assert_eq!(record.as_receiver(), "");
     ///
+    ///     // Calling `redo` once will redo all merged commands.
     ///     record.redo().unwrap()?;
     ///     assert_eq!(record.into_receiver(), "abc");
     ///
@@ -98,8 +100,8 @@ pub trait Command<R>: Debug + Display {
 
 impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
-        (**self).redo(receiver)
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        (**self).exec(receiver)
     }
 
     #[inline]
@@ -120,9 +122,9 @@ struct Merger<R> {
 
 impl<R> Command<R> for Merger<R> {
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
-        self.cmd1.redo(receiver)?;
-        self.cmd2.redo(receiver)
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        self.cmd1.exec(receiver)?;
+        self.cmd2.exec(receiver)
     }
 
     #[inline]
