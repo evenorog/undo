@@ -22,6 +22,78 @@ pub use record::{Commands, Record, RecordBuilder, Signal};
 pub use stack::Stack;
 
 /// Base functionality for all commands.
+#[cfg(not(feature = "display"))]
+pub trait Command<R>: Debug {
+    /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
+    /// something went wrong.
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+
+    /// Restores the state as it was before [`exec`] was called and returns `Ok` if everything
+    /// went fine, and `Err` if something went wrong.
+    ///
+    /// [`exec`]: trait.Command.html#tymethod.exec
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+
+    /// Used for automatic merging of commands.
+    ///
+    /// Two commands are merged together when a command is pushed, and it has
+    /// the same id as the top command already on the stack or record. When commands are merged together,
+    /// undoing and redoing them are done in one step.
+    ///
+    /// # Examples
+    /// ```
+    /// use std::error::Error;
+    /// use undo::{Command, Record};
+    ///
+    /// #[derive(Debug)]
+    /// struct Add(char);
+    ///
+    /// impl Command<String> for Add {
+    ///     fn exec(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    ///         s.push(self.0);
+    ///         Ok(())
+    ///     }
+    ///
+    ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    ///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    ///         Ok(())
+    ///     }
+    ///
+    ///     fn id(&self) -> Option<u32> {
+    ///         Some(1)
+    ///     }
+    /// }
+    ///
+    /// fn foo() -> Result<(), Box<Error>> {
+    ///     let mut record = Record::default();
+    ///
+    ///     // 'a', 'b', and 'c' are merged.
+    ///     record.exec(Add('a'))?;
+    ///     record.exec(Add('b'))?;
+    ///     record.exec(Add('c'))?;
+    ///     assert_eq!(record.len(), 1);
+    ///     assert_eq!(record.as_receiver(), "abc");
+    ///
+    ///     // Calling `undo` once will undo all merged commands.
+    ///     record.undo().unwrap()?;
+    ///     assert_eq!(record.as_receiver(), "");
+    ///
+    ///     // Calling `redo` once will redo all merged commands.
+    ///     record.redo().unwrap()?;
+    ///     assert_eq!(record.into_receiver(), "abc");
+    ///
+    ///     Ok(())
+    /// }
+    /// # foo().unwrap();
+    /// ```
+    #[inline]
+    fn id(&self) -> Option<u32> {
+        None
+    }
+}
+
+/// Base functionality for all commands.
+#[cfg(feature = "display")]
 pub trait Command<R>: Debug + Display {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
@@ -149,6 +221,7 @@ impl<R> Debug for Merger<R> {
     }
 }
 
+#[cfg(feature = "display")]
 impl<R> Display for Merger<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {

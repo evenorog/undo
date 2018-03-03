@@ -1,6 +1,8 @@
 use std::collections::hash_map::{HashMap, RandomState};
 use std::error;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::fmt::{self, Debug, Formatter};
+#[cfg(feature = "display")]
+use std::fmt::Display;
 use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use {Command, Commands, Error, Record, Stack};
@@ -183,6 +185,7 @@ impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
     ///
     /// [`to_undo_string`]: record/struct.Record.html#method.to_undo_string
     #[inline]
+    #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
         self.get().and_then(|record| record.to_undo_string())
     }
@@ -191,6 +194,7 @@ impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
     ///
     /// [`to_redo_string`]: record/struct.Record.html#method.to_redo_string
     #[inline]
+    #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
         self.get().and_then(|record| record.to_redo_string())
     }
@@ -206,6 +210,7 @@ impl<'a, K: Hash + Eq + Debug, V: Debug, S: BuildHasher> Debug for Group<'a, K, 
     }
 }
 
+#[cfg(feature = "display")]
 impl<'a, K: Hash + Eq + Display, V: Display> Display for Group<'a, K, V> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {

@@ -11,3 +11,7 @@ keywords = ["undo", "redo"]
 categories = ["data-structures"]
 
 [dependencies]
+
+[features]
+default = []
+display = []

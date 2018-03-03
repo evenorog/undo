@@ -1,3 +1,4 @@
+#[cfg(feature = "display")]
 use std::fmt::{self, Display, Formatter};
 use {Command, Error, Merger};
 
@@ -9,7 +10,6 @@ use {Command, Error, Merger};
 /// # Examples
 /// ```
 /// use std::error::Error;
-/// use std::fmt::{self, Display, Formatter};
 /// use undo::{Command, Stack};
 ///
 /// #[derive(Debug)]
@@ -24,12 +24,6 @@ use {Command, Error, Merger};
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
 ///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
 ///         Ok(())
-///     }
-/// }
-///
-/// impl Display for Add {
-///     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-///         write!(f, "Add `{}`", self.0)
 ///     }
 /// }
 ///
@@ -171,6 +165,7 @@ impl<R> From<R> for Stack<R> {
     }
 }
 
+#[cfg(feature = "display")]
 impl<R> Display for Stack<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {

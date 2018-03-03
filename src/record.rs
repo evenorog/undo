@@ -1,6 +1,8 @@
 use std::collections::vec_deque::{IntoIter, VecDeque};
 use std::error;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::fmt::{self, Debug, Formatter};
+#[cfg(feature = "display")]
+use std::fmt::Display;
 use std::marker::PhantomData;
 use {Command, Error, Merger};
 
@@ -46,7 +48,6 @@ pub enum Signal {
 /// # Examples
 /// ```
 /// use std::error::Error;
-/// use std::fmt::{self, Display, Formatter};
 /// use undo::{Command, Record};
 ///
 /// #[derive(Debug)]
@@ -61,12 +62,6 @@ pub enum Signal {
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
 ///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
 ///         Ok(())
-///     }
-/// }
-///
-/// impl Display for Add {
-///     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-///         write!(f, "Add `{}`", self.0)
 ///     }
 /// }
 ///
@@ -250,7 +245,6 @@ impl<'a, R> Record<'a, R> {
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use std::fmt::{self, Display, Formatter};
     /// # use undo::*;
     /// #
     /// # #[derive(Debug)]
@@ -265,12 +259,6 @@ impl<'a, R> Record<'a, R> {
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
-    /// #     }
-    /// # }
-    /// #
-    /// # impl Display for Add {
-    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    /// #         write!(f, "Add `{}`", self.0)
     /// #     }
     /// # }
     /// #
@@ -457,6 +445,7 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`undo`]: struct.Record.html#method.undo
     #[inline]
+    #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
             Some(self.commands[self.cursor - 1].to_string())
@@ -469,6 +458,7 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`redo`]: struct.Record.html#method.redo
     #[inline]
+    #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
             Some(self.commands[self.cursor].to_string())
@@ -524,6 +514,7 @@ impl<'a, R: Debug> Debug for Record<'a, R> {
     }
 }
 
+#[cfg(feature = "display")]
 impl<'a, R> Display for Record<'a, R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -583,7 +574,6 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use std::fmt::{self, Display, Formatter};
     /// # use undo::*;
     /// #
     /// # #[derive(Debug)]
@@ -598,12 +588,6 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
-    /// #     }
-    /// # }
-    /// #
-    /// # impl Display for Add {
-    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    /// #         write!(f, "Add `{}`", self.0)
     /// #     }
     /// # }
     /// #
@@ -640,7 +624,6 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use std::fmt::{self, Display, Formatter};
     /// # use undo::*;
     /// #
     /// # #[derive(Debug)]
@@ -655,12 +638,6 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
-    /// #     }
-    /// # }
-    /// #
-    /// # impl Display for Add {
-    /// #     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    /// #         write!(f, "Add `{}`", self.0)
     /// #     }
     /// # }
     /// #
