@@ -92,7 +92,6 @@ pub trait Command<R>: Debug {
     }
 }
 
-/// Base functionality for all commands.
 #[cfg(feature = "display")]
 pub trait Command<R>: Debug + Display {
     fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
