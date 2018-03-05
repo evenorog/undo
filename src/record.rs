@@ -367,7 +367,7 @@ impl<'a, R> Record<'a, R> {
             return None;
         }
 
-        let ok = self.commands[self.cursor - 1].undo(&mut self.receiver).map(|_| {
+        let result = self.commands[self.cursor - 1].undo(&mut self.receiver).map(|_| {
             let was_saved = self.is_saved();
             let old = self.cursor;
             self.cursor -= 1;
@@ -390,7 +390,7 @@ impl<'a, R> Record<'a, R> {
                 }
             }
         });
-        Some(ok)
+        Some(result)
     }
 
     /// Calls the [`exec`] method for the active command and sets the next one as the
@@ -406,7 +406,7 @@ impl<'a, R> Record<'a, R> {
         if !self.can_redo() {
             return None;
         }
-        let ok = self.commands[self.cursor].exec(&mut self.receiver).map(|_| {
+        let result = self.commands[self.cursor].exec(&mut self.receiver).map(|_| {
             let was_saved = self.is_saved();
             let old = self.cursor;
             self.cursor += 1;
@@ -429,7 +429,7 @@ impl<'a, R> Record<'a, R> {
                 }
             }
         });
-        Some(ok)
+        Some(result)
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
