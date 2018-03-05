@@ -367,33 +367,30 @@ impl<'a, R> Record<'a, R> {
             return None;
         }
 
-        match self.commands[self.cursor - 1].undo(&mut self.receiver) {
-            Ok(_) => {
-                let was_saved = self.is_saved();
-                let old = self.cursor;
-                self.cursor -= 1;
-                let len = self.len();
-                let is_saved = self.is_saved();
-                if let Some(ref mut f) = self.signals {
-                    // Cursor has always changed at this point.
-                    f(Signal::Active { old, new: self.cursor });
-                    // Check if the records ability to redo changed.
-                    if old == len {
-                        f(Signal::Redo(true));
-                    }
-                    // Check if the records ability to undo changed.
-                    if old == 1 {
-                        f(Signal::Undo(false));
-                    }
-                    // Check if the receiver went from saved to unsaved, or unsaved to saved.
-                    if was_saved != is_saved {
-                        f(Signal::Saved(is_saved));
-                    }
+        let ok = self.commands[self.cursor - 1].undo(&mut self.receiver).map(|_| {
+            let was_saved = self.is_saved();
+            let old = self.cursor;
+            self.cursor -= 1;
+            let len = self.len();
+            let is_saved = self.is_saved();
+            if let Some(ref mut f) = self.signals {
+                // Cursor has always changed at this point.
+                f(Signal::Active { old, new: self.cursor });
+                // Check if the records ability to redo changed.
+                if old == len {
+                    f(Signal::Redo(true));
                 }
-                Some(Ok(()))
+                // Check if the records ability to undo changed.
+                if old == 1 {
+                    f(Signal::Undo(false));
+                }
+                // Check if the receiver went from saved to unsaved, or unsaved to saved.
+                if was_saved != is_saved {
+                    f(Signal::Saved(is_saved));
+                }
             }
-            Err(e) => Some(Err(e)),
-        }
+        });
+        Some(ok)
     }
 
     /// Calls the [`exec`] method for the active command and sets the next one as the
@@ -409,34 +406,30 @@ impl<'a, R> Record<'a, R> {
         if !self.can_redo() {
             return None;
         }
-
-        match self.commands[self.cursor].exec(&mut self.receiver) {
-            Ok(_) => {
-                let was_saved = self.is_saved();
-                let old = self.cursor;
-                self.cursor += 1;
-                let len = self.len();
-                let is_saved = self.is_saved();
-                if let Some(ref mut f) = self.signals {
-                    // Cursor has always changed at this point.
-                    f(Signal::Active { old, new: self.cursor });
-                    // Check if the records ability to redo changed.
-                    if old == len - 1 {
-                        f(Signal::Redo(false));
-                    }
-                    // Check if the records ability to undo changed.
-                    if old == 0 {
-                        f(Signal::Undo(true));
-                    }
-                    // Check if the receiver went from saved to unsaved, or unsaved to saved.
-                    if was_saved != is_saved {
-                        f(Signal::Saved(is_saved));
-                    }
+        let ok = self.commands[self.cursor].exec(&mut self.receiver).map(|_| {
+            let was_saved = self.is_saved();
+            let old = self.cursor;
+            self.cursor += 1;
+            let len = self.len();
+            let is_saved = self.is_saved();
+            if let Some(ref mut f) = self.signals {
+                // Cursor has always changed at this point.
+                f(Signal::Active { old, new: self.cursor });
+                // Check if the records ability to redo changed.
+                if old == len - 1 {
+                    f(Signal::Redo(false));
                 }
-                Some(Ok(()))
+                // Check if the records ability to undo changed.
+                if old == 0 {
+                    f(Signal::Undo(true));
+                }
+                // Check if the receiver went from saved to unsaved, or unsaved to saved.
+                if was_saved != is_saved {
+                    f(Signal::Saved(is_saved));
+                }
             }
-            Err(e) => Some(Err(e)),
-        }
+        });
+        Some(ok)
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
