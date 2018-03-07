@@ -42,9 +42,8 @@ pub trait Command<R>: Debug {
     ///
     /// # Examples
     /// ```
-    /// use std::error::Error;
-    /// use undo::{Command, Record};
-    ///
+    /// # use std::error::Error;
+    /// # use undo::*;
     /// #[derive(Debug)]
     /// struct Add(char);
     ///

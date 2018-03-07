@@ -47,9 +47,8 @@ pub enum Signal {
 ///
 /// # Examples
 /// ```
-/// use std::error::Error;
-/// use undo::{Command, Record};
-///
+/// # use std::error::Error;
+/// # use undo::*;
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
@@ -406,6 +405,7 @@ impl<'a, R> Record<'a, R> {
         if !self.can_redo() {
             return None;
         }
+
         let result = self.commands[self.cursor].exec(&mut self.receiver).map(|_| {
             let was_saved = self.is_saved();
             let old = self.cursor;
@@ -509,8 +509,8 @@ impl<'a, R: Debug> Debug for Record<'a, R> {
 impl<'a, R> Display for Record<'a, R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        for (idx, cmd) in self.commands.iter().enumerate().rev() {
-            if idx + 1 == self.cursor {
+        for (i, cmd) in self.commands.iter().enumerate().rev() {
+            if i + 1 == self.cursor {
                 writeln!(f, "* {}", cmd)?;
             } else {
                 writeln!(f, "  {}", cmd)?;

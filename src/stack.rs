@@ -9,9 +9,8 @@ use {Command, Error, Merger};
 ///
 /// # Examples
 /// ```
-/// use std::error::Error;
-/// use undo::{Command, Stack};
-///
+/// # use std::error::Error;
+/// # use undo::*;
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
