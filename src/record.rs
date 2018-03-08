@@ -361,7 +361,7 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
+    pub fn undo(&mut self) -> Option<Result<(), Box<error::Error + Send + Sync>>> {
         if !self.can_undo() {
             return None;
         }
@@ -401,7 +401,7 @@ impl<'a, R> Record<'a, R> {
     ///
     /// [`exec`]: trait.Command.html#tymethod.exec
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
+    pub fn redo(&mut self) -> Option<Result<(), Box<error::Error + Send + Sync>>> {
         if !self.can_redo() {
             return None;
         }
