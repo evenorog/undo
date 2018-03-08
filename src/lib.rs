@@ -166,7 +166,7 @@ impl<R> Display for Merger<R> {
 ///
 /// The error contains the error itself and the command that caused the error.
 #[derive(Debug)]
-pub struct Error<R>(pub Box<Command<R>>, pub Box<error::Error>);
+pub struct Error<R>(pub Box<Command<R>>, pub Box<error::Error + Send + Sync>);
 
 impl<R> Display for Error<R> {
     #[inline]
