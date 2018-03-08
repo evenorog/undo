@@ -23,7 +23,7 @@ pub use stack::Stack;
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
-pub trait Command<R>: Debug {
+pub trait Command<R>: Debug + Send + Sync {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
     fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
@@ -92,7 +92,7 @@ pub trait Command<R>: Debug {
 }
 
 #[cfg(feature = "display")]
-pub trait Command<R>: Debug + Display {
+pub trait Command<R>: Debug + Display + Send + Sync {
     fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
