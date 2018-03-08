@@ -26,13 +26,13 @@ pub use stack::Stack;
 pub trait Command<R>: Debug + Send + Sync {
     /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
     /// something went wrong.
-    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error + Send + Sync>>;
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
     /// Restores the state as it was before [`exec`] was called and returns `Ok` if everything
     /// went fine, and `Err` if something went wrong.
     ///
     /// [`exec`]: trait.Command.html#tymethod.exec
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error + Send + Sync>>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
     /// Used for automatic merging of commands.
     ///
@@ -93,9 +93,9 @@ pub trait Command<R>: Debug + Send + Sync {
 
 #[cfg(feature = "display")]
 pub trait Command<R>: Debug + Display + Send + Sync {
-    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error + Send + Sync>>;
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error + Send + Sync>>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
     #[inline]
     fn id(&self) -> Option<u32> {
@@ -105,12 +105,12 @@ pub trait Command<R>: Debug + Display + Send + Sync {
 
 impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     #[inline]
-    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error + Send + Sync>> {
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
         (**self).exec(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error + Send + Sync>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
         (**self).undo(receiver)
     }
 
@@ -127,13 +127,13 @@ struct Merger<R> {
 
 impl<R> Command<R> for Merger<R> {
     #[inline]
-    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error + Send + Sync>> {
+    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
         self.cmd1.exec(receiver)?;
         self.cmd2.exec(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error + Send + Sync>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
         self.cmd2.undo(receiver)?;
         self.cmd1.undo(receiver)
     }
@@ -166,7 +166,7 @@ impl<R> Display for Merger<R> {
 ///
 /// The error contains the error itself and the command that caused the error.
 #[derive(Debug)]
-pub struct Error<R>(pub Box<Command<R>>, pub Box<error::Error + Send + Sync>);
+pub struct Error<R>(pub Box<Command<R>>, pub Box<error::Error>);
 
 impl<R> Display for Error<R> {
     #[inline]

@@ -169,7 +169,7 @@ impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
     ///
     /// [`undo`]: record/struct.Record.html#method.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), Box<error::Error + Send + Sync>>> {
+    pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
         self.get_mut().and_then(|record| record.undo())
     }
 
@@ -177,7 +177,7 @@ impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
     ///
     /// [`redo`]: record/struct.Record.html#method.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), Box<error::Error + Send + Sync>>> {
+    pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
         self.get_mut().and_then(|record| record.redo())
     }
 
