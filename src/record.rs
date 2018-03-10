@@ -319,11 +319,7 @@ impl<'a, R> Record<'a, R> {
                     _ => {
                         if self.limit != 0 && self.limit == self.cursor {
                             self.commands.pop_front();
-                            self.saved = match self.saved {
-                                Some(0) => None,
-                                Some(saved) => Some(saved - 1),
-                                None => None,
-                            };
+                            self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                         } else {
                             self.cursor += 1;
                         }
