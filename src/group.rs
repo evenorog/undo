@@ -237,7 +237,7 @@ impl<'a, K: Hash + Eq, V> Default for Group<'a, K, V, RandomState> {
 }
 
 /// Builder for a group.
-pub struct GroupBuilder<'a, K: Hash + Eq, V, S = RandomState> where S: BuildHasher {
+pub struct GroupBuilder<'a, K: Hash + Eq, V, S: BuildHasher> {
     map: PhantomData<(K, V, S)>,
     capacity: usize,
     signals: Option<Box<FnMut(Option<&K>) + Send + Sync + 'a>>,
