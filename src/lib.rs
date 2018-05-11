@@ -1,38 +1,40 @@
 //! An undo-redo library with dynamic dispatch and automatic command merging.
 //! It uses the [command pattern](https://en.wikipedia.org/wiki/Command_pattern)
 //! where the user modifies a receiver by applying commands on it.
-//!
-//! The library has currently two data structures that can be used to modify the receiver:
-//!
-//! * A stack that can push and pop commands to modify the receiver.
-//! * A record that can roll the state of the receiver forwards and backwards.
 
 #![forbid(unstable_features, bad_style)]
 #![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
 
 mod group;
 mod record;
-mod stack;
 
 use std::error;
 use std::fmt::{self, Debug, Display, Formatter};
 
 pub use group::{Group, GroupBuilder};
-pub use record::{Commands, Record, RecordBuilder, Signal};
-pub use stack::Stack;
+pub use record::{Record, RecordBuilder, Signal};
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
 pub trait Command<R>: Debug + Send + Sync {
-    /// Executes the desired command and returns `Ok` if everything went fine, and `Err` if
-    /// something went wrong.
-    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+    /// Applies the command on the receiver and returns `Ok` if everything went fine,
+    /// and `Err` if something went wrong.
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
-    /// Restores the state as it was before [`exec`] was called and returns `Ok` if everything
-    /// went fine, and `Err` if something went wrong.
-    ///
-    /// [`exec`]: trait.Command.html#tymethod.exec
+    /// Restores the state of the receiver as it was before the command was applied
+    /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+
+    /// Reapplies the command on the receiver and return `Ok` if everything went fine,
+    /// and `Err` if something went wrong.
+    ///
+    /// The default implementation uses the [`apply`] implementation.
+    ///
+    /// [`apply`]: trait.Command.html#tymethod.apply
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        self.apply(receiver)
+    }
 
     /// Used for automatic merging of commands.
     ///
@@ -48,7 +50,7 @@ pub trait Command<R>: Debug + Send + Sync {
     /// struct Add(char);
     ///
     /// impl Command<String> for Add {
-    ///     fn exec(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    ///     fn apply(&mut self, s: &mut String) -> Result<(), Box<Error>> {
     ///         s.push(self.0);
     ///         Ok(())
     ///     }
@@ -63,13 +65,13 @@ pub trait Command<R>: Debug + Send + Sync {
     ///     }
     /// }
     ///
-    /// fn foo() -> Result<(), Box<Error>> {
+    /// fn main() -> Result<(), Box<Error>> {
     ///     let mut record = Record::default();
     ///
-    ///     // 'a', 'b', and 'c' are merged.
-    ///     record.exec(Add('a'))?;
-    ///     record.exec(Add('b'))?;
-    ///     record.exec(Add('c'))?;
+    ///     // The `a`, `b`, and `c` commands are merged.
+    ///     record.apply(Add('a'))?;
+    ///     record.apply(Add('b'))?;
+    ///     record.apply(Add('c'))?;
     ///     assert_eq!(record.len(), 1);
     ///     assert_eq!(record.as_receiver(), "abc");
     ///
@@ -83,7 +85,6 @@ pub trait Command<R>: Debug + Send + Sync {
     ///
     ///     Ok(())
     /// }
-    /// # foo().unwrap();
     /// ```
     #[inline]
     fn id(&self) -> Option<u32> {
@@ -93,9 +94,14 @@ pub trait Command<R>: Debug + Send + Sync {
 
 #[cfg(feature = "display")]
 pub trait Command<R>: Debug + Display + Send + Sync {
-    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
 
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        self.apply(receiver)
+    }
 
     #[inline]
     fn id(&self) -> Option<u32> {
@@ -105,13 +111,18 @@ pub trait Command<R>: Debug + Display + Send + Sync {
 
 impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     #[inline]
-    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
-        (**self).exec(receiver)
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        (**self).apply(receiver)
     }
 
     #[inline]
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
         (**self).undo(receiver)
+    }
+
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        (**self).redo(receiver)
     }
 
     #[inline]
@@ -127,15 +138,21 @@ struct Merger<R> {
 
 impl<R> Command<R> for Merger<R> {
     #[inline]
-    fn exec(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
-        self.cmd1.exec(receiver)?;
-        self.cmd2.exec(receiver)
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        self.cmd1.apply(receiver)?;
+        self.cmd2.apply(receiver)
     }
 
     #[inline]
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
         self.cmd2.undo(receiver)?;
         self.cmd1.undo(receiver)
+    }
+
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+        self.cmd1.redo(receiver)?;
+        self.cmd2.redo(receiver)
     }
 
     #[inline]
@@ -183,6 +200,6 @@ impl<R: Debug> error::Error for Error<R> {
 
     #[inline]
     fn cause(&self) -> Option<&error::Error> {
-        self.1.cause()
+        Some(&*self.1 as &error::Error)
     }
 }

@@ -8,11 +8,6 @@ An undo-redo library with dynamic dispatch and automatic command merging.
 It uses the [command pattern](https://en.wikipedia.org/wiki/Command_pattern) 
 where the user modifies a receiver by applying commands on it.
 
-The library has currently two data structures that can be used to modify the receiver:
-
-* A stack that can push and pop commands to modify the receiver.
-* A record that can roll the state of the receiver forwards and backwards.
-
 ## License
 
 Licensed under either of
