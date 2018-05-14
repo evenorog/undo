@@ -4,7 +4,7 @@ use std::fmt::{self, Debug, Formatter};
 #[cfg(feature = "display")]
 use std::fmt::Display;
 use std::marker::PhantomData;
-use {Command, Error, Merger};
+use {Command, Error, merge::Merged};
 
 /// The signals sent when the record or the receiver changes.
 ///
@@ -36,7 +36,7 @@ pub enum Signal {
         /// The `index + 1` of the old active command.
         old: usize,
         /// The `index + 1` of the new active command.
-        new: usize
+        new: usize,
     },
 }
 
@@ -130,6 +130,39 @@ impl<'a, R> Record<'a, R> {
         }
     }
 
+    /// Reserves capacity for at least `additional` more commands.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.commands.reserve(additional);
+    }
+
+    /// Sets the limit of the record and returns the new limit.
+    ///
+    /// If `limit < len` the first commands will be removed until `len == limit`.
+    /// However, if the current active command is going to be removed, the limit is instead
+    /// adjusted to `len - active` so that the active command is not popped off.
+    #[inline]
+    pub fn set_limit(&mut self, limit: usize) -> usize {
+        self.limit = limit;
+        let len = self.len();
+        if limit < len && limit != 0 {
+            unimplemented!();
+        }
+        self.limit
+    }
+
+    /// Sets how different signals should be handled when the state changes.
+    #[inline]
+    pub fn set_signals<F>(&mut self, f: F)
+        where
+            F: FnMut(Signal) + Send + Sync + 'a,
+    {
+        self.signals = Some(Box::new(f) as _);
+    }
+
     /// Returns the capacity of the record.
     #[inline]
     pub fn capacity(&self) -> usize {
@@ -148,13 +181,10 @@ impl<'a, R> Record<'a, R> {
         self.commands.is_empty()
     }
 
-    /// Returns the limit of the record, or `None` if it has no limit.
+    /// Returns the limit of the record.
     #[inline]
-    pub fn limit(&self) -> Option<usize> {
-        match self.limit {
-            0 => None,
-            v => Some(v),
-        }
+    pub fn limit(&self) -> usize {
+        self.limit
     }
 
     /// Returns `true` if the record can undo.
@@ -248,68 +278,67 @@ impl<'a, R> Record<'a, R> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     /// [`id`]: trait.Command.html#method.id
     #[inline]
-    pub fn apply<C>(&mut self, mut cmd: C) -> Result<impl Iterator<Item = Box<Command<R> + 'static>>, Error<R>>
-    where
-        C: Command<R> + 'static,
-        R: 'static,
+    pub fn apply<C>(&mut self, mut cmd: C) -> Result<impl Iterator<Item=Box<Command<R> + 'static>>, Error<R>>
+        where
+            C: Command<R> + 'static,
+            R: 'static,
     {
-        match cmd.apply(&mut self.receiver) {
-            Ok(_) => {
-                let old = self.cursor;
-                let could_undo = self.can_undo();
-                let could_redo = self.can_redo();
-                let was_saved = self.is_saved();
-
-                // Pop off all elements after cursor from record.
-                let iter = self.commands.split_off(self.cursor).into_iter();
-                debug_assert_eq!(self.cursor, self.len());
-
-                // Check if the saved state was popped off.
-                if self.saved.map_or(false, |saved| saved > self.cursor) {
-                    self.saved = None;
-                }
-
-                match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
-                    (Some(id1), Some(id2)) if id1 == id2 && !was_saved => {
-                        // Merge the command with the one on the top of the stack.
-                        let cmd = Merger {
-                            cmd1: self.commands.pop_back().unwrap(),
-                            cmd2: Box::new(cmd),
-                        };
-                        self.commands.push_back(Box::new(cmd));
-                    }
-                    _ => {
-                        if self.limit != 0 && self.limit == self.cursor {
-                            self.commands.pop_front();
-                            self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
-                        } else {
-                            self.cursor += 1;
-                        }
-                        self.commands.push_back(Box::new(cmd));
-                    }
-                }
-
-                debug_assert_eq!(self.cursor, self.len());
-                if let Some(ref mut f) = self.signals {
-                    // We emit this signal even if the commands might have been merged.
-                    f(Signal::Active { old, new: self.cursor });
-                    // Record can never redo after executing a command, check if you could redo before.
-                    if could_redo {
-                        f(Signal::Redo(false));
-                    }
-                    // Record can always undo after executing a command, check if you could not undo before.
-                    if !could_undo {
-                        f(Signal::Undo(true));
-                    }
-                    // Check if the receiver went from saved to unsaved.
-                    if was_saved {
-                        f(Signal::Saved(false));
-                    }
-                }
-                Ok(iter)
-            }
-            Err(e) => Err(Error(Box::new(cmd), e)),
+        if let Err(e) = cmd.apply(&mut self.receiver) {
+            return Err(Error(Box::new(cmd), e));
         }
+
+        let old = self.cursor;
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        let was_saved = self.is_saved();
+
+        // Pop off all elements after cursor from record.
+        let iter = self.commands.split_off(self.cursor).into_iter();
+        debug_assert_eq!(self.cursor, self.len());
+
+        // Check if the saved state was popped off.
+        if self.saved.map_or(false, |saved| saved > self.cursor) {
+            self.saved = None;
+        }
+
+        match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
+            (Some(id1), Some(id2)) if id1 == id2 && !was_saved => {
+                // Merge the command with the one on the top of the stack.
+                let cmd = Merged {
+                    cmd1: self.commands.pop_back().unwrap(),
+                    cmd2: Box::new(cmd),
+                };
+                self.commands.push_back(Box::new(cmd));
+            }
+            _ => {
+                if self.limit != 0 && self.limit == self.cursor {
+                    self.commands.pop_front();
+                    self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
+                } else {
+                    self.cursor += 1;
+                }
+                self.commands.push_back(Box::new(cmd));
+            }
+        }
+
+        debug_assert_eq!(self.cursor, self.len());
+        if let Some(ref mut f) = self.signals {
+            // We emit this signal even if the commands might have been merged.
+            f(Signal::Active { old, new: self.cursor });
+            // Record can never redo after executing a command, check if you could redo before.
+            if could_redo {
+                f(Signal::Redo(false));
+            }
+            // Record can always undo after executing a command, check if you could not undo before.
+            if !could_undo {
+                f(Signal::Undo(true));
+            }
+            // Check if the receiver went from saved to unsaved.
+            if was_saved {
+                f(Signal::Saved(false));
+            }
+        }
+        Ok(iter)
     }
 
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
@@ -430,7 +459,7 @@ impl<'a, R> Record<'a, R> {
 
     /// Returns an iterator over the commands.
     #[inline]
-    pub fn commands(&self) -> impl Iterator<Item = &Command<R>> {
+    pub fn commands(&self) -> impl Iterator<Item=&Command<R>> {
         self.commands.iter().map(|x| &**x)
     }
 }
@@ -602,8 +631,8 @@ impl<'a, R> RecordBuilder<'a, R> {
     /// ```
     #[inline]
     pub fn signals<F>(mut self, f: F) -> RecordBuilder<'a, R>
-    where
-        F: FnMut(Signal) + Send + Sync + 'a,
+        where
+            F: FnMut(Signal) + Send + Sync + 'a,
     {
         self.signals = Some(Box::new(f));
         self

@@ -6,10 +6,10 @@
 #![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
 
 mod group;
+mod merge;
 mod record;
 
-use std::error;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::{error, fmt::{self, Debug, Display, Formatter}};
 
 pub use group::{Group, GroupBuilder};
 pub use record::{Record, RecordBuilder, Signal};
@@ -131,68 +131,36 @@ impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     }
 }
 
-struct Merger<R> {
-    cmd1: Box<Command<R>>,
-    cmd2: Box<Command<R>>,
-}
+/// An error which holds the command that caused it.
+pub struct Error<R>(pub Box<Command<R> + 'static>, pub Box<error::Error>);
 
-impl<R> Command<R> for Merger<R> {
-    #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
-        self.cmd1.apply(receiver)?;
-        self.cmd2.apply(receiver)
-    }
-
-    #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
-        self.cmd2.undo(receiver)?;
-        self.cmd1.undo(receiver)
-    }
-
-    #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
-        self.cmd1.redo(receiver)?;
-        self.cmd2.redo(receiver)
-    }
-
-    #[inline]
-    fn id(&self) -> Option<u32> {
-        self.cmd1.id()
-    }
-}
-
-impl<R> Debug for Merger<R> {
+impl<R> Debug for Error<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Merger")
-            .field("cmd1", &self.cmd1)
-            .field("cmd2", &self.cmd2)
+        f.debug_tuple("Error")
+            .field(&self.0)
+            .field(&self.1)
             .finish()
     }
 }
 
-#[cfg(feature = "display")]
-impl<R> Display for Merger<R> {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} + {}", self.cmd1, self.cmd2)
-    }
-}
-
-/// The error type.
-///
-/// The error contains the error itself and the command that caused the error.
-#[derive(Debug)]
-pub struct Error<R>(pub Box<Command<R>>, pub Box<error::Error>);
-
+#[cfg(not(feature = "display"))]
 impl<R> Display for Error<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", self.1)
+        write!(f, "{error}", error = self.1)
     }
 }
 
-impl<R: Debug> error::Error for Error<R> {
+#[cfg(feature = "display")]
+impl<R> Display for Error<R> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "`{error}` caused by `{command}`", error = self.1, command = self.0)
+    }
+}
+
+impl<R> error::Error for Error<R> {
     #[inline]
     fn description(&self) -> &str {
         self.1.description()
@@ -200,6 +168,6 @@ impl<R: Debug> error::Error for Error<R> {
 
     #[inline]
     fn cause(&self) -> Option<&error::Error> {
-        Some(&*self.1 as &error::Error)
+        self.1.cause()
     }
 }
