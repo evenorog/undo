@@ -1,4 +1,5 @@
-use std::{error, fmt::{self, Debug, Display, Formatter}, marker, u32};
+use std::{error, marker, u32};
+use std::fmt::{self, Debug, Formatter};
 use Command;
 
 /// A command wrapper which always merges with itself.

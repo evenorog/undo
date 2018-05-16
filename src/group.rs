@@ -8,24 +8,24 @@ use std::marker::PhantomData;
 use {Command, Error, Record};
 
 /// A group of records.
-pub struct Group<'a, K: Hash + Eq, V, S = RandomState> where S: BuildHasher {
+pub struct Group<K: Hash + Eq, V, S = RandomState> {
     group: HashMap<K, V, S>,
     active: Option<K>,
-    signals: Option<Box<FnMut(Option<&K>) + Send + Sync + 'a>>,
+    signals: Option<Box<FnMut(Option<&K>) + Send + Sync + 'static>>,
 }
 
-impl<'a, K: Hash + Eq, V> Group<'a, K, V, RandomState> {
+impl<K: Hash + Eq, V> Group<K, V, RandomState> {
     /// Returns a new group.
     #[inline]
-    pub fn new() -> Group<'a, K, V, RandomState> {
+    pub fn new() -> Group<K, V, RandomState> {
         Default::default()
     }
 }
 
-impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<'a, K, V, S> {
+impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
     /// Returns a builder for a group.
     #[inline]
-    pub fn builder() -> GroupBuilder<'a, K, V, S> {
+    pub fn builder() -> GroupBuilder<K, V, S> {
         GroupBuilder {
             group: PhantomData,
             capacity: 0,
@@ -40,15 +40,6 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<'a, K, V, S> {
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.group.reserve(additional);
-    }
-
-    /// Sets how different signals should be handled when the state changes.
-    #[inline]
-    pub fn set_signals<F>(&mut self, f: F)
-        where
-            F: FnMut(Option<&K>) + Send + Sync + 'a,
-    {
-        self.signals = Some(Box::new(f) as _);
     }
 
     /// Returns the capacity of the group.
@@ -67,6 +58,15 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<'a, K, V, S> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.group.is_empty()
+    }
+
+    /// Sets how different signals should be handled when the state changes.
+    #[inline]
+    pub fn set_signals<F>(&mut self, f: F)
+        where
+            F: FnMut(Option<&K>) + Send + Sync + 'static,
+    {
+        self.signals = Some(Box::new(f) as _);
     }
 
     /// Inserts an item into the group.
@@ -124,7 +124,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<'a, K, V, S> {
     }
 }
 
-impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
+impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// Calls the [`set_saved`] method on the active record.
     ///
     /// [`set_saved`]: record/struct.Record.html#method.set_saved
@@ -197,12 +197,12 @@ impl<'a, K: Hash + Eq, R, S: BuildHasher> Group<'a, K, Record<'a, R>, S> {
 
     /// Returns an iterator over the records.
     #[inline]
-    pub fn records(&self) -> impl Iterator<Item=&Record<'a, R>> {
+    pub fn records(&self) -> impl Iterator<Item=&Record<R>> {
         self.group.values()
     }
 }
 
-impl<'a, K: Hash + Eq + Debug, V: Debug, S: BuildHasher> Debug for Group<'a, K, V, S> {
+impl<K: Hash + Eq + Debug, V: Debug, S: BuildHasher> Debug for Group<K, V, S> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Group")
@@ -213,7 +213,7 @@ impl<'a, K: Hash + Eq + Debug, V: Debug, S: BuildHasher> Debug for Group<'a, K, 
 }
 
 #[cfg(feature = "display")]
-impl<'a, K: Hash + Eq + Display, V: Display> Display for Group<'a, K, V> {
+impl<K: Hash + Eq + Display, V: Display> Display for Group<K, V> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         for (key, item) in &self.group {
@@ -227,9 +227,9 @@ impl<'a, K: Hash + Eq + Display, V: Display> Display for Group<'a, K, V> {
     }
 }
 
-impl<'a, K: Hash + Eq, V> Default for Group<'a, K, V, RandomState> {
+impl<K: Hash + Eq, V> Default for Group<K, V, RandomState> {
     #[inline]
-    fn default() -> Group<'a, K, V, RandomState> {
+    fn default() -> Group<K, V, RandomState> {
         Group {
             group: HashMap::new(),
             active: None,
@@ -239,35 +239,35 @@ impl<'a, K: Hash + Eq, V> Default for Group<'a, K, V, RandomState> {
 }
 
 /// Builder for a group.
-pub struct GroupBuilder<'a, K: Hash + Eq, V, S: BuildHasher> {
+pub struct GroupBuilder<K: Hash + Eq, V, S: BuildHasher> {
     group: PhantomData<(K, V, S)>,
     capacity: usize,
-    signals: Option<Box<FnMut(Option<&K>) + Send + Sync + 'a>>,
+    signals: Option<Box<FnMut(Option<&K>) + Send + Sync + 'static>>,
 }
 
-impl<'a, K: Hash + Eq, V> GroupBuilder<'a, K, V, RandomState> {
+impl<K: Hash + Eq, V> GroupBuilder<K, V, RandomState> {
     /// Creates the group.
     #[inline]
-    pub fn build(self) -> Group<'a, K, V, RandomState> {
+    pub fn build(self) -> Group<K, V, RandomState> {
         self.build_with_hasher(Default::default())
     }
 }
 
-impl<'a, K: Hash + Eq, V, S: BuildHasher> GroupBuilder<'a, K, V, S> {
+impl<K: Hash + Eq, V, S: BuildHasher> GroupBuilder<K, V, S> {
     /// Sets the specified [capacity] for the group.
     ///
     /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> GroupBuilder<'a, K, V, S> {
+    pub fn capacity(mut self, capacity: usize) -> GroupBuilder<K, V, S> {
         self.capacity = capacity;
         self
     }
 
     /// Decides what should happen when the active stack changes.
     #[inline]
-    pub fn signals<F>(mut self, f: F) -> GroupBuilder<'a, K, V, S>
+    pub fn signals<F>(mut self, f: F) -> GroupBuilder<K, V, S>
         where
-            F: FnMut(Option<&K>) + Send + Sync + 'a
+            F: FnMut(Option<&K>) + Send + Sync + 'static
     {
         self.signals = Some(Box::new(f));
         self
@@ -275,7 +275,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> GroupBuilder<'a, K, V, S> {
 
     /// Creates the group with the given hasher.
     #[inline]
-    pub fn build_with_hasher(self, hasher: S) -> Group<'a, K, V, S> {
+    pub fn build_with_hasher(self, hasher: S) -> Group<K, V, S> {
         Group {
             group: HashMap::with_capacity_and_hasher(self.capacity, hasher),
             active: None,
@@ -284,7 +284,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> GroupBuilder<'a, K, V, S> {
     }
 }
 
-impl<'a, K: Hash + Eq, V, S: BuildHasher> Debug for GroupBuilder<'a, K, V, S> {
+impl<K: Hash + Eq, V, S: BuildHasher> Debug for GroupBuilder<K, V, S> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("GroupBuilder")
