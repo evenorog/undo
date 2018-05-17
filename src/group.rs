@@ -18,7 +18,11 @@ impl<K: Hash + Eq, V> Group<K, V, RandomState> {
     /// Returns a new group.
     #[inline]
     pub fn new() -> Group<K, V, RandomState> {
-        Default::default()
+        Group {
+            group: HashMap::new(),
+            active: None,
+            signals: None,
+        }
     }
 }
 
@@ -230,11 +234,7 @@ impl<K: Hash + Eq + Display, V: Display> Display for Group<K, V> {
 impl<K: Hash + Eq, V> Default for Group<K, V, RandomState> {
     #[inline]
     fn default() -> Group<K, V, RandomState> {
-        Group {
-            group: HashMap::new(),
-            active: None,
-            signals: None,
-        }
+        Group::new()
     }
 }
 

@@ -170,7 +170,9 @@ impl<R> Record<R> {
     #[inline]
     pub fn set_limit(&mut self, limit: usize) -> usize {
         if limit > 0 && limit < self.len() {
-            unimplemented!();
+            let begin = usize::min(self.cursor, self.len() - limit);
+            self.commands = self.commands.split_off(begin);
+            self.limit = self.len();
         } else {
             self.limit = limit;
         }
@@ -205,9 +207,7 @@ impl<R> Record<R> {
         self.saved = Some(self.cursor);
         if let Some(ref mut f) = self.signals {
             // Check if the receiver went from unsaved to saved.
-            if !was_saved {
-                f(Signal::Saved(true));
-            }
+            if !was_saved { f(Signal::Saved(true)); }
         }
     }
 
@@ -218,9 +218,7 @@ impl<R> Record<R> {
         self.saved = None;
         if let Some(ref mut f) = self.signals {
             // Check if the receiver went from saved to unsaved.
-            if was_saved {
-                f(Signal::Saved(false));
-            }
+            if was_saved { f(Signal::Saved(false)); }
         }
     }
 
@@ -247,21 +245,13 @@ impl<R> Record<R> {
 
         if let Some(ref mut f) = self.signals {
             // Emit signal if the cursor has changed.
-            if old != 0 {
-                f(Signal::Active { old, new: 0 });
-            }
+            if old != 0 { f(Signal::Active { old, new: 0 }); }
             // Record can never undo after being cleared, check if you could undo before.
-            if could_undo {
-                f(Signal::Undo(false));
-            }
+            if could_undo { f(Signal::Undo(false)); }
             // Record can never redo after being cleared, check if you could redo before.
-            if could_redo {
-                f(Signal::Redo(false));
-            }
+            if could_redo { f(Signal::Redo(false)); }
             // Check if the receiver went from unsaved to saved.
-            if !was_saved {
-                f(Signal::Saved(true));
-            }
+            if !was_saved { f(Signal::Saved(true)); }
         }
     }
 
@@ -300,6 +290,7 @@ impl<R> Record<R> {
             self.saved = None;
         }
 
+        // Try to merge commands unless the receiver is in a saved state.
         match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
             (Some(id1), Some(id2)) if id1 == id2 && !was_saved => {
                 // Merge the command with the one on the top of the stack.
@@ -310,7 +301,9 @@ impl<R> Record<R> {
                 self.commands.push_back(Box::new(cmd));
             }
             _ => {
+                // If commands are not merged push it onto the record.
                 if self.limit != 0 && self.limit == self.cursor {
+                    // If limit is reached, pop off the first command.
                     self.commands.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                 } else {
@@ -325,17 +318,11 @@ impl<R> Record<R> {
             // We emit this signal even if the commands might have been merged.
             f(Signal::Active { old, new: self.cursor });
             // Record can never redo after executing a command, check if you could redo before.
-            if could_redo {
-                f(Signal::Redo(false));
-            }
+            if could_redo { f(Signal::Redo(false)); }
             // Record can always undo after executing a command, check if you could not undo before.
-            if !could_undo {
-                f(Signal::Undo(true));
-            }
+            if !could_undo { f(Signal::Undo(true)); }
             // Check if the receiver went from saved to unsaved.
-            if was_saved {
-                f(Signal::Saved(false));
-            }
+            if was_saved { f(Signal::Saved(false)); }
         }
         Ok(iter)
     }
@@ -362,17 +349,11 @@ impl<R> Record<R> {
                 // Cursor has always changed at this point.
                 f(Signal::Active { old, new: self.cursor });
                 // Check if the records ability to redo changed.
-                if old == len {
-                    f(Signal::Redo(true));
-                }
+                if old == len { f(Signal::Redo(true)); }
                 // Check if the records ability to undo changed.
-                if old == 1 {
-                    f(Signal::Undo(false));
-                }
+                if old == 1 { f(Signal::Undo(false)); }
                 // Check if the receiver went from saved to unsaved, or unsaved to saved.
-                if was_saved != is_saved {
-                    f(Signal::Saved(is_saved));
-                }
+                if was_saved != is_saved { f(Signal::Saved(is_saved)); }
             }
         });
         Some(result)
@@ -402,20 +383,64 @@ impl<R> Record<R> {
                 // Cursor has always changed at this point.
                 f(Signal::Active { old, new: self.cursor });
                 // Check if the records ability to redo changed.
-                if old == len - 1 {
-                    f(Signal::Redo(false));
-                }
+                if old == len - 1 { f(Signal::Redo(false)); }
                 // Check if the records ability to undo changed.
-                if old == 0 {
-                    f(Signal::Undo(true));
-                }
+                if old == 0 { f(Signal::Undo(true)); }
                 // Check if the receiver went from saved to unsaved, or unsaved to saved.
-                if was_saved != is_saved {
-                    f(Signal::Saved(is_saved));
-                }
+                if was_saved != is_saved { f(Signal::Saved(is_saved)); }
             }
         });
         Some(result)
+    }
+
+    /// Repeatedly calls [`undo`] or [`redo`] until the command at `index` is reached.
+    /// The signals are emitted once after reaching the `index`.
+    ///
+    /// # Errors
+    /// If an error returns when applying [`undo`] or [`redo`] the error is returned at once.
+    ///
+    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`redo`]: trait.Command.html#method.redo
+    #[inline]
+    pub fn set_command(&mut self, index: usize) -> Option<Result<(), Box<error::Error>>> {
+        if index >= self.len() {
+            return None;
+        }
+
+        let was_saved = self.is_saved();
+        let old = self.cursor;
+        let len = self.len();
+        // Temporarily remove signals so they are not called each iteration.
+        let signals = self.signals.take();
+        // Decide if we need to undo or redo to reach index.
+        let redo = index < self.cursor;
+        let f = if redo { Record::redo } else { Record::undo };
+        while self.cursor != index {
+            if let Err(e) = f(self)? {
+                return Some(Err(e));
+            }
+        }
+        // Add signals back.
+        self.signals = signals;
+        let is_saved = self.is_saved();
+        if let Some(ref mut f) = self.signals {
+            // Emit signal if the cursor has changed.
+            if old != self.cursor { f(Signal::Active { old, new: self.cursor }); }
+            // Check if the receiver went from saved to unsaved, or unsaved to saved.
+            if was_saved != is_saved { f(Signal::Saved(is_saved)); }
+            if redo {
+                // Check if the records ability to redo changed.
+                if old == len - 1 { f(Signal::Redo(false)); }
+                // Check if the records ability to undo changed.
+                if old == 0 { f(Signal::Undo(true)); }
+            } else {
+                // Check if the records ability to redo changed.
+                if old == len { f(Signal::Redo(true)); }
+                // Check if the records ability to undo changed.
+                if old == 1 { f(Signal::Undo(false)); }
+            }
+        }
+        Some(Ok(()))
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
@@ -458,16 +483,16 @@ impl<R> Record<R> {
 
     /// Returns an iterator over the commands.
     #[inline]
-    pub fn commands(&self) -> impl Iterator<Item = &Command<R>> {
+    pub fn commands(&self) -> impl Iterator<Item=&Command<R>> {
         self.commands.iter().map(|cmd| &**cmd)
     }
 
     /// Returns an iterator over the commands of type `C`.
     #[inline]
-    pub fn commands_of<C>(&self) -> impl Iterator<Item = &C>
+    pub fn commands_of<C>(&self) -> impl Iterator<Item=&C>
         where
             C: Command<R> + 'static,
-            R: 'static ,
+            R: 'static,
     {
         self.commands.iter().filter_map(|cmd| {
             let cmd = cmd as &Any;
