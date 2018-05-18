@@ -55,7 +55,7 @@ impl<R, C: Command<R> + 'static> Debug for Merger<R, C> {
 }
 
 #[cfg(feature = "display")]
-impl<R, C: Command<R> + 'static> Display for Merger<R, C> {
+impl<R, C: Command<R> + 'static> fmt::Display for Merger<R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{cmd}", cmd = self.cmd)
