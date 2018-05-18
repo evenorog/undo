@@ -185,7 +185,7 @@ impl<R> Record<R> {
         where
             F: FnMut(Signal) + Send + Sync + 'static,
     {
-        self.signals = Some(Box::new(f) as _);
+        self.signals = Some(Box::new(f));
     }
 
     /// Returns `true` if the record can undo.
@@ -267,13 +267,14 @@ impl<R> Record<R> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     /// [`id`]: trait.Command.html#method.id
     #[inline]
-    pub fn apply<C>(&mut self, mut cmd: C) -> Result<impl Iterator<Item=Box<Command<R> + 'static>>, Error<R>>
+    pub fn apply<C>(&mut self, cmd: C) -> Result<impl Iterator<Item=Box<Command<R> + 'static>>, Error<R>>
         where
             C: Command<R> + 'static,
             R: 'static,
     {
+        let mut cmd = Box::new(cmd);
         if let Err(e) = cmd.apply(&mut self.receiver) {
-            return Err(Error(Box::new(cmd), e));
+            return Err(Error(cmd, e));
         }
 
         let old = self.cursor;
@@ -294,11 +295,11 @@ impl<R> Record<R> {
         match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
             (Some(id1), Some(id2)) if id1 == id2 && !was_saved => {
                 // Merge the command with the one on the top of the stack.
-                let cmd = Merged {
+                let merged = Merged {
                     cmd1: self.commands.pop_back().unwrap(),
-                    cmd2: Box::new(cmd),
+                    cmd2: cmd,
                 };
-                self.commands.push_back(Box::new(cmd));
+                self.commands.push_back(Box::new(merged));
             }
             _ => {
                 // If commands are not merged push it onto the record.
@@ -309,7 +310,7 @@ impl<R> Record<R> {
                 } else {
                     self.cursor += 1;
                 }
-                self.commands.push_back(Box::new(cmd));
+                self.commands.push_back(cmd);
             }
         }
 
