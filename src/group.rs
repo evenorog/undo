@@ -181,6 +181,14 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
         self.get_mut().and_then(|record| record.redo())
     }
 
+    /// Calls the [`set_command`] method on the active record.
+    ///
+    /// [`set_command`]: record/struct.Record.html#method.set_command
+    #[inline]
+    pub fn set_command(&mut self, index: usize) -> Option<Result<(), Box<error::Error>>> {
+        self.get_mut().and_then(|record| record.set_command(index))
+    }
+
     /// Calls the [`to_undo_string`] method on the active record.
     ///
     /// [`to_undo_string`]: record/struct.Record.html#method.to_undo_string
