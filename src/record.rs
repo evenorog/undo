@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::collections::vec_deque::VecDeque;
 use std::error;
 use std::fmt::{self, Debug, Formatter};
@@ -486,19 +485,6 @@ impl<R> Record<R> {
     #[inline]
     pub fn commands(&self) -> impl Iterator<Item=&Command<R>> {
         self.commands.iter().map(|cmd| &**cmd)
-    }
-
-    /// Returns an iterator over the commands of type `C`.
-    #[inline]
-    pub fn commands_of<C>(&self) -> impl Iterator<Item=&C>
-        where
-            C: Command<R> + 'static,
-            R: 'static,
-    {
-        self.commands.iter().filter_map(|cmd| {
-            let cmd = cmd as &Any;
-            cmd.downcast_ref::<C>()
-        })
     }
 }
 
