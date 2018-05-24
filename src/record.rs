@@ -169,6 +169,7 @@ impl<R> Record<R> {
     #[inline]
     pub fn set_limit(&mut self, limit: usize) -> usize {
         if limit > 0 && limit < self.len() {
+            let old = self.cursor;
             let could_undo = self.can_undo();
             let was_saved = self.is_saved();
 
@@ -182,10 +183,13 @@ impl<R> Record<R> {
                 self.saved = None;
             }
 
-            let is_saved = self.is_saved();
+            let new = self.cursor;
             let can_undo = self.can_undo();
+            let is_saved = self.is_saved();
             if let Some(ref mut f) = self.signals {
-                // We can never undo after this, check if we could before.
+                // Emit signal if the cursor has changed.
+                if old != new { f(Signal::Active { old, new }) }
+                // Check if the records ability to undo changed.
                 if could_undo != can_undo { f(Signal::Undo(can_undo)) }
                 // Check if the receiver went from saved to unsaved.
                 if was_saved != is_saved { f(Signal::Saved(is_saved)) }
