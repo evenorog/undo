@@ -148,7 +148,7 @@ impl<R> Debug for Error<R> {
 impl<R> Display for Error<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{error}", error = self.1)
+        (&self.1 as &Display).fmt(f)
     }
 }
 
