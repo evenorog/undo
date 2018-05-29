@@ -748,6 +748,7 @@ mod tests {
         record.set_limit(3);
         assert_eq!(record.cursor, 3);
         assert_eq!(record.limit(), 3);
+        assert_eq!(record.len(), 3);
         assert!(record.can_undo());
         assert!(!record.can_redo());
 
@@ -765,6 +766,7 @@ mod tests {
         record.set_limit(2);
         assert_eq!(record.cursor, 0);
         assert_eq!(record.limit(), 3);
+        assert_eq!(record.len(), 3);
         assert!(!record.can_undo());
         assert!(record.can_redo());
 
@@ -788,6 +790,7 @@ mod tests {
         record.set_limit(2);
         assert_eq!(record.cursor, 0);
         assert_eq!(record.limit(), 5);
+        assert_eq!(record.len(), 5);
         assert!(!record.can_undo());
         assert!(record.can_redo());
 
