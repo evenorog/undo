@@ -250,9 +250,6 @@ impl<R> Record<R> {
     }
 
     /// Removes all commands from the record without undoing them.
-    ///
-    /// This resets the record back to its initial state and emits the appropriate signals,
-    /// while leaving the receiver unmodified.
     #[inline]
     pub fn clear(&mut self) {
         let old = self.cursor;
@@ -508,12 +505,6 @@ impl<R> Record<R> {
     #[inline]
     pub fn into_receiver(self) -> R {
         self.receiver
-    }
-
-    /// Returns an iterator over the commands.
-    #[inline]
-    pub fn commands(&self) -> impl Iterator<Item=&Command<R>> {
-        self.commands.iter().map(|cmd| &**cmd)
     }
 }
 
@@ -839,5 +830,54 @@ mod tests {
         assert_eq!(record.as_receiver(), "abcde");
         assert!(record.set_command(6).is_none());
         assert_eq!(record.command(), 5);
+    }
+
+    #[test]
+    fn signals() {
+        use std::sync::{Arc, atomic::{AtomicBool, AtomicUsize, Ordering}};
+
+        let mut record = Record::default();
+        let undo = Arc::new(AtomicBool::new(false));
+        let redo = Arc::new(AtomicBool::new(false));
+        let saved = Arc::new(AtomicBool::new(false));
+        let command = Arc::new(AtomicUsize::new(0));
+        {
+            let undo = undo.clone();
+            let redo = redo.clone();
+            let saved = saved.clone();
+            let command = command.clone();
+            record.set_signals(move |signal| {
+                match signal {
+                    Signal::Undo(x) => undo.store(x, Ordering::Relaxed),
+                    Signal::Redo(x) => redo.store(x, Ordering::Relaxed),
+                    Signal::Saved(x) => saved.store(x, Ordering::Relaxed),
+                    Signal::Command { new, .. } => command.store(new, Ordering::Relaxed),
+                }
+            });
+        }
+
+        record.apply(Add('a')).unwrap();
+        assert_eq!(undo.load(Ordering::Relaxed), true);
+        assert_eq!(redo.load(Ordering::Relaxed), false);
+        assert_eq!(saved.load(Ordering::Relaxed), false);
+        assert_eq!(command.load(Ordering::Relaxed), 1);
+
+        record.undo().unwrap().unwrap();
+        assert_eq!(undo.load(Ordering::Relaxed), false);
+        assert_eq!(redo.load(Ordering::Relaxed), true);
+        assert_eq!(saved.load(Ordering::Relaxed), true);
+        assert_eq!(command.load(Ordering::Relaxed), 0);
+
+        record.redo().unwrap().unwrap();
+        assert_eq!(undo.load(Ordering::Relaxed), true);
+        assert_eq!(redo.load(Ordering::Relaxed), false);
+        assert_eq!(saved.load(Ordering::Relaxed), false);
+        assert_eq!(command.load(Ordering::Relaxed), 1);
+
+        record.clear();
+        assert_eq!(undo.load(Ordering::Relaxed), false);
+        assert_eq!(redo.load(Ordering::Relaxed), false);
+        assert_eq!(saved.load(Ordering::Relaxed), true);
+        assert_eq!(command.load(Ordering::Relaxed), 0);
     }
 }
