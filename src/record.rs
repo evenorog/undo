@@ -28,14 +28,14 @@ pub enum Signal {
     ///
     /// This signal will be emitted when the record enters or leaves its receivers saved state.
     Saved(bool),
-    /// Says if the active command has changed.
+    /// Says if the current command has changed.
     ///
-    /// This signal will be emitted when the records active command has changed. This includes
+    /// This signal will be emitted when the records current command has changed. This includes
     /// when two commands have been merged, in which case `old == new`.
-    Active {
-        /// The `index + 1` of the old active command.
+    Command {
+        /// The position of the old command.
         old: usize,
-        /// The `index + 1` of the new active command.
+        /// The position of the new command.
         new: usize,
     },
 }
@@ -188,7 +188,7 @@ impl<R> Record<R> {
             let is_saved = self.is_saved();
             if let Some(ref mut f) = self.signals {
                 // Emit signal if the cursor has changed.
-                if old != new { f(Signal::Active { old, new }) }
+                if old != new { f(Signal::Command { old, new }) }
                 // Check if the records ability to undo changed.
                 if could_undo != can_undo { f(Signal::Undo(can_undo)) }
                 // Check if the receiver went from saved to unsaved.
@@ -255,18 +255,18 @@ impl<R> Record<R> {
     /// while leaving the receiver unmodified.
     #[inline]
     pub fn clear(&mut self) {
+        let old = self.cursor;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
 
-        let old = self.cursor;
         self.commands.clear();
         self.cursor = 0;
         self.saved = Some(0);
 
         if let Some(ref mut f) = self.signals {
             // Emit signal if the cursor has changed.
-            if old != 0 { f(Signal::Active { old, new: 0 }); }
+            if old != 0 { f(Signal::Command { old, new: 0 }); }
             // Record can never undo after being cleared, check if you could undo before.
             if could_undo { f(Signal::Undo(false)); }
             // Record can never redo after being cleared, check if you could redo before.
@@ -338,7 +338,7 @@ impl<R> Record<R> {
         debug_assert_eq!(self.cursor, self.len());
         if let Some(ref mut f) = self.signals {
             // We emit this signal even if the commands might have been merged.
-            f(Signal::Active { old, new: self.cursor });
+            f(Signal::Command { old, new: self.cursor });
             // Record can never redo after executing a command, check if you could redo before.
             if could_redo { f(Signal::Redo(false)); }
             // Record can always undo after executing a command, check if you could not undo before.
@@ -369,7 +369,7 @@ impl<R> Record<R> {
             let is_saved = self.is_saved();
             if let Some(ref mut f) = self.signals {
                 // Cursor has always changed at this point.
-                f(Signal::Active { old, new: self.cursor });
+                f(Signal::Command { old, new: self.cursor });
                 // Check if the records ability to redo changed.
                 if old == len { f(Signal::Redo(true)); }
                 // Check if the records ability to undo changed.
@@ -403,7 +403,7 @@ impl<R> Record<R> {
             let is_saved = self.is_saved();
             if let Some(ref mut f) = self.signals {
                 // Cursor has always changed at this point.
-                f(Signal::Active { old, new: self.cursor });
+                f(Signal::Command { old, new: self.cursor });
                 // Check if the records ability to redo changed.
                 if old == len - 1 { f(Signal::Redo(false)); }
                 // Check if the records ability to undo changed.
@@ -413,6 +413,12 @@ impl<R> Record<R> {
             }
         });
         Some(result)
+    }
+
+    /// Returns the position of the current command.
+    #[inline]
+    pub fn command(&self) -> usize {
+        self.cursor
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
@@ -448,7 +454,7 @@ impl<R> Record<R> {
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signals {
             // Emit signal if the cursor has changed.
-            if old != self.cursor { f(Signal::Active { old, new: self.cursor }); }
+            if old != self.cursor { f(Signal::Command { old, new: self.cursor }); }
             // Check if the receiver went from saved to unsaved, or unsaved to saved.
             if was_saved != is_saved { f(Signal::Saved(is_saved)); }
             if redo {
@@ -665,8 +671,8 @@ impl<R> RecordBuilder<R> {
     ///             Signal::Redo(false) => println!("The record can not redo."),
     ///             Signal::Saved(true) => println!("The receiver is in a saved state."),
     ///             Signal::Saved(false) => println!("The receiver is not in a saved state."),
-    ///             Signal::Active { old, new } => {
-    ///                 println!("The active command has changed from {} to {}.", old, new);
+    ///             Signal::Command { old, new } => {
+    ///                 println!("The current command has changed from {} to {}.", old, new);
     ///             }
     ///         }
     ///     })
@@ -747,13 +753,14 @@ mod tests {
         record.apply(Add('e')).unwrap();
 
         record.set_limit(3);
-        assert_eq!(record.cursor, 3);
+        assert_eq!(record.command(), 3);
         assert_eq!(record.limit(), 3);
         assert_eq!(record.len(), 3);
         assert!(record.can_undo());
         assert!(!record.can_redo());
 
-        let mut record = Record::default();
+        record.clear();
+        assert_eq!(record.set_limit(5), 5);
         record.apply(Add('a')).unwrap();
         record.apply(Add('b')).unwrap();
         record.apply(Add('c')).unwrap();
@@ -765,7 +772,7 @@ mod tests {
         record.undo().unwrap().unwrap();
 
         record.set_limit(2);
-        assert_eq!(record.cursor, 0);
+        assert_eq!(record.command(), 0);
         assert_eq!(record.limit(), 3);
         assert_eq!(record.len(), 3);
         assert!(!record.can_undo());
@@ -775,7 +782,8 @@ mod tests {
         record.redo().unwrap().unwrap();
         record.redo().unwrap().unwrap();
 
-        let mut record = Record::default();
+        record.clear();
+        assert_eq!(record.set_limit(5), 5);
         record.apply(Add('a')).unwrap();
         record.apply(Add('b')).unwrap();
         record.apply(Add('c')).unwrap();
@@ -789,7 +797,7 @@ mod tests {
         record.undo().unwrap().unwrap();
 
         record.set_limit(2);
-        assert_eq!(record.cursor, 0);
+        assert_eq!(record.command(), 0);
         assert_eq!(record.limit(), 5);
         assert_eq!(record.len(), 5);
         assert!(!record.can_undo());
@@ -812,17 +820,24 @@ mod tests {
         record.apply(Add('e')).unwrap();
 
         record.set_command(0).unwrap().unwrap();
+        assert_eq!(record.command(), 0);
         assert_eq!(record.as_receiver(), "");
         record.set_command(1).unwrap().unwrap();
+        assert_eq!(record.command(), 1);
         assert_eq!(record.as_receiver(), "a");
         record.set_command(2).unwrap().unwrap();
+        assert_eq!(record.command(), 2);
         assert_eq!(record.as_receiver(), "ab");
         record.set_command(3).unwrap().unwrap();
+        assert_eq!(record.command(), 3);
         assert_eq!(record.as_receiver(), "abc");
         record.set_command(4).unwrap().unwrap();
+        assert_eq!(record.command(), 4);
         assert_eq!(record.as_receiver(), "abcd");
         record.set_command(5).unwrap().unwrap();
+        assert_eq!(record.command(), 5);
         assert_eq!(record.as_receiver(), "abcde");
         assert!(record.set_command(6).is_none());
+        assert_eq!(record.command(), 5);
     }
 }
