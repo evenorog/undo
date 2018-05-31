@@ -415,8 +415,8 @@ impl<R> Record<R> {
         Some(result)
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the command at `index` is reached.
-    /// The signals are emitted once after reaching the `index`.
+    /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
+    /// The signals are emitted once after reaching the `cursor`.
     ///
     /// # Errors
     /// If an error returns when applying [`undo`] or [`redo`] the error is returned at once.
@@ -424,8 +424,8 @@ impl<R> Record<R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn set_command(&mut self, index: usize) -> Option<Result<(), Box<error::Error>>> {
-        if index >= self.len() {
+    pub fn set_command(&mut self, cursor: usize) -> Option<Result<(), Box<error::Error>>> {
+        if cursor > self.len() {
             return None;
         }
 
@@ -434,11 +434,12 @@ impl<R> Record<R> {
         let len = self.len();
         // Temporarily remove signals so they are not called each iteration.
         let signals = self.signals.take();
-        // Decide if we need to undo or redo to reach index.
-        let redo = index < self.cursor;
+        // Decide if we need to undo or redo to reach cursor.
+        let redo = cursor > self.cursor;
         let f = if redo { Record::redo } else { Record::undo };
-        while self.cursor != index {
-            if let Err(e) = f(self)? {
+        while self.cursor != cursor {
+            if let Err(e) = f(self).unwrap() {
+                self.signals = signals;
                 return Some(Err(e));
             }
         }
@@ -799,5 +800,29 @@ mod tests {
         record.redo().unwrap().unwrap();
         record.redo().unwrap().unwrap();
         record.redo().unwrap().unwrap();
+    }
+
+    #[test]
+    fn set_command() {
+        let mut record = Record::default();
+        record.apply(Add('a')).unwrap();
+        record.apply(Add('b')).unwrap();
+        record.apply(Add('c')).unwrap();
+        record.apply(Add('d')).unwrap();
+        record.apply(Add('e')).unwrap();
+
+        record.set_command(0).unwrap().unwrap();
+        assert_eq!(record.as_receiver(), "");
+        record.set_command(1).unwrap().unwrap();
+        assert_eq!(record.as_receiver(), "a");
+        record.set_command(2).unwrap().unwrap();
+        assert_eq!(record.as_receiver(), "ab");
+        record.set_command(3).unwrap().unwrap();
+        assert_eq!(record.as_receiver(), "abc");
+        record.set_command(4).unwrap().unwrap();
+        assert_eq!(record.as_receiver(), "abcd");
+        record.set_command(5).unwrap().unwrap();
+        assert_eq!(record.as_receiver(), "abcde");
+        assert!(record.set_command(6).is_none());
     }
 }
