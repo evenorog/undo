@@ -417,7 +417,7 @@ impl<R> Record<R> {
 
     /// Returns the position of the current command.
     #[inline]
-    pub fn command(&self) -> usize {
+    pub fn cursor(&self) -> usize {
         self.cursor
     }
 
@@ -430,7 +430,7 @@ impl<R> Record<R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn set_command(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
+    pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
         if cursor > self.len() {
             return None;
         }
@@ -444,9 +444,9 @@ impl<R> Record<R> {
         let redo = cursor > self.cursor;
         let f = if redo { Record::redo } else { Record::undo };
         while self.cursor != cursor {
-            if let Err(e) = f(self).unwrap() {
+            if let Err(err) = f(self).unwrap() {
                 self.signals = signals;
-                return Some(Err(e));
+                return Some(Err(err));
             }
         }
         // Add signals back.
@@ -747,7 +747,7 @@ mod tests {
         record.apply(Add('e')).unwrap();
 
         record.set_limit(3);
-        assert_eq!(record.command(), 3);
+        assert_eq!(record.cursor(), 3);
         assert_eq!(record.limit(), 3);
         assert_eq!(record.len(), 3);
         assert!(record.can_undo());
@@ -766,7 +766,7 @@ mod tests {
         record.undo().unwrap().unwrap();
 
         record.set_limit(2);
-        assert_eq!(record.command(), 0);
+        assert_eq!(record.cursor(), 0);
         assert_eq!(record.limit(), 3);
         assert_eq!(record.len(), 3);
         assert!(!record.can_undo());
@@ -791,7 +791,7 @@ mod tests {
         record.undo().unwrap().unwrap();
 
         record.set_limit(2);
-        assert_eq!(record.command(), 0);
+        assert_eq!(record.cursor(), 0);
         assert_eq!(record.limit(), 5);
         assert_eq!(record.len(), 5);
         assert!(!record.can_undo());
@@ -813,26 +813,26 @@ mod tests {
         record.apply(Add('d')).unwrap();
         record.apply(Add('e')).unwrap();
 
-        record.set_command(0).unwrap().unwrap();
-        assert_eq!(record.command(), 0);
+        record.set_cursor(0).unwrap().unwrap();
+        assert_eq!(record.cursor(), 0);
         assert_eq!(record.as_receiver(), "");
-        record.set_command(1).unwrap().unwrap();
-        assert_eq!(record.command(), 1);
+        record.set_cursor(1).unwrap().unwrap();
+        assert_eq!(record.cursor(), 1);
         assert_eq!(record.as_receiver(), "a");
-        record.set_command(2).unwrap().unwrap();
-        assert_eq!(record.command(), 2);
+        record.set_cursor(2).unwrap().unwrap();
+        assert_eq!(record.cursor(), 2);
         assert_eq!(record.as_receiver(), "ab");
-        record.set_command(3).unwrap().unwrap();
-        assert_eq!(record.command(), 3);
+        record.set_cursor(3).unwrap().unwrap();
+        assert_eq!(record.cursor(), 3);
         assert_eq!(record.as_receiver(), "abc");
-        record.set_command(4).unwrap().unwrap();
-        assert_eq!(record.command(), 4);
+        record.set_cursor(4).unwrap().unwrap();
+        assert_eq!(record.cursor(), 4);
         assert_eq!(record.as_receiver(), "abcd");
-        record.set_command(5).unwrap().unwrap();
-        assert_eq!(record.command(), 5);
+        record.set_cursor(5).unwrap().unwrap();
+        assert_eq!(record.cursor(), 5);
         assert_eq!(record.as_receiver(), "abcde");
-        assert!(record.set_command(6).is_none());
-        assert_eq!(record.command(), 5);
+        assert!(record.set_cursor(6).is_none());
+        assert_eq!(record.cursor(), 5);
     }
 
     #[test]

@@ -180,12 +180,20 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
         self.get_mut().and_then(|record| record.redo())
     }
 
-    /// Calls the [`set_command`] method on the active record.
+    /// Calls the [`cursor`] method on the active record.
     ///
-    /// [`set_command`]: record/struct.Record.html#method.set_command
+    /// [`cursor`]: record/struct.Record.html#method.cursor
     #[inline]
-    pub fn set_command(&mut self, index: usize) -> Option<Result<(), Error<R>>> {
-        self.get_mut().and_then(|record| record.set_command(index))
+    pub fn cursor(&self) -> Option<usize> {
+        self.get().map(|record| record.cursor())
+    }
+
+    /// Calls the [`set_cursor`] method on the active record.
+    ///
+    /// [`set_cursor`]: record/struct.Record.html#method.set_cursor
+    #[inline]
+    pub fn set_cursor(&mut self, index: usize) -> Option<Result<(), Error<R>>> {
+        self.get_mut().and_then(|record| record.set_cursor(index))
     }
 
     /// Calls the [`to_undo_string`] method on the active record.
