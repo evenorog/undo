@@ -1,5 +1,4 @@
 use std::collections::hash_map::{HashMap, RandomState};
-use std::error;
 use std::fmt::{self, Debug, Formatter};
 #[cfg(feature = "display")]
 use std::fmt::Display;
@@ -169,7 +168,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     ///
     /// [`undo`]: record/struct.Record.html#method.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
+    pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
         self.get_mut().and_then(|record| record.undo())
     }
 
@@ -177,7 +176,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     ///
     /// [`redo`]: record/struct.Record.html#method.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
+    pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         self.get_mut().and_then(|record| record.redo())
     }
 
@@ -185,7 +184,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     ///
     /// [`set_command`]: record/struct.Record.html#method.set_command
     #[inline]
-    pub fn set_command(&mut self, index: usize) -> Option<Result<(), Box<error::Error>>> {
+    pub fn set_command(&mut self, index: usize) -> Option<Result<(), Error<R>>> {
         self.get_mut().and_then(|record| record.set_command(index))
     }
 

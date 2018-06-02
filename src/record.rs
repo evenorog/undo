@@ -1,5 +1,4 @@
 use std::collections::vec_deque::VecDeque;
-use std::error;
 use std::fmt::{self, Debug, Formatter};
 #[cfg(feature = "display")]
 use std::fmt::Display;
@@ -279,8 +278,7 @@ impl<R> Record<R> {
     /// All commands above the active one are removed from the stack and returned as an iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned together with the command,
-    /// and the state of the stack is left unchanged.
+    /// If an error occur when executing [`apply`] the error is returned together with the command.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     /// [`id`]: trait.Command.html#method.id
@@ -291,8 +289,8 @@ impl<R> Record<R> {
             R: 'static,
     {
         let mut cmd = Box::new(cmd);
-        if let Err(e) = cmd.apply(&mut self.receiver) {
-            return Err(Error(cmd, e));
+        if let Err(err) = cmd.apply(&mut self.receiver) {
+            return Err(Error(cmd, err));
         }
 
         let old = self.cursor;
@@ -349,67 +347,72 @@ impl<R> Record<R> {
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned and the state is left unchanged.
+    /// If an error occur when executing [`undo`] the error is returned together with the command.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    pub fn undo(&mut self) -> Option<Result<(), Box<error::Error>>> {
+    pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
         if !self.can_undo() {
             return None;
         }
 
-        let result = self.commands[self.cursor - 1].undo(&mut self.receiver).map(|_| {
-            let was_saved = self.is_saved();
-            let old = self.cursor;
-            self.cursor -= 1;
-            let len = self.len();
-            let is_saved = self.is_saved();
-            if let Some(ref mut f) = self.signals {
-                // Cursor has always changed at this point.
-                f(Signal::Command { old, new: self.cursor });
-                // Check if the records ability to redo changed.
-                if old == len { f(Signal::Redo(true)); }
-                // Check if the records ability to undo changed.
-                if old == 1 { f(Signal::Undo(false)); }
-                // Check if the receiver went from saved to unsaved, or unsaved to saved.
-                if was_saved != is_saved { f(Signal::Saved(is_saved)); }
-            }
-        });
-        Some(result)
+        if let Err(err) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
+            let cmd = self.commands.remove(self.cursor - 1).unwrap();
+            return Some(Err(Error(cmd, err)));
+        }
+
+        let was_saved = self.is_saved();
+        let old = self.cursor;
+        self.cursor -= 1;
+        let len = self.len();
+        let is_saved = self.is_saved();
+        if let Some(ref mut f) = self.signals {
+            // Cursor has always changed at this point.
+            f(Signal::Command { old, new: self.cursor });
+            // Check if the records ability to redo changed.
+            if old == len { f(Signal::Redo(true)); }
+            // Check if the records ability to undo changed.
+            if old == 1 { f(Signal::Undo(false)); }
+            // Check if the receiver went from saved to unsaved, or unsaved to saved.
+            if was_saved != is_saved { f(Signal::Saved(is_saved)); }
+        }
+        Some(Ok(()))
     }
 
     /// Calls the [`redo`] method for the active command and sets the next one as the
     /// new active one.
     ///
     /// # Errors
-    /// If an error occur when applying [`redo`] the
-    /// error is returned and the state is left unchanged.
+    /// If an error occur when executing [`redo`] the error is returned together with the command.
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn redo(&mut self) -> Option<Result<(), Box<error::Error>>> {
+    pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         if !self.can_redo() {
             return None;
         }
 
-        let result = self.commands[self.cursor].redo(&mut self.receiver).map(|_| {
-            let was_saved = self.is_saved();
-            let old = self.cursor;
-            self.cursor += 1;
-            let len = self.len();
-            let is_saved = self.is_saved();
-            if let Some(ref mut f) = self.signals {
-                // Cursor has always changed at this point.
-                f(Signal::Command { old, new: self.cursor });
-                // Check if the records ability to redo changed.
-                if old == len - 1 { f(Signal::Redo(false)); }
-                // Check if the records ability to undo changed.
-                if old == 0 { f(Signal::Undo(true)); }
-                // Check if the receiver went from saved to unsaved, or unsaved to saved.
-                if was_saved != is_saved { f(Signal::Saved(is_saved)); }
-            }
-        });
-        Some(result)
+        if let Err(err) = self.commands[self.cursor].redo(&mut self.receiver) {
+            let cmd = self.commands.remove(self.cursor).unwrap();
+            return Some(Err(Error(cmd, err)));
+        }
+
+        let was_saved = self.is_saved();
+        let old = self.cursor;
+        self.cursor += 1;
+        let len = self.len();
+        let is_saved = self.is_saved();
+        if let Some(ref mut f) = self.signals {
+            // Cursor has always changed at this point.
+            f(Signal::Command { old, new: self.cursor });
+            // Check if the records ability to redo changed.
+            if old == len - 1 { f(Signal::Redo(false)); }
+            // Check if the records ability to undo changed.
+            if old == 0 { f(Signal::Undo(true)); }
+            // Check if the receiver went from saved to unsaved, or unsaved to saved.
+            if was_saved != is_saved { f(Signal::Saved(is_saved)); }
+        }
+        Some(Ok(()))
     }
 
     /// Returns the position of the current command.
@@ -422,12 +425,12 @@ impl<R> Record<R> {
     /// The signals are emitted once after reaching the `cursor`.
     ///
     /// # Errors
-    /// If an error returns when applying [`undo`] or [`redo`] the error is returned at once.
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn set_command(&mut self, cursor: usize) -> Option<Result<(), Box<error::Error>>> {
+    pub fn set_command(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
         if cursor > self.len() {
             return None;
         }
