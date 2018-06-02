@@ -29,9 +29,9 @@ pub enum Signal {
     Saved(bool),
     /// Says if the current command has changed.
     ///
-    /// This signal will be emitted when the records current command has changed. This includes
+    /// This signal will be emitted when the records cursor has changed. This includes
     /// when two commands have been merged, in which case `old == new`.
-    Command {
+    Cursor {
         /// The position of the old command.
         old: usize,
         /// The position of the new command.
@@ -187,7 +187,7 @@ impl<R> Record<R> {
             let is_saved = self.is_saved();
             if let Some(ref mut f) = self.signals {
                 // Emit signal if the cursor has changed.
-                if old != new { f(Signal::Command { old, new }) }
+                if old != new { f(Signal::Cursor { old, new }) }
                 // Check if the records ability to undo changed.
                 if could_undo != can_undo { f(Signal::Undo(can_undo)) }
                 // Check if the receiver went from saved to unsaved.
@@ -262,7 +262,7 @@ impl<R> Record<R> {
 
         if let Some(ref mut f) = self.signals {
             // Emit signal if the cursor has changed.
-            if old != 0 { f(Signal::Command { old, new: 0 }); }
+            if old != 0 { f(Signal::Cursor { old, new: 0 }); }
             // Record can never undo after being cleared, check if you could undo before.
             if could_undo { f(Signal::Undo(false)); }
             // Record can never redo after being cleared, check if you could redo before.
@@ -333,7 +333,7 @@ impl<R> Record<R> {
         debug_assert_eq!(self.cursor, self.len());
         if let Some(ref mut f) = self.signals {
             // We emit this signal even if the commands might have been merged.
-            f(Signal::Command { old, new: self.cursor });
+            f(Signal::Cursor { old, new: self.cursor });
             // Record can never redo after executing a command, check if you could redo before.
             if could_redo { f(Signal::Redo(false)); }
             // Record can always undo after executing a command, check if you could not undo before.
@@ -368,7 +368,7 @@ impl<R> Record<R> {
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signals {
             // Cursor has always changed at this point.
-            f(Signal::Command { old, new: self.cursor });
+            f(Signal::Cursor { old, new: self.cursor });
             // Check if the records ability to redo changed.
             if old == len { f(Signal::Redo(true)); }
             // Check if the records ability to undo changed.
@@ -404,7 +404,7 @@ impl<R> Record<R> {
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signals {
             // Cursor has always changed at this point.
-            f(Signal::Command { old, new: self.cursor });
+            f(Signal::Cursor { old, new: self.cursor });
             // Check if the records ability to redo changed.
             if old == len - 1 { f(Signal::Redo(false)); }
             // Check if the records ability to undo changed.
@@ -454,7 +454,7 @@ impl<R> Record<R> {
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signals {
             // Emit signal if the cursor has changed.
-            if old != self.cursor { f(Signal::Command { old, new: self.cursor }); }
+            if old != self.cursor { f(Signal::Cursor { old, new: self.cursor }); }
             // Check if the receiver went from saved to unsaved, or unsaved to saved.
             if was_saved != is_saved { f(Signal::Saved(is_saved)); }
             if redo {
@@ -665,7 +665,7 @@ impl<R> RecordBuilder<R> {
     ///             Signal::Redo(false) => println!("The record can not redo."),
     ///             Signal::Saved(true) => println!("The receiver is in a saved state."),
     ///             Signal::Saved(false) => println!("The receiver is not in a saved state."),
-    ///             Signal::Command { old, new } => {
+    ///             Signal::Cursor { old, new } => {
     ///                 println!("The current command has changed from {} to {}.", old, new);
     ///             }
     ///         }
@@ -854,7 +854,7 @@ mod tests {
                     Signal::Undo(x) => undo.store(x, Ordering::Relaxed),
                     Signal::Redo(x) => redo.store(x, Ordering::Relaxed),
                     Signal::Saved(x) => saved.store(x, Ordering::Relaxed),
-                    Signal::Command { new, .. } => command.store(new, Ordering::Relaxed),
+                    Signal::Cursor { new, .. } => command.store(new, Ordering::Relaxed),
                 }
             });
         }
