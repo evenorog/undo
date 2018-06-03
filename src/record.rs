@@ -843,18 +843,18 @@ mod tests {
         let undo = Arc::new(AtomicBool::new(false));
         let redo = Arc::new(AtomicBool::new(false));
         let saved = Arc::new(AtomicBool::new(false));
-        let command = Arc::new(AtomicUsize::new(0));
+        let cursor = Arc::new(AtomicUsize::new(0));
         {
             let undo = undo.clone();
             let redo = redo.clone();
             let saved = saved.clone();
-            let command = command.clone();
+            let cursor = cursor.clone();
             record.set_signals(move |signal| {
                 match signal {
                     Signal::Undo(x) => undo.store(x, Ordering::Relaxed),
                     Signal::Redo(x) => redo.store(x, Ordering::Relaxed),
                     Signal::Saved(x) => saved.store(x, Ordering::Relaxed),
-                    Signal::Cursor { new, .. } => command.store(new, Ordering::Relaxed),
+                    Signal::Cursor { new, .. } => cursor.store(new, Ordering::Relaxed),
                 }
             });
         }
@@ -863,24 +863,24 @@ mod tests {
         assert_eq!(undo.load(Ordering::Relaxed), true);
         assert_eq!(redo.load(Ordering::Relaxed), false);
         assert_eq!(saved.load(Ordering::Relaxed), false);
-        assert_eq!(command.load(Ordering::Relaxed), 1);
+        assert_eq!(cursor.load(Ordering::Relaxed), 1);
 
         record.undo().unwrap().unwrap();
         assert_eq!(undo.load(Ordering::Relaxed), false);
         assert_eq!(redo.load(Ordering::Relaxed), true);
         assert_eq!(saved.load(Ordering::Relaxed), true);
-        assert_eq!(command.load(Ordering::Relaxed), 0);
+        assert_eq!(cursor.load(Ordering::Relaxed), 0);
 
         record.redo().unwrap().unwrap();
         assert_eq!(undo.load(Ordering::Relaxed), true);
         assert_eq!(redo.load(Ordering::Relaxed), false);
         assert_eq!(saved.load(Ordering::Relaxed), false);
-        assert_eq!(command.load(Ordering::Relaxed), 1);
+        assert_eq!(cursor.load(Ordering::Relaxed), 1);
 
         record.clear();
         assert_eq!(undo.load(Ordering::Relaxed), false);
         assert_eq!(redo.load(Ordering::Relaxed), false);
         assert_eq!(saved.load(Ordering::Relaxed), true);
-        assert_eq!(command.load(Ordering::Relaxed), 0);
+        assert_eq!(cursor.load(Ordering::Relaxed), 0);
     }
 }
