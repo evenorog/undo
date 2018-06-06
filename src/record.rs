@@ -504,6 +504,14 @@ impl<R> Record<R> {
         &self.receiver
     }
 
+    /// Returns a mutable reference to the `receiver`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_receiver(&mut self) -> &mut R {
+        &mut self.receiver
+    }
+
     /// Consumes the record, returning the `receiver`.
     #[inline]
     pub fn into_receiver(self) -> R {
@@ -522,6 +530,13 @@ impl<R> AsRef<R> for Record<R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.as_receiver()
+    }
+}
+
+impl<R> AsMut<R> for Record<R> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut R {
+        self.as_mut_receiver()
     }
 }
 
