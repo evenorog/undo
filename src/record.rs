@@ -220,25 +220,22 @@ impl<R> Record<R> {
         self.cursor < self.len()
     }
 
-    /// Marks the receiver as currently being in a saved state.
+    /// Marks the receiver as currently being in a saved or unsaved state.
     #[inline]
-    pub fn set_saved(&mut self) {
+    pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
-        self.saved = Some(self.cursor);
-        if let Some(ref mut f) = self.signals {
-            // Check if the receiver went from unsaved to saved.
-            if !was_saved { f(Signal::Saved(true)); }
-        }
-    }
-
-    /// Marks the receiver as no longer being in a saved state.
-    #[inline]
-    pub fn set_unsaved(&mut self) {
-        let was_saved = self.is_saved();
-        self.saved = None;
-        if let Some(ref mut f) = self.signals {
-            // Check if the receiver went from saved to unsaved.
-            if was_saved { f(Signal::Saved(false)); }
+        if saved {
+            self.saved = Some(self.cursor);
+            if let Some(ref mut f) = self.signals {
+                // Check if the receiver went from unsaved to saved.
+                if !was_saved { f(Signal::Saved(true)); }
+            }
+        } else {
+            self.saved = None;
+            if let Some(ref mut f) = self.signals {
+                // Check if the receiver went from saved to unsaved.
+                if was_saved { f(Signal::Saved(false)); }
+            }
         }
     }
 

@@ -132,16 +132,8 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     ///
     /// [`set_saved`]: record/struct.Record.html#method.set_saved
     #[inline]
-    pub fn set_saved(&mut self) {
-        self.get_mut().map(|record| record.set_saved());
-    }
-
-    /// Calls the [`set_unsaved`] method on the active record.
-    ///
-    /// [`set_unsaved`]: record/struct.Record.html#method.set_unsaved
-    #[inline]
-    pub fn set_unsaved(&mut self) {
-        self.get_mut().map(|record| record.set_unsaved());
+    pub fn set_saved(&mut self, saved: bool) {
+        self.get_mut().map(|record| record.set_saved(saved));
     }
 
     /// Calls the [`is_saved`] method on the active record.
