@@ -105,7 +105,7 @@ pub struct Record<R> {
 impl<R> Record<R> {
     /// Returns a new record.
     #[inline]
-    pub fn new<T: Into<R>>(receiver: T) -> Record<R> {
+    pub fn new(receiver: impl Into<R>) -> Record<R> {
         Record {
             commands: VecDeque::new(),
             receiver: receiver.into(),
@@ -243,6 +243,63 @@ impl<R> Record<R> {
     #[inline]
     pub fn is_saved(&self) -> bool {
         self.saved.map_or(false, |saved| saved == self.cursor)
+    }
+
+    /// Returns the position of the current command.
+    #[inline]
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
+
+    /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
+    /// The signals are emitted once after reaching the `cursor`.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
+    ///
+    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`redo`]: trait.Command.html#method.redo
+    #[inline]
+    pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
+        if cursor > self.len() {
+            return None;
+        }
+
+        let was_saved = self.is_saved();
+        let old = self.cursor;
+        let len = self.len();
+        // Temporarily remove signals so they are not called each iteration.
+        let signals = self.signals.take();
+        // Decide if we need to undo or redo to reach cursor.
+        let redo = cursor > self.cursor;
+        let f = if redo { Record::redo } else { Record::undo };
+        while self.cursor != cursor {
+            if let Err(err) = f(self).unwrap() {
+                self.signals = signals;
+                return Some(Err(err));
+            }
+        }
+        // Add signals back.
+        self.signals = signals;
+        let is_saved = self.is_saved();
+        if let Some(ref mut f) = self.signals {
+            // Emit signal if the cursor has changed.
+            if old != self.cursor { f(Signal::Cursor { old, new: self.cursor }); }
+            // Check if the receiver went from saved to unsaved, or unsaved to saved.
+            if was_saved != is_saved { f(Signal::Saved(is_saved)); }
+            if redo {
+                // Check if the records ability to redo changed.
+                if old == len - 1 { f(Signal::Redo(false)); }
+                // Check if the records ability to undo changed.
+                if old == 0 { f(Signal::Undo(true)); }
+            } else {
+                // Check if the records ability to redo changed.
+                if old == len { f(Signal::Redo(true)); }
+                // Check if the records ability to undo changed.
+                if old == 1 { f(Signal::Undo(false)); }
+            }
+        }
+        Some(Ok(()))
     }
 
     /// Removes all commands from the record without undoing them.
@@ -408,63 +465,6 @@ impl<R> Record<R> {
             if old == 0 { f(Signal::Undo(true)); }
             // Check if the receiver went from saved to unsaved, or unsaved to saved.
             if was_saved != is_saved { f(Signal::Saved(is_saved)); }
-        }
-        Some(Ok(()))
-    }
-
-    /// Returns the position of the current command.
-    #[inline]
-    pub fn cursor(&self) -> usize {
-        self.cursor
-    }
-
-    /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
-    /// The signals are emitted once after reaching the `cursor`.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
-    ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
-    /// [`redo`]: trait.Command.html#method.redo
-    #[inline]
-    pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
-        if cursor > self.len() {
-            return None;
-        }
-
-        let was_saved = self.is_saved();
-        let old = self.cursor;
-        let len = self.len();
-        // Temporarily remove signals so they are not called each iteration.
-        let signals = self.signals.take();
-        // Decide if we need to undo or redo to reach cursor.
-        let redo = cursor > self.cursor;
-        let f = if redo { Record::redo } else { Record::undo };
-        while self.cursor != cursor {
-            if let Err(err) = f(self).unwrap() {
-                self.signals = signals;
-                return Some(Err(err));
-            }
-        }
-        // Add signals back.
-        self.signals = signals;
-        let is_saved = self.is_saved();
-        if let Some(ref mut f) = self.signals {
-            // Emit signal if the cursor has changed.
-            if old != self.cursor { f(Signal::Cursor { old, new: self.cursor }); }
-            // Check if the receiver went from saved to unsaved, or unsaved to saved.
-            if was_saved != is_saved { f(Signal::Saved(is_saved)); }
-            if redo {
-                // Check if the records ability to redo changed.
-                if old == len - 1 { f(Signal::Redo(false)); }
-                // Check if the records ability to undo changed.
-                if old == 0 { f(Signal::Undo(true)); }
-            } else {
-                // Check if the records ability to redo changed.
-                if old == len { f(Signal::Redo(true)); }
-                // Check if the records ability to undo changed.
-                if old == 1 { f(Signal::Undo(false)); }
-            }
         }
         Some(Ok(()))
     }
@@ -698,7 +698,7 @@ impl<R> RecordBuilder<R> {
 
     /// Creates the record.
     #[inline]
-    pub fn build<T: Into<R>>(self, receiver: T) -> Record<R> {
+    pub fn build(self, receiver: impl Into<R>) -> Record<R> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: receiver.into(),
