@@ -3,9 +3,7 @@
 use std::collections::vec_deque::IntoIter;
 use {Command, Error, Record};
 
-/// A [history tree] of commands.
-///
-/// [history tree]: https://www.emacswiki.org/emacs/UndoTree
+/// A history of commands.
 #[derive(Debug, Default)]
 pub struct History<R> {
     record: Record<R>,
@@ -15,14 +13,11 @@ pub struct History<R> {
 impl<R> History<R> {
     /// Returns a new history.
     #[inline]
-    pub fn new(receiver: impl Into<R>) -> History<R> {
-        History {
-            record: Record::new(receiver),
-            branch: Vec::new(),
-        }
+    pub fn new(_: impl Into<R>) -> History<R> {
+        unimplemented!()
     }
 
-    /// Pushes the command to the top of the history tree and executes its [`apply`] method.
+    /// Pushes the command to the top of the history and executes its [`apply`] method.
     /// The command is merged with the previous top command if they have the same [`id`].
     ///
     /// # Errors
@@ -59,40 +54,6 @@ impl<R> History<R> {
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         unimplemented!()
-    }
-
-    /// Returns a reference to the `receiver`.
-    #[inline]
-    pub fn as_receiver(&self) -> &R {
-        &self.record.as_receiver()
-    }
-
-    /// Returns a mutable reference to the `receiver`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
-        self.record.as_mut_receiver()
-    }
-
-    /// Consumes the record, returning the `receiver`.
-    #[inline]
-    pub fn into_receiver(self) -> R {
-        self.record.into_receiver()
-    }
-}
-
-impl<R> AsRef<R> for History<R> {
-    #[inline]
-    fn as_ref(&self) -> &R {
-        self.as_receiver()
-    }
-}
-
-impl<R> AsMut<R> for History<R> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut R {
-        self.as_mut_receiver()
     }
 }
 
