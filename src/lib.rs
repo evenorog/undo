@@ -6,6 +6,7 @@
 #![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
 
 mod group;
+mod history;
 mod merge;
 mod record;
 

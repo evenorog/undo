@@ -329,7 +329,7 @@ impl<R> Record<R> {
     /// Pushes the command to the top of the record and executes its [`apply`] method.
     /// The command is merged with the previous top command if they have the same [`id`].
     ///
-    /// All commands above the active one are removed from the stack and returned as an iterator.
+    /// All commands above the active one are removed and returned as an iterator.
     ///
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned together with the command.
