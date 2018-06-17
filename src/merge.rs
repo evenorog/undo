@@ -1,5 +1,5 @@
-use std::{error, marker, u32};
 use std::fmt::{self, Debug, Formatter};
+use std::{error, marker, u32};
 use Command;
 
 /// A command wrapper which always merges with itself.
@@ -48,9 +48,7 @@ impl<R, C: Command<R> + 'static> Command<R> for Merger<R, C> {
 impl<R, C: Command<R> + 'static> Debug for Merger<R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Merger")
-            .field("cmd", &self.cmd)
-            .finish()
+        f.debug_struct("Merger").field("cmd", &self.cmd).finish()
     }
 }
 

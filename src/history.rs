@@ -32,7 +32,8 @@ impl<R> History<R> {
     /// [`id`]: trait.Command.html#method.id
     #[inline]
     pub fn apply(&mut self, _: impl Command<R> + 'static) -> Result<(), Error<R>>
-        where R: 'static,
+    where
+        R: 'static,
     {
         unimplemented!()
     }

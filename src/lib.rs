@@ -10,7 +10,9 @@ mod history;
 mod merge;
 mod record;
 
-use std::{error, fmt::{self, Debug, Display, Formatter}};
+use std::{
+    error, fmt::{self, Debug, Display, Formatter},
+};
 
 pub use group::{Group, GroupBuilder};
 pub use record::{Record, RecordBuilder, Signal};
@@ -157,7 +159,12 @@ impl<R> Display for Error<R> {
 impl<R> Display for Error<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "`{error}` caused by `{command}`", error = self.1, command = self.0)
+        write!(
+            f,
+            "`{error}` caused by `{command}`",
+            error = self.1,
+            command = self.0
+        )
     }
 }
 

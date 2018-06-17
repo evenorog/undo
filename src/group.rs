@@ -1,7 +1,7 @@
 use std::collections::hash_map::{HashMap, RandomState};
-use std::fmt::{self, Debug, Formatter};
 #[cfg(feature = "display")]
 use std::fmt::Display;
+use std::fmt::{self, Debug, Formatter};
 use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use {Command, Error, Record};
@@ -66,8 +66,8 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
     /// Sets how different signals should be handled when the state changes.
     #[inline]
     pub fn set_signals<F>(&mut self, f: F)
-        where
-            F: FnMut(Option<&K>) + Send + Sync + 'static,
+    where
+        F: FnMut(Option<&K>) + Send + Sync + 'static,
     {
         self.signals = Some(Box::new(f));
     }
@@ -87,14 +87,18 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
     /// Gets a reference to the current active item in the group.
     #[inline]
     pub fn get(&self) -> Option<&V> {
-        self.active.as_ref().and_then(|active| self.group.get(active))
+        self.active
+            .as_ref()
+            .and_then(|active| self.group.get(active))
     }
 
     /// Gets a mutable reference to the current active item in the group.
     #[inline]
     pub fn get_mut(&mut self) -> Option<&mut V> {
         let group = &mut self.group;
-        self.active.as_ref().and_then(move |active| group.get_mut(active))
+        self.active
+            .as_ref()
+            .and_then(move |active| group.get_mut(active))
     }
 
     /// Sets the current active item in the group to `k`.
@@ -166,8 +170,12 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     ///
     /// [`apply`]: record/struct.Record.html#method.apply
     #[inline]
-    pub fn apply(&mut self, cmd: impl Command<R> + 'static) -> Option<Result<impl Iterator<Item=Box<Command<R> + 'static>>, Error<R>>>
-        where R: 'static,
+    pub fn apply(
+        &mut self,
+        cmd: impl Command<R> + 'static,
+    ) -> Option<Result<impl Iterator<Item = Box<Command<R> + 'static>>, Error<R>>>
+    where
+        R: 'static,
     {
         self.get_mut().map(move |record| record.apply(cmd))
     }
@@ -208,7 +216,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
 
     /// Returns an iterator over the records.
     #[inline]
-    pub fn records(&self) -> impl Iterator<Item=&Record<R>> {
+    pub fn records(&self) -> impl Iterator<Item = &Record<R>> {
         self.group.values()
     }
 }
@@ -273,8 +281,8 @@ impl<K: Hash + Eq, V, S: BuildHasher> GroupBuilder<K, V, S> {
     /// Decides what should happen when the active stack changes.
     #[inline]
     pub fn signals<F>(mut self, f: F) -> GroupBuilder<K, V, S>
-        where
-            F: FnMut(Option<&K>) + Send + Sync + 'static
+    where
+        F: FnMut(Option<&K>) + Send + Sync + 'static,
     {
         self.signals = Some(Box::new(f));
         self
