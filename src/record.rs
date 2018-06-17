@@ -123,6 +123,7 @@ impl<R> Record<R> {
             receiver: PhantomData,
             capacity: 0,
             limit: 0,
+            saved: true,
             signals: None,
         }
     }
@@ -639,6 +640,7 @@ pub struct RecordBuilder<R> {
     receiver: PhantomData<R>,
     capacity: usize,
     limit: usize,
+    saved: bool,
     signals: Option<Box<FnMut(Signal) + Send + Sync + 'static>>,
 }
 
@@ -705,6 +707,13 @@ impl<R> RecordBuilder<R> {
         self
     }
 
+    /// Sets if the receiver is initially in a saved state.
+    #[inline]
+    pub fn saved(mut self, saved: bool) -> RecordBuilder<R> {
+        self.saved = saved;
+        self
+    }
+
     /// Decides how different signals should be handled when the state changes.
     /// By default the record does nothing.
     ///
@@ -766,7 +775,7 @@ impl<R> RecordBuilder<R> {
             receiver: receiver.into(),
             cursor: 0,
             limit: self.limit,
-            saved: Some(0),
+            saved: if self.saved { Some(0) } else { None },
             signals: self.signals,
         }
     }
@@ -787,6 +796,7 @@ impl<R: Debug> Debug for RecordBuilder<R> {
             .field("receiver", &self.receiver)
             .field("capacity", &self.capacity)
             .field("limit", &self.limit)
+            .field("saved", &self.saved)
             .finish()
     }
 }

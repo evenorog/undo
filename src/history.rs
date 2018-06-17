@@ -1,13 +1,14 @@
 #![allow(dead_code)]
 
-use std::collections::vec_deque::IntoIter;
-use {Command, Error, Record};
+use std::collections::vec_deque::{IntoIter, VecDeque};
+use {Command, Error};
 
 /// A history of commands.
 #[derive(Debug, Default)]
 pub struct History<R> {
-    record: Record<R>,
-    branch: Vec<IntoIter<Box<Command<R> + 'static>>>,
+    commands: VecDeque<Box<Command<R> + 'static>>,
+    receiver: R,
+    branches: Vec<IntoIter<Box<Command<R> + 'static>>>,
 }
 
 impl<R> History<R> {
