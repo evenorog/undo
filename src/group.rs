@@ -97,31 +97,33 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
         self.active.as_ref().and_then(move |active| group.get_mut(active))
     }
 
-    /// Sets the current active item in the group.
+    /// Sets the current active item in the group to `k`.
     ///
     /// Returns `None` if the item was successfully set, otherwise `k` is returned.
     #[inline]
-    pub fn set(&mut self, k: K) -> Option<K> {
-        if self.group.contains_key(&k) {
-            if self.active.as_ref().map_or(false, |a| a != &k) {
-                if let Some(ref mut f) = self.signals {
-                    f(Some(&k))
+    pub fn set(&mut self, k: impl Into<Option<K>>) -> Option<K> {
+        match k.into() {
+            Some(k) => {
+                if self.group.contains_key(&k) {
+                    if self.active.as_ref().map_or(false, |a| a != &k) {
+                        if let Some(ref mut f) = self.signals {
+                            f(Some(&k))
+                        }
+                    }
+                    self.active = Some(k);
+                    None
+                } else {
+                    Some(k)
                 }
             }
-            self.active = Some(k);
-            None
-        } else {
-            Some(k)
-        }
-    }
-
-    /// Unsets the current active item in the group.
-    #[inline]
-    pub fn unset(&mut self) {
-        if self.active.is_some() {
-            self.active = None;
-            if let Some(ref mut f) = self.signals {
-                f(None);
+            None => {
+                if self.active.is_some() {
+                    self.active = None;
+                    if let Some(ref mut f) = self.signals {
+                        f(None);
+                    }
+                }
+                None
             }
         }
     }
@@ -156,18 +158,16 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     ///
     /// [`set_cursor`]: record/struct.Record.html#method.set_cursor
     #[inline]
-    pub fn set_cursor(&mut self, index: usize) -> Option<Result<(), Error<R>>> {
-        self.get_mut().and_then(|record| record.set_cursor(index))
+    pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
+        self.get_mut().and_then(|record| record.set_cursor(cursor))
     }
 
     /// Calls the [`apply`] method on the active record.
     ///
     /// [`apply`]: record/struct.Record.html#method.apply
     #[inline]
-    pub fn apply<C>(&mut self, cmd: C) -> Option<Result<impl Iterator<Item=Box<Command<R> + 'static>>, Error<R>>>
-        where
-            C: Command<R> + 'static,
-            R: 'static,
+    pub fn apply(&mut self, cmd: impl Command<R> + 'static) -> Option<Result<impl Iterator<Item=Box<Command<R> + 'static>>, Error<R>>>
+        where R: 'static,
     {
         self.get_mut().map(move |record| record.apply(cmd))
     }
