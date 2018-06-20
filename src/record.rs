@@ -165,7 +165,7 @@ impl<R> Record<R> {
     ///
     /// If `limit < len` the first commands will be removed until `len == limit`.
     /// However, if the current active command is going to be removed, the limit is instead
-    /// adjusted to `len - active` so that the active command is not popped off.
+    /// adjusted to `len - active` so the active command is not removed.
     #[inline]
     pub fn set_limit(&mut self, limit: usize) -> usize {
         if limit > 0 && limit < self.len() {
@@ -208,10 +208,7 @@ impl<R> Record<R> {
 
     /// Sets how different signals should be handled when the state changes.
     #[inline]
-    pub fn set_signals<F>(&mut self, f: F)
-    where
-        F: FnMut(Signal) + Send + Sync + 'static,
-    {
+    pub fn set_signals(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
         self.signals = Some(Box::new(f));
     }
 
@@ -334,11 +331,10 @@ impl<R> Record<R> {
         let old = self.cursor;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
-        let was_saved = self.is_saved();
 
         self.commands.clear();
         self.cursor = 0;
-        self.saved = Some(0);
+        self.saved = if self.is_saved() { Some(0) } else { None };
 
         if let Some(ref mut f) = self.signals {
             // Emit signal if the cursor has changed.
@@ -352,10 +348,6 @@ impl<R> Record<R> {
             // Record can never redo after being cleared, check if you could redo before.
             if could_redo {
                 f(Signal::Redo(false));
-            }
-            // Check if the receiver went from unsaved to saved.
-            if !was_saved {
-                f(Signal::Saved(true));
             }
         }
     }
@@ -759,10 +751,7 @@ impl<R> RecordBuilder<R> {
     /// # }
     /// ```
     #[inline]
-    pub fn signals<F>(mut self, f: F) -> RecordBuilder<R>
-    where
-        F: FnMut(Signal) + Send + Sync + 'static,
-    {
+    pub fn signals(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> RecordBuilder<R> {
         self.signals = Some(Box::new(f));
         self
     }

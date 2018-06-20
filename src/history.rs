@@ -1,14 +1,20 @@
 #![allow(dead_code)]
 
-use std::collections::vec_deque::{IntoIter, VecDeque};
-use {Command, Error};
+use {Command, Error, Record};
+
+#[derive(Debug)]
+struct Branch<R> {
+    parent: usize,
+    cursor: usize,
+    commands: Box<[Box<Command<R> + 'static>]>,
+}
 
 /// A history of commands.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct History<R> {
-    commands: VecDeque<Box<Command<R> + 'static>>,
-    receiver: R,
-    branches: Vec<IntoIter<Box<Command<R> + 'static>>>,
+    id: usize,
+    record: Record<R>,
+    branches: Vec<Branch<R>>,
 }
 
 impl<R> History<R> {
@@ -27,11 +33,22 @@ impl<R> History<R> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     /// [`id`]: trait.Command.html#method.id
     #[inline]
-    pub fn apply(&mut self, _: impl Command<R> + 'static) -> Result<(), Error<R>>
+    pub fn apply(&mut self, cmd: impl Command<R> + 'static) -> Result<(), Error<R>>
     where
         R: 'static,
     {
-        unimplemented!()
+        let commands = self.record.apply(cmd)?;
+        let commands: Vec<_> = commands.collect();
+        if !commands.is_empty() {
+            let commands = commands.into_boxed_slice();
+            let branch = Branch {
+                parent: self.id,
+                cursor: self.record.cursor(),
+                commands,
+            };
+            self.branches.push(branch);
+        }
+        Ok(())
     }
 
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
@@ -42,7 +59,7 @@ impl<R> History<R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
-        unimplemented!()
+        self.record.undo()
     }
 
     /// Calls the [`redo`] method for the active command and sets the next one as the
@@ -54,7 +71,7 @@ impl<R> History<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
-        unimplemented!()
+        self.record.redo()
     }
 }
 
