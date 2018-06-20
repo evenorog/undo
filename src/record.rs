@@ -953,7 +953,7 @@ mod tests {
         record.clear();
         assert_eq!(undo.load(Ordering::Relaxed), false);
         assert_eq!(redo.load(Ordering::Relaxed), false);
-        assert_eq!(saved.load(Ordering::Relaxed), true);
+        assert_eq!(saved.load(Ordering::Relaxed), false);
         assert_eq!(cursor.load(Ordering::Relaxed), 0);
     }
 }

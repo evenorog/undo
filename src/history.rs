@@ -20,8 +20,12 @@ pub struct History<R> {
 impl<R> History<R> {
     /// Returns a new history.
     #[inline]
-    pub fn new(_: impl Into<R>) -> History<R> {
-        unimplemented!()
+    pub fn new(receiver: impl Into<R>) -> History<R> {
+        History {
+            id: 0,
+            record: Record::new(receiver),
+            branches: Vec::new(),
+        }
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -40,13 +44,11 @@ impl<R> History<R> {
         let commands = self.record.apply(cmd)?;
         let commands: Vec<_> = commands.collect();
         if !commands.is_empty() {
-            let commands = commands.into_boxed_slice();
-            let branch = Branch {
+            self.branches.push(Branch {
                 parent: self.id,
                 cursor: self.record.cursor(),
-                commands,
-            };
-            self.branches.push(branch);
+                commands: commands.into_boxed_slice(),
+            });
         }
         Ok(())
     }
