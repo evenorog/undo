@@ -160,7 +160,8 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`set_cursor`]: record/struct.Record.html#method.set_cursor
     #[inline]
     pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
-        self.active_mut().and_then(|record| record.set_cursor(cursor))
+        self.active_mut()
+            .and_then(|record| record.set_cursor(cursor))
     }
 
     /// Calls the [`apply`] method on the active record.
@@ -271,7 +272,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> GroupBuilder<K, V, S> {
 
     /// Decides what should happen when the active stack changes.
     #[inline]
-    pub fn signal<F>(
+    pub fn signal(
         mut self,
         f: impl FnMut(Option<&K>) + Send + Sync + 'static,
     ) -> GroupBuilder<K, V, S> {
