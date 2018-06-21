@@ -5,14 +5,14 @@ use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use {merge::Merged, Command, Error};
 
-/// The signals sent when the record or the receiver changes.
+/// The signal sent when the record or the receiver changes.
 ///
 /// When one of these states changes in the record or the receiver, they will send a corresponding
 /// signal to the user. For example, if the record can no longer redo any commands, it sends a
-/// `Signal::Redo(false)` signal to tell the user. The signals can be handled in the [`signals`]
+/// `Signal::Redo(false)` signal to tell the user. The signal can be handled in the [`signal`]
 /// method.
 ///
-/// [`signals`]: struct.RecordBuilder.html#method.signals
+/// [`signal`]: struct.RecordBuilder.html#method.signal
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the record can undo.
@@ -43,7 +43,7 @@ pub enum Signal {
 ///
 /// The record can roll the receivers state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
-/// about changes to the stack or the receiver through [signals]. The user
+/// about changes to the stack or the receiver through [signal]. The user
 /// can give the record a function that is called each time the state changes
 /// by using the [`builder`].
 ///
@@ -92,14 +92,14 @@ pub enum Signal {
 /// ```
 ///
 /// [`builder`]: struct.RecordBuilder.html
-/// [signals]: enum.Signal.html
+/// [signal]: enum.Signal.html
 pub struct Record<R> {
     commands: VecDeque<Box<Command<R> + 'static>>,
     receiver: R,
     cursor: usize,
     limit: usize,
     saved: Option<usize>,
-    signals: Option<Box<FnMut(Signal) + Send + Sync + 'static>>,
+    signal: Option<Box<FnMut(Signal) + Send + Sync + 'static>>,
 }
 
 impl<R> Record<R> {
@@ -112,7 +112,7 @@ impl<R> Record<R> {
             cursor: 0,
             limit: 0,
             saved: Some(0),
-            signals: None,
+            signal: None,
         }
     }
 
@@ -124,7 +124,7 @@ impl<R> Record<R> {
             capacity: 0,
             limit: 0,
             saved: true,
-            signals: None,
+            signal: None,
         }
     }
 
@@ -186,18 +186,18 @@ impl<R> Record<R> {
             let new = self.cursor;
             let can_undo = self.can_undo();
             let is_saved = self.is_saved();
-            if let Some(ref mut f) = self.signals {
+            if let Some(ref mut f) = self.signal {
                 // Emit signal if the cursor has changed.
                 if old != new {
-                    f(Signal::Cursor { old, new })
+                    f(Signal::Cursor { old, new });
                 }
                 // Check if the records ability to undo changed.
                 if could_undo != can_undo {
-                    f(Signal::Undo(can_undo))
+                    f(Signal::Undo(can_undo));
                 }
                 // Check if the receiver went from saved to unsaved.
                 if was_saved != is_saved {
-                    f(Signal::Saved(is_saved))
+                    f(Signal::Saved(is_saved));
                 }
             }
         } else {
@@ -206,10 +206,10 @@ impl<R> Record<R> {
         self.limit
     }
 
-    /// Sets how different signals should be handled when the state changes.
+    /// Sets how the signal should be handled when the state changes.
     #[inline]
-    pub fn set_signals(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
-        self.signals = Some(Box::new(f));
+    pub fn set_signal(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
+        self.signal = Some(Box::new(f));
     }
 
     /// Returns `true` if the record can undo.
@@ -230,7 +230,7 @@ impl<R> Record<R> {
         let was_saved = self.is_saved();
         if saved {
             self.saved = Some(self.cursor);
-            if let Some(ref mut f) = self.signals {
+            if let Some(ref mut f) = self.signal {
                 // Check if the receiver went from unsaved to saved.
                 if !was_saved {
                     f(Signal::Saved(true));
@@ -238,7 +238,7 @@ impl<R> Record<R> {
             }
         } else {
             self.saved = None;
-            if let Some(ref mut f) = self.signals {
+            if let Some(ref mut f) = self.signal {
                 // Check if the receiver went from saved to unsaved.
                 if was_saved {
                     f(Signal::Saved(false));
@@ -260,7 +260,7 @@ impl<R> Record<R> {
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
-    /// The signals are emitted once after reaching the `cursor`.
+    /// The signal are emitted once after reaching the `cursor`.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
@@ -276,21 +276,21 @@ impl<R> Record<R> {
         let was_saved = self.is_saved();
         let old = self.cursor;
         let len = self.len();
-        // Temporarily remove signals so they are not called each iteration.
-        let signals = self.signals.take();
+        // Temporarily remove signal so they are not called each iteration.
+        let signal = self.signal.take();
         // Decide if we need to undo or redo to reach cursor.
         let redo = cursor > self.cursor;
         let f = if redo { Record::redo } else { Record::undo };
         while self.cursor != cursor {
             if let Err(err) = f(self).unwrap() {
-                self.signals = signals;
+                self.signal = signal;
                 return Some(Err(err));
             }
         }
-        // Add signals back.
-        self.signals = signals;
+        // Add signal back.
+        self.signal = signal;
         let is_saved = self.is_saved();
-        if let Some(ref mut f) = self.signals {
+        if let Some(ref mut f) = self.signal {
             // Emit signal if the cursor has changed.
             if old != self.cursor {
                 f(Signal::Cursor {
@@ -336,7 +336,7 @@ impl<R> Record<R> {
         self.cursor = 0;
         self.saved = if self.is_saved() { Some(0) } else { None };
 
-        if let Some(ref mut f) = self.signals {
+        if let Some(ref mut f) = self.signal {
             // Emit signal if the cursor has changed.
             if old != 0 {
                 f(Signal::Cursor { old, new: 0 });
@@ -413,7 +413,7 @@ impl<R> Record<R> {
         }
 
         debug_assert_eq!(self.cursor, self.len());
-        if let Some(ref mut f) = self.signals {
+        if let Some(ref mut f) = self.signal {
             // We emit this signal even if the commands might have been merged.
             f(Signal::Cursor {
                 old,
@@ -457,7 +457,7 @@ impl<R> Record<R> {
         self.cursor -= 1;
         let len = self.len();
         let is_saved = self.is_saved();
-        if let Some(ref mut f) = self.signals {
+        if let Some(ref mut f) = self.signal {
             // Cursor has always changed at this point.
             f(Signal::Cursor {
                 old,
@@ -502,7 +502,7 @@ impl<R> Record<R> {
         self.cursor += 1;
         let len = self.len();
         let is_saved = self.is_saved();
-        if let Some(ref mut f) = self.signals {
+        if let Some(ref mut f) = self.signal {
             // Cursor has always changed at this point.
             f(Signal::Cursor {
                 old,
@@ -633,7 +633,7 @@ pub struct RecordBuilder<R> {
     capacity: usize,
     limit: usize,
     saved: bool,
-    signals: Option<Box<FnMut(Signal) + Send + Sync + 'static>>,
+    signal: Option<Box<FnMut(Signal) + Send + Sync + 'static>>,
 }
 
 impl<R> RecordBuilder<R> {
@@ -706,7 +706,7 @@ impl<R> RecordBuilder<R> {
         self
     }
 
-    /// Decides how different signals should be handled when the state changes.
+    /// Decides how the signal should be handled when the state changes.
     /// By default the record does nothing.
     ///
     /// # Examples
@@ -732,7 +732,7 @@ impl<R> RecordBuilder<R> {
     /// # fn main() -> Result<(), Box<Error>> {
     /// # let mut record =
     /// Record::builder()
-    ///     .signals(|signal| {
+    ///     .signal(|signal| {
     ///         match signal {
     ///             Signal::Undo(true) => println!("The record can undo."),
     ///             Signal::Undo(false) => println!("The record can not undo."),
@@ -751,8 +751,8 @@ impl<R> RecordBuilder<R> {
     /// # }
     /// ```
     #[inline]
-    pub fn signals(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> RecordBuilder<R> {
-        self.signals = Some(Box::new(f));
+    pub fn signal(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> RecordBuilder<R> {
+        self.signal = Some(Box::new(f));
         self
     }
 
@@ -765,7 +765,7 @@ impl<R> RecordBuilder<R> {
             cursor: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
-            signals: self.signals,
+            signal: self.signal,
         }
     }
 }
@@ -909,7 +909,7 @@ mod tests {
     }
 
     #[test]
-    fn signals() {
+    fn signal() {
         use std::sync::{
             atomic::{AtomicBool, AtomicUsize, Ordering}, Arc,
         };
@@ -924,7 +924,7 @@ mod tests {
             let redo = redo.clone();
             let saved = saved.clone();
             let cursor = cursor.clone();
-            record.set_signals(move |signal| match signal {
+            record.set_signal(move |signal| match signal {
                 Signal::Undo(x) => undo.store(x, Ordering::Relaxed),
                 Signal::Redo(x) => redo.store(x, Ordering::Relaxed),
                 Signal::Saved(x) => saved.store(x, Ordering::Relaxed),

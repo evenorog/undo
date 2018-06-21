@@ -10,7 +10,7 @@ use {Command, Error, Record};
 pub struct Group<K: Hash + Eq, V, S = RandomState> {
     group: HashMap<K, V, S>,
     active: Option<K>,
-    signals: Option<Box<FnMut(Option<&K>) + Send + Sync + 'static>>,
+    signal: Option<Box<FnMut(Option<&K>) + Send + Sync + 'static>>,
 }
 
 impl<K: Hash + Eq, V> Group<K, V, RandomState> {
@@ -20,7 +20,7 @@ impl<K: Hash + Eq, V> Group<K, V, RandomState> {
         Group {
             group: HashMap::new(),
             active: None,
-            signals: None,
+            signal: None,
         }
     }
 }
@@ -32,7 +32,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
         GroupBuilder {
             group: PhantomData,
             capacity: 0,
-            signals: None,
+            signal: None,
         }
     }
 
@@ -63,13 +63,10 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
         self.group.is_empty()
     }
 
-    /// Sets how different signals should be handled when the state changes.
+    /// Sets how the signal should be handled when the state changes.
     #[inline]
-    pub fn set_signals<F>(&mut self, f: F)
-    where
-        F: FnMut(Option<&K>) + Send + Sync + 'static,
-    {
-        self.signals = Some(Box::new(f));
+    pub fn set_signal(&mut self, f: impl FnMut(Option<&K>) + Send + Sync + 'static) {
+        self.signal = Some(Box::new(f));
     }
 
     /// Inserts an item into the group.
@@ -110,7 +107,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
             Some(k) => {
                 if self.group.contains_key(&k) {
                     if self.active.as_ref().map_or(false, |a| a != &k) {
-                        if let Some(ref mut f) = self.signals {
+                        if let Some(ref mut f) = self.signal {
                             f(Some(&k))
                         }
                     }
@@ -123,7 +120,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
             None => {
                 if self.active.is_some() {
                     self.active = None;
-                    if let Some(ref mut f) = self.signals {
+                    if let Some(ref mut f) = self.signal {
                         f(None);
                     }
                 }
@@ -257,7 +254,7 @@ impl<K: Hash + Eq, V> Default for Group<K, V, RandomState> {
 pub struct GroupBuilder<K: Hash + Eq, V, S: BuildHasher> {
     group: PhantomData<(K, V, S)>,
     capacity: usize,
-    signals: Option<Box<FnMut(Option<&K>) + Send + Sync + 'static>>,
+    signal: Option<Box<FnMut(Option<&K>) + Send + Sync + 'static>>,
 }
 
 impl<K: Hash + Eq, V> GroupBuilder<K, V, RandomState> {
@@ -280,11 +277,11 @@ impl<K: Hash + Eq, V, S: BuildHasher> GroupBuilder<K, V, S> {
 
     /// Decides what should happen when the active stack changes.
     #[inline]
-    pub fn signals<F>(mut self, f: F) -> GroupBuilder<K, V, S>
-    where
-        F: FnMut(Option<&K>) + Send + Sync + 'static,
-    {
-        self.signals = Some(Box::new(f));
+    pub fn signal<F>(
+        mut self,
+        f: impl FnMut(Option<&K>) + Send + Sync + 'static,
+    ) -> GroupBuilder<K, V, S> {
+        self.signal = Some(Box::new(f));
         self
     }
 
@@ -294,7 +291,7 @@ impl<K: Hash + Eq, V, S: BuildHasher> GroupBuilder<K, V, S> {
         Group {
             group: HashMap::with_capacity_and_hasher(self.capacity, hasher),
             active: None,
-            signals: self.signals,
+            signal: self.signal,
         }
     }
 }
