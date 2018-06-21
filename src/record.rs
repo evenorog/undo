@@ -365,14 +365,13 @@ impl<R> Record<R> {
     #[inline]
     pub fn apply(
         &mut self,
-        cmd: impl Command<R> + 'static,
+        mut cmd: impl Command<R> + 'static,
     ) -> Result<impl Iterator<Item = Box<Command<R> + 'static>>, Error<R>>
     where
         R: 'static,
     {
-        let mut cmd = Box::new(cmd);
         if let Err(err) = cmd.apply(&mut self.receiver) {
-            return Err(Error(cmd, err));
+            return Err(Error(Box::new(cmd), err));
         }
 
         let old = self.cursor;
@@ -393,10 +392,7 @@ impl<R> Record<R> {
         match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
             (Some(id1), Some(id2)) if id1 == id2 && !was_saved => {
                 // Merge the command with the one on the top of the stack.
-                let merged = Merged {
-                    cmd1: self.commands.pop_back().unwrap(),
-                    cmd2: cmd,
-                };
+                let merged = Merged::new(self.commands.pop_back().unwrap(), cmd);
                 self.commands.push_back(Box::new(merged));
             }
             _ => {
@@ -408,7 +404,7 @@ impl<R> Record<R> {
                 } else {
                     self.cursor += 1;
                 }
-                self.commands.push_back(cmd);
+                self.commands.push_back(Box::new(cmd));
             }
         }
 
