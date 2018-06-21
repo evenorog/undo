@@ -60,12 +60,26 @@ impl<R, C: Command<R> + 'static> fmt::Display for Merger<R, C> {
     }
 }
 
-pub struct Merged<R> {
-    pub cmd1: Box<Command<R> + 'static>,
-    pub cmd2: Box<Command<R> + 'static>,
+/// The result of merging two commands.
+pub struct Merged<R, C1: Command<R> + 'static, C2: Command<R> + 'static> {
+    cmd1: C1,
+    cmd2: C2,
+    _marker: marker::PhantomData<Box<Command<R> + 'static>>,
 }
 
-impl<R> Command<R> for Merged<R> {
+impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Merged<R, C1, C2> {
+    /// Merges `cmd1` and `cmd2` into a single command.
+    #[inline]
+    pub fn new(cmd1: C1, cmd2: C2) -> Merged<R, C1, C2> {
+        Merged {
+            cmd1,
+            cmd2,
+            _marker: marker::PhantomData,
+        }
+    }
+}
+
+impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Command<R> for Merged<R, C1, C2> {
     #[inline]
     fn apply(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
         self.cmd1.apply(receiver)?;
@@ -90,7 +104,7 @@ impl<R> Command<R> for Merged<R> {
     }
 }
 
-impl<R> Debug for Merged<R> {
+impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Debug for Merged<R, C1, C2> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Merged")
@@ -101,7 +115,7 @@ impl<R> Debug for Merged<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Display for Merged<R> {
+impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Display for Merged<R, C1, C2> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{cmd1} + {cmd2}", cmd1 = self.cmd1, cmd2 = self.cmd2)
