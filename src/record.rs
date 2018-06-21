@@ -5,6 +5,8 @@ use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use {merge::Merged, Command, Error};
 
+const NO_LIMIT: usize = 0;
+
 /// The signal sent when the record or the receiver changes.
 ///
 /// When one of these states changes in the record or the receiver, they will send a corresponding
@@ -110,7 +112,7 @@ impl<R> Record<R> {
             commands: VecDeque::new(),
             receiver: receiver.into(),
             cursor: 0,
-            limit: 0,
+            limit: NO_LIMIT,
             saved: Some(0),
             signal: None,
         }
@@ -122,7 +124,7 @@ impl<R> Record<R> {
         RecordBuilder {
             receiver: PhantomData,
             capacity: 0,
-            limit: 0,
+            limit: NO_LIMIT,
             saved: true,
             signal: None,
         }
@@ -168,7 +170,7 @@ impl<R> Record<R> {
     /// adjusted to `len - active` so the active command is not removed.
     #[inline]
     pub fn set_limit(&mut self, limit: usize) -> usize {
-        if limit > 0 && limit < self.len() {
+        if limit != NO_LIMIT && limit < self.len() {
             let old = self.cursor;
             let could_undo = self.can_undo();
             let was_saved = self.is_saved();
@@ -397,7 +399,7 @@ impl<R> Record<R> {
             }
             _ => {
                 // If commands are not merged push it onto the record.
-                if self.limit != 0 && self.limit == self.cursor {
+                if self.limit != NO_LIMIT && self.limit == self.cursor {
                     // If limit is reached, pop off the first command.
                     self.commands.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
