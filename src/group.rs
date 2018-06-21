@@ -6,7 +6,7 @@ use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use {Command, Error, Record};
 
-/// A group of records.
+/// A group of records or histories.
 pub struct Group<K: Hash + Eq, V, S = RandomState> {
     group: HashMap<K, V, S>,
     active: Option<K>,

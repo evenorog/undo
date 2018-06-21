@@ -15,7 +15,7 @@ use std::{
 };
 
 pub use group::{Group, GroupBuilder};
-pub use history::History;
+pub use history::{History, HistoryBuilder};
 pub use merge::{Merged, Merger};
 pub use record::{Record, RecordBuilder, Signal};
 

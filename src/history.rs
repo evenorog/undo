@@ -1,5 +1,4 @@
-#![allow(dead_code)]
-
+use std::marker::PhantomData;
 use {Command, Error, Record};
 
 #[derive(Debug)]
@@ -82,4 +81,10 @@ impl<R> From<R> for History<R> {
     fn from(receiver: R) -> Self {
         History::new(receiver)
     }
+}
+
+/// Builder for a history.
+#[allow(missing_debug_implementations)]
+pub struct HistoryBuilder<R> {
+    receiver: PhantomData<R>,
 }
