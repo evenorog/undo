@@ -4,22 +4,29 @@ use Command;
 
 /// A command wrapper which always merges with itself.
 ///
-/// This is done by always having an [`id`] of `u32::MAX`.
+/// This wrapper has an [`id`] of `u32::MAX`.
 ///
 /// [`id`]: trait.Command.html#method.id
-#[allow(dead_code)]
 pub struct Merger<R, C: Command<R> + 'static> {
     cmd: C,
     _marker: marker::PhantomData<Box<Command<R> + 'static>>,
 }
 
-impl<R, C: Command<R> + 'static> From<C> for Merger<R, C> {
+impl<R, C: Command<R> + 'static> Merger<R, C> {
+    /// Returns a new merger command.
     #[inline]
-    fn from(cmd: C) -> Self {
+    pub fn new(cmd: C) -> Merger<R, C> {
         Merger {
             cmd,
             _marker: marker::PhantomData,
         }
+    }
+}
+
+impl<R, C: Command<R> + 'static> From<C> for Merger<R, C> {
+    #[inline]
+    fn from(cmd: C) -> Self {
+        Merger::new(cmd)
     }
 }
 

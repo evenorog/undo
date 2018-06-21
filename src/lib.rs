@@ -15,6 +15,8 @@ use std::{
 };
 
 pub use group::{Group, GroupBuilder};
+pub use history::History;
+pub use merge::{Merged, Merger};
 pub use record::{Record, RecordBuilder, Signal};
 
 /// Base functionality for all commands.
