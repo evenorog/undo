@@ -83,7 +83,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
 
     /// Gets a reference to the current active item in the group.
     #[inline]
-    pub fn get(&self) -> Option<&V> {
+    pub fn active(&self) -> Option<&V> {
         self.active
             .as_ref()
             .and_then(|active| self.group.get(active))
@@ -91,7 +91,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
 
     /// Gets a mutable reference to the current active item in the group.
     #[inline]
-    pub fn get_mut(&mut self) -> Option<&mut V> {
+    pub fn active_mut(&mut self) -> Option<&mut V> {
         let group = &mut self.group;
         self.active
             .as_ref()
@@ -102,7 +102,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
     ///
     /// Returns `None` if the item was successfully set, otherwise `k` is returned.
     #[inline]
-    pub fn set(&mut self, k: impl Into<Option<K>>) -> Option<K> {
+    pub fn set_active(&mut self, k: impl Into<Option<K>>) -> Option<K> {
         match k.into() {
             Some(k) => {
                 if self.group.contains_key(&k) {
@@ -136,7 +136,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`set_saved`]: record/struct.Record.html#method.set_saved
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
-        self.get_mut().map(|record| record.set_saved(saved));
+        self.active_mut().map(|record| record.set_saved(saved));
     }
 
     /// Calls the [`is_saved`] method on the active record.
@@ -144,7 +144,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`is_saved`]: record/struct.Record.html#method.is_saved
     #[inline]
     pub fn is_saved(&self) -> bool {
-        self.get().map_or(false, |record| record.is_saved())
+        self.active().map_or(false, |record| record.is_saved())
     }
 
     /// Calls the [`cursor`] method on the active record.
@@ -152,7 +152,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`cursor`]: record/struct.Record.html#method.cursor
     #[inline]
     pub fn cursor(&self) -> Option<usize> {
-        self.get().map(|record| record.cursor())
+        self.active().map(|record| record.cursor())
     }
 
     /// Calls the [`set_cursor`] method on the active record.
@@ -160,7 +160,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`set_cursor`]: record/struct.Record.html#method.set_cursor
     #[inline]
     pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
-        self.get_mut().and_then(|record| record.set_cursor(cursor))
+        self.active_mut().and_then(|record| record.set_cursor(cursor))
     }
 
     /// Calls the [`apply`] method on the active record.
@@ -174,7 +174,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     where
         R: 'static,
     {
-        self.get_mut().map(move |record| record.apply(cmd))
+        self.active_mut().map(move |record| record.apply(cmd))
     }
 
     /// Calls the [`undo`] method on the active record.
@@ -182,7 +182,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`undo`]: record/struct.Record.html#method.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
-        self.get_mut().and_then(|record| record.undo())
+        self.active_mut().and_then(|record| record.undo())
     }
 
     /// Calls the [`redo`] method on the active record.
@@ -190,7 +190,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`redo`]: record/struct.Record.html#method.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
-        self.get_mut().and_then(|record| record.redo())
+        self.active_mut().and_then(|record| record.redo())
     }
 
     /// Calls the [`to_undo_string`] method on the active record.
@@ -199,7 +199,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     #[inline]
     #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
-        self.get().and_then(|record| record.to_undo_string())
+        self.active().and_then(|record| record.to_undo_string())
     }
 
     /// Calls the [`to_redo_string`] method on the active record.
@@ -208,13 +208,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     #[inline]
     #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
-        self.get().and_then(|record| record.to_redo_string())
-    }
-
-    /// Returns an iterator over the records.
-    #[inline]
-    pub fn records(&self) -> impl Iterator<Item = &Record<R>> {
-        self.group.values()
+        self.active().and_then(|record| record.to_redo_string())
     }
 }
 
