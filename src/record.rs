@@ -270,6 +270,7 @@ impl<R> Record<R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
+    #[must_use]
     pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
         if cursor > self.len() {
             return None;

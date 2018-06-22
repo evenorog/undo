@@ -83,7 +83,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
 
     /// Gets a reference to the current active item in the group.
     #[inline]
-    pub fn active(&self) -> Option<&V> {
+    pub fn get_active(&self) -> Option<&V> {
         self.active
             .as_ref()
             .and_then(|active| self.group.get(active))
@@ -91,7 +91,7 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
 
     /// Gets a mutable reference to the current active item in the group.
     #[inline]
-    pub fn active_mut(&mut self) -> Option<&mut V> {
+    pub fn get_mut_active(&mut self) -> Option<&mut V> {
         let group = &mut self.group;
         self.active
             .as_ref()
@@ -136,7 +136,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`set_saved`]: record/struct.Record.html#method.set_saved
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
-        self.active_mut().map(|record| record.set_saved(saved));
+        self.get_mut_active().map(|record| record.set_saved(saved));
     }
 
     /// Calls the [`is_saved`] method on the active record.
@@ -144,7 +144,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`is_saved`]: record/struct.Record.html#method.is_saved
     #[inline]
     pub fn is_saved(&self) -> bool {
-        self.active().map_or(false, |record| record.is_saved())
+        self.get_active().map_or(false, |record| record.is_saved())
     }
 
     /// Calls the [`cursor`] method on the active record.
@@ -152,15 +152,16 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     /// [`cursor`]: record/struct.Record.html#method.cursor
     #[inline]
     pub fn cursor(&self) -> Option<usize> {
-        self.active().map(|record| record.cursor())
+        self.get_active().map(|record| record.cursor())
     }
 
     /// Calls the [`set_cursor`] method on the active record.
     ///
     /// [`set_cursor`]: record/struct.Record.html#method.set_cursor
     #[inline]
+    #[must_use]
     pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
-        self.active_mut()
+        self.get_mut_active()
             .and_then(|record| record.set_cursor(cursor))
     }
 
@@ -168,6 +169,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     ///
     /// [`apply`]: record/struct.Record.html#method.apply
     #[inline]
+    #[must_use]
     pub fn apply(
         &mut self,
         cmd: impl Command<R> + 'static,
@@ -175,41 +177,45 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     where
         R: 'static,
     {
-        self.active_mut().map(move |record| record.apply(cmd))
+        self.get_mut_active().map(move |record| record.apply(cmd))
     }
 
     /// Calls the [`undo`] method on the active record.
     ///
     /// [`undo`]: record/struct.Record.html#method.undo
     #[inline]
+    #[must_use]
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
-        self.active_mut().and_then(|record| record.undo())
+        self.get_mut_active().and_then(|record| record.undo())
     }
 
     /// Calls the [`redo`] method on the active record.
     ///
     /// [`redo`]: record/struct.Record.html#method.redo
     #[inline]
+    #[must_use]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
-        self.active_mut().and_then(|record| record.redo())
+        self.get_mut_active().and_then(|record| record.redo())
     }
 
     /// Calls the [`to_undo_string`] method on the active record.
     ///
     /// [`to_undo_string`]: record/struct.Record.html#method.to_undo_string
     #[inline]
+    #[must_use]
     #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
-        self.active().and_then(|record| record.to_undo_string())
+        self.get_active().and_then(|record| record.to_undo_string())
     }
 
     /// Calls the [`to_redo_string`] method on the active record.
     ///
     /// [`to_redo_string`]: record/struct.Record.html#method.to_redo_string
     #[inline]
+    #[must_use]
     #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
-        self.active().and_then(|record| record.to_redo_string())
+        self.get_active().and_then(|record| record.to_redo_string())
     }
 }
 
