@@ -10,7 +10,7 @@ use {Command, Error, Record};
 pub struct Group<K: Hash + Eq, V, S = RandomState> {
     group: HashMap<K, V, S>,
     active: Option<K>,
-    signal: Option<Box<FnMut(Option<&K>) + Send + Sync + 'static>>,
+    signal: Option<Box<dyn FnMut(Option<&K>) + Send + Sync + 'static>>,
 }
 
 impl<K: Hash + Eq, V> Group<K, V, RandomState> {
@@ -171,7 +171,7 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     pub fn apply(
         &mut self,
         cmd: impl Command<R> + 'static,
-    ) -> Option<Result<impl Iterator<Item = Box<Command<R> + 'static>>, Error<R>>>
+    ) -> Option<Result<impl Iterator<Item = Box<dyn Command<R> + 'static>>, Error<R>>>
     where
         R: 'static,
     {
@@ -249,7 +249,7 @@ impl<K: Hash + Eq, V> Default for Group<K, V, RandomState> {
 pub struct GroupBuilder<K: Hash + Eq, V, S: BuildHasher> {
     group: PhantomData<(K, V, S)>,
     capacity: usize,
-    signal: Option<Box<FnMut(Option<&K>) + Send + Sync + 'static>>,
+    signal: Option<Box<dyn FnMut(Option<&K>) + Send + Sync + 'static>>,
 }
 
 impl<K: Hash + Eq, V> GroupBuilder<K, V, RandomState> {

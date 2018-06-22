@@ -57,18 +57,18 @@ pub enum Signal {
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
 ///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
 ///         Ok(())
 ///     }
 /// }
 ///
-/// fn main() -> Result<(), Box<Error>> {
+/// fn main() -> Result<(), Box<dyn Error>> {
 ///     let mut record = Record::default();
 ///
 ///     record.apply(Add('a'))?;
@@ -96,12 +96,12 @@ pub enum Signal {
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
 pub struct Record<R> {
-    commands: VecDeque<Box<Command<R> + 'static>>,
+    commands: VecDeque<Box<dyn Command<R> + 'static>>,
     receiver: R,
     cursor: usize,
     limit: usize,
     saved: Option<usize>,
-    signal: Option<Box<FnMut(Signal) + Send + Sync + 'static>>,
+    signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
 }
 
 impl<R> Record<R> {
@@ -368,7 +368,7 @@ impl<R> Record<R> {
     pub fn apply(
         &mut self,
         mut cmd: impl Command<R> + 'static,
-    ) -> Result<impl Iterator<Item = Box<Command<R> + 'static>>, Error<R>>
+    ) -> Result<impl Iterator<Item = Box<dyn Command<R> + 'static>>, Error<R>>
     where
         R: 'static,
     {
@@ -440,6 +440,7 @@ impl<R> Record<R> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
+    #[must_use]
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
         if !self.can_undo() {
             return None;
@@ -485,6 +486,7 @@ impl<R> Record<R> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
+    #[must_use]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         if !self.can_redo() {
             return None;
@@ -526,6 +528,7 @@ impl<R> Record<R> {
     ///
     /// [`undo`]: struct.Record.html#method.undo
     #[inline]
+    #[must_use]
     #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
@@ -539,6 +542,7 @@ impl<R> Record<R> {
     ///
     /// [`redo`]: struct.Record.html#method.redo
     #[inline]
+    #[must_use]
     #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
@@ -631,7 +635,7 @@ pub struct RecordBuilder<R> {
     capacity: usize,
     limit: usize,
     saved: bool,
-    signal: Option<Box<FnMut(Signal) + Send + Sync + 'static>>,
+    signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
 }
 
 impl<R> RecordBuilder<R> {
@@ -797,12 +801,12 @@ mod tests {
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<Error>> {
+        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
             receiver.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<Error>> {
+        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
             self.0 = receiver.pop().ok_or("`receiver` is empty")?;
             Ok(())
         }

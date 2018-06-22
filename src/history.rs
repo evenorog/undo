@@ -5,7 +5,7 @@ use {Command, Error, Record};
 struct Branch<R> {
     parent: usize,
     cursor: usize,
-    commands: Box<[Box<Command<R> + 'static>]>,
+    commands: Box<[Box<dyn Command<R> + 'static>]>,
 }
 
 /// A history of commands.
@@ -59,6 +59,7 @@ impl<R> History<R> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
+    #[must_use]
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
         self.record.undo()
     }
@@ -71,6 +72,7 @@ impl<R> History<R> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
+    #[must_use]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         self.record.redo()
     }
