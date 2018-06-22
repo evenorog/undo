@@ -1,5 +1,7 @@
+use std::error::Error;
 use std::fmt::{self, Debug, Formatter};
-use std::{error, marker, u32};
+use std::marker::PhantomData;
+use std::u32;
 use Command;
 
 /// A command wrapper which always merges with itself.
@@ -9,7 +11,7 @@ use Command;
 /// [`id`]: trait.Command.html#method.id
 pub struct Merger<R, C: Command<R> + 'static> {
     cmd: C,
-    _marker: marker::PhantomData<Box<dyn Command<R> + 'static>>,
+    _marker: PhantomData<Box<dyn Command<R> + 'static>>,
 }
 
 impl<R, C: Command<R> + 'static> Merger<R, C> {
@@ -18,7 +20,7 @@ impl<R, C: Command<R> + 'static> Merger<R, C> {
     pub fn new(cmd: C) -> Merger<R, C> {
         Merger {
             cmd,
-            _marker: marker::PhantomData,
+            _marker: PhantomData,
         }
     }
 }
@@ -32,17 +34,17 @@ impl<R, C: Command<R> + 'static> From<C> for Merger<R, C> {
 
 impl<R, C: Command<R> + 'static> Command<R> for Merger<R, C> {
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error>> {
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
         self.cmd.apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
         self.cmd.undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
         self.cmd.redo(receiver)
     }
 
@@ -71,7 +73,7 @@ impl<R, C: Command<R> + 'static> fmt::Display for Merger<R, C> {
 pub struct Merged<R, C1: Command<R> + 'static, C2: Command<R> + 'static> {
     cmd1: C1,
     cmd2: C2,
-    _marker: marker::PhantomData<Box<dyn Command<R> + 'static>>,
+    _marker: PhantomData<Box<dyn Command<R> + 'static>>,
 }
 
 impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Merged<R, C1, C2> {
@@ -81,26 +83,26 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Merged<R, C1, C2> {
         Merged {
             cmd1,
             cmd2,
-            _marker: marker::PhantomData,
+            _marker: PhantomData,
         }
     }
 }
 
 impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Command<R> for Merged<R, C1, C2> {
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error>> {
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
         self.cmd1.apply(receiver)?;
         self.cmd2.apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
         self.cmd2.undo(receiver)?;
         self.cmd1.undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
         self.cmd1.redo(receiver)?;
         self.cmd2.redo(receiver)
     }
