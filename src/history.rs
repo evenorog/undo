@@ -103,6 +103,7 @@ impl<R> History<R> {
         let mut path = vec![dest];
         while branch != ORIGIN {
             dest = self.branches.remove(&branch).unwrap();
+            branch = dest.parent;
             path.push(dest);
         }
 
@@ -113,6 +114,7 @@ impl<R> History<R> {
             let mut tmp = vec![start];
             while branch != ORIGIN {
                 start = self.branches.remove(&branch).unwrap();
+                branch = start.parent;
                 tmp.push(start);
             }
             tmp.reverse();
@@ -127,8 +129,22 @@ impl<R> History<R> {
             }
             // Apply the commands in the branch and move older commands into their own branch.
             for cmd in dest.commands {
-                if let Err(err) = self.apply(cmd) {
-                    return Some(Err(err));
+                let cursor = self.record.cursor();
+                let commands = match self.record.apply(cmd) {
+                    Ok(commands) => commands,
+                    Err(err) => return Some(Err(err)),
+                };
+                let commands: Vec<_> = commands.collect();
+                if !commands.is_empty() {
+                    self.branches.insert(
+                        self.id,
+                        Branch {
+                            parent: dest.parent,
+                            cursor,
+                            commands,
+                        },
+                    );
+                    self.id = dest.parent;
                 }
             }
         }
