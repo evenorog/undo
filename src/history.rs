@@ -1,16 +1,10 @@
 use std::collections::HashMap;
+use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::RangeFrom;
 use {Command, Error, Record};
 
 const ORIGIN: usize = 0;
-
-#[derive(Debug)]
-struct Branch<R> {
-    parent: usize,
-    cursor: usize,
-    commands: Box<[Box<dyn Command<R> + 'static>]>,
-}
 
 /// A history of commands.
 #[derive(Debug)]
@@ -48,6 +42,7 @@ impl<R> History<R> {
     where
         R: 'static,
     {
+        let cursor = self.record.cursor();
         let commands = self.record.apply(cmd)?;
         let commands: Vec<_> = commands.collect();
         if !commands.is_empty() {
@@ -56,8 +51,8 @@ impl<R> History<R> {
                 id,
                 Branch {
                     parent: self.id,
-                    cursor: self.record.cursor(),
-                    commands: commands.into_boxed_slice(),
+                    cursor,
+                    commands,
                 },
             );
             Ok(Some(id))
@@ -94,34 +89,55 @@ impl<R> History<R> {
     /// Jumps to the command in `branch` at `cursor`.
     #[inline]
     #[must_use]
-    pub fn jump_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>> {
+    pub fn jump_to(&mut self, mut branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
+    where
+        R: 'static,
+    {
         if self.id == branch {
             return self.record.set_cursor(cursor);
         }
 
-        let mut dest = self.branches.get(&branch)?;
+        let mut dest = self.branches.remove(&branch)?;
+        branch = dest.parent;
         let mut path = vec![dest];
-        while dest.parent != ORIGIN {
-            dest = &self.branches[&dest.parent];
+        while branch != ORIGIN {
+            dest = self.branches.remove(&branch).unwrap();
             path.push(dest);
         }
 
         if self.id != ORIGIN {
-            let mut start = &self.branches[&self.parent];
+            let mut start = self.branches.remove(&self.parent).unwrap();
+            branch = start.parent;
             let mut tmp = vec![start];
-            while start.parent != ORIGIN {
-                start = &self.branches[&start.parent];
+            while branch != ORIGIN {
+                start = self.branches.remove(&branch).unwrap();
                 tmp.push(start);
             }
             tmp.reverse();
             path.append(&mut tmp);
         }
 
-        while let Some(_) = path.pop() {
+        while let Some(branch) = path.pop() {
             // Walk the path from `start` to `dest`.
+            if let Err(err) = self.record.set_cursor(branch.cursor).unwrap() {
+                return Some(Err(err));
+            }
+
+            for cmd in branch.commands {
+                if let Err(err) = self.apply(cmd) {
+                    return Some(Err(err));
+                }
+            }
         }
 
-        unimplemented!()
+        Some(Ok(()))
+    }
+}
+
+impl<R: Default> Default for History<R> {
+    #[inline]
+    fn default() -> History<R> {
+        History::new(R::default())
     }
 }
 
@@ -132,8 +148,64 @@ impl<R> From<R> for History<R> {
     }
 }
 
+struct Branch<R> {
+    parent: usize,
+    cursor: usize,
+    commands: Vec<Box<dyn Command<R> + 'static>>,
+}
+
+impl<R> Debug for Branch<R> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Branch")
+            .field("parent", &self.parent)
+            .field("cursor", &self.cursor)
+            .field("commands", &self.commands)
+            .finish()
+    }
+}
+
 /// Builder for a history.
 #[derive(Debug)]
 pub struct HistoryBuilder<R> {
     receiver: PhantomData<R>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::error::Error;
+
+    #[derive(Debug)]
+    struct Add(char);
+
+    impl Command<String> for Add {
+        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+            receiver.push(self.0);
+            Ok(())
+        }
+
+        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+            self.0 = receiver.pop().ok_or("`receiver` is empty")?;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn jump_to() {
+        let mut history = History::default();
+        history.apply(Add('a')).unwrap();
+        history.apply(Add('b')).unwrap();
+        history.apply(Add('c')).unwrap();
+        history.apply(Add('d')).unwrap();
+        history.apply(Add('e')).unwrap();
+
+        history.undo().unwrap().unwrap();
+        history.undo().unwrap().unwrap();
+
+        let b = history.apply(Add('f')).unwrap().unwrap();
+        history.apply(Add('g')).unwrap();
+
+        history.jump_to(b, 5).unwrap().unwrap();
+    }
 }
