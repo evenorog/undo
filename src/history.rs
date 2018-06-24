@@ -94,7 +94,7 @@ impl<R> History<R> {
         R: 'static,
     {
         if self.id == branch {
-            return self.record.set_cursor(cursor);
+            return self.record.jump_to(cursor);
         }
 
         // Find the path from `dest` to `ORIGIN`.
@@ -122,7 +122,7 @@ impl<R> History<R> {
         // Walk the path from `start` to `dest`.
         while let Some(dest) = path.pop() {
             // Move to `dest.cursor` either by undoing or redoing.
-            if let Err(err) = self.record.set_cursor(dest.cursor).unwrap() {
+            if let Err(err) = self.record.jump_to(dest.cursor).unwrap() {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.

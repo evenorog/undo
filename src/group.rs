@@ -131,40 +131,6 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> Group<K, V, S> {
 }
 
 impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
-    /// Calls the [`set_saved`] method on the active record.
-    ///
-    /// [`set_saved`]: record/struct.Record.html#method.set_saved
-    #[inline]
-    pub fn set_saved(&mut self, saved: bool) {
-        self.get_mut_active().map(|record| record.set_saved(saved));
-    }
-
-    /// Calls the [`is_saved`] method on the active record.
-    ///
-    /// [`is_saved`]: record/struct.Record.html#method.is_saved
-    #[inline]
-    pub fn is_saved(&self) -> bool {
-        self.get_active().map_or(false, |record| record.is_saved())
-    }
-
-    /// Calls the [`cursor`] method on the active record.
-    ///
-    /// [`cursor`]: record/struct.Record.html#method.cursor
-    #[inline]
-    pub fn cursor(&self) -> Option<usize> {
-        self.get_active().map(|record| record.cursor())
-    }
-
-    /// Calls the [`set_cursor`] method on the active record.
-    ///
-    /// [`set_cursor`]: record/struct.Record.html#method.set_cursor
-    #[inline]
-    #[must_use]
-    pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
-        self.get_mut_active()
-            .and_then(|record| record.set_cursor(cursor))
-    }
-
     /// Calls the [`apply`] method on the active record.
     ///
     /// [`apply`]: record/struct.Record.html#method.apply
@@ -196,6 +162,16 @@ impl<K: Hash + Eq, R, S: BuildHasher> Group<K, Record<R>, S> {
     #[must_use]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         self.get_mut_active().and_then(|record| record.redo())
+    }
+
+    /// Calls the [`jump_to`] method on the active record.
+    ///
+    /// [`jump_to`]: record/struct.Record.html#method.jump_to
+    #[inline]
+    #[must_use]
+    pub fn jump_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
+        self.get_mut_active()
+            .and_then(|record| record.jump_to(cursor))
     }
 
     /// Calls the [`to_undo_string`] method on the active record.

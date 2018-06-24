@@ -261,73 +261,6 @@ impl<R> Record<R> {
         self.cursor
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
-    /// The signal are emitted once after reaching the `cursor`.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
-    ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
-    /// [`redo`]: trait.Command.html#method.redo
-    #[inline]
-    #[must_use]
-    pub fn set_cursor(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
-        if cursor > self.len() {
-            return None;
-        }
-
-        let was_saved = self.is_saved();
-        let old = self.cursor;
-        let len = self.len();
-        // Temporarily remove signal so they are not called each iteration.
-        let signal = self.signal.take();
-        // Decide if we need to undo or redo to reach cursor.
-        let redo = cursor > self.cursor;
-        let f = if redo { Record::redo } else { Record::undo };
-        while self.cursor != cursor {
-            if let Err(err) = f(self).unwrap() {
-                self.signal = signal;
-                return Some(Err(err));
-            }
-        }
-        // Add signal back.
-        self.signal = signal;
-        let is_saved = self.is_saved();
-        if let Some(ref mut f) = self.signal {
-            // Emit signal if the cursor has changed.
-            if old != self.cursor {
-                f(Signal::Cursor {
-                    old,
-                    new: self.cursor,
-                });
-            }
-            // Check if the receiver went from saved to unsaved, or unsaved to saved.
-            if was_saved != is_saved {
-                f(Signal::Saved(is_saved));
-            }
-            if redo {
-                // Check if the records ability to redo changed.
-                if old == len - 1 {
-                    f(Signal::Redo(false));
-                }
-                // Check if the records ability to undo changed.
-                if old == 0 {
-                    f(Signal::Undo(true));
-                }
-            } else {
-                // Check if the records ability to redo changed.
-                if old == len {
-                    f(Signal::Redo(true));
-                }
-                // Check if the records ability to undo changed.
-                if old == 1 {
-                    f(Signal::Undo(false));
-                }
-            }
-        }
-        Some(Ok(()))
-    }
-
     /// Removes all commands from the record without undoing them.
     #[inline]
     pub fn clear(&mut self) {
@@ -520,6 +453,73 @@ impl<R> Record<R> {
             // Check if the receiver went from saved to unsaved, or unsaved to saved.
             if was_saved != is_saved {
                 f(Signal::Saved(is_saved));
+            }
+        }
+        Some(Ok(()))
+    }
+
+    /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
+    /// The signal are emitted once after reaching the `cursor`.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
+    ///
+    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`redo`]: trait.Command.html#method.redo
+    #[inline]
+    #[must_use]
+    pub fn jump_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
+        if cursor > self.len() {
+            return None;
+        }
+
+        let was_saved = self.is_saved();
+        let old = self.cursor;
+        let len = self.len();
+        // Temporarily remove signal so they are not called each iteration.
+        let signal = self.signal.take();
+        // Decide if we need to undo or redo to reach cursor.
+        let redo = cursor > self.cursor;
+        let f = if redo { Record::redo } else { Record::undo };
+        while self.cursor != cursor {
+            if let Err(err) = f(self).unwrap() {
+                self.signal = signal;
+                return Some(Err(err));
+            }
+        }
+        // Add signal back.
+        self.signal = signal;
+        let is_saved = self.is_saved();
+        if let Some(ref mut f) = self.signal {
+            // Emit signal if the cursor has changed.
+            if old != self.cursor {
+                f(Signal::Cursor {
+                    old,
+                    new: self.cursor,
+                });
+            }
+            // Check if the receiver went from saved to unsaved, or unsaved to saved.
+            if was_saved != is_saved {
+                f(Signal::Saved(is_saved));
+            }
+            if redo {
+                // Check if the records ability to redo changed.
+                if old == len - 1 {
+                    f(Signal::Redo(false));
+                }
+                // Check if the records ability to undo changed.
+                if old == 0 {
+                    f(Signal::Undo(true));
+                }
+            } else {
+                // Check if the records ability to redo changed.
+                if old == len {
+                    f(Signal::Redo(true));
+                }
+                // Check if the records ability to undo changed.
+                if old == 1 {
+                    f(Signal::Undo(false));
+                }
             }
         }
         Some(Ok(()))
@@ -889,25 +889,25 @@ mod tests {
         record.apply(Add('d')).unwrap();
         record.apply(Add('e')).unwrap();
 
-        record.set_cursor(0).unwrap().unwrap();
+        record.jump_to(0).unwrap().unwrap();
         assert_eq!(record.cursor(), 0);
         assert_eq!(record.as_receiver(), "");
-        record.set_cursor(1).unwrap().unwrap();
+        record.jump_to(1).unwrap().unwrap();
         assert_eq!(record.cursor(), 1);
         assert_eq!(record.as_receiver(), "a");
-        record.set_cursor(2).unwrap().unwrap();
+        record.jump_to(2).unwrap().unwrap();
         assert_eq!(record.cursor(), 2);
         assert_eq!(record.as_receiver(), "ab");
-        record.set_cursor(3).unwrap().unwrap();
+        record.jump_to(3).unwrap().unwrap();
         assert_eq!(record.cursor(), 3);
         assert_eq!(record.as_receiver(), "abc");
-        record.set_cursor(4).unwrap().unwrap();
+        record.jump_to(4).unwrap().unwrap();
         assert_eq!(record.cursor(), 4);
         assert_eq!(record.as_receiver(), "abcd");
-        record.set_cursor(5).unwrap().unwrap();
+        record.jump_to(5).unwrap().unwrap();
         assert_eq!(record.cursor(), 5);
         assert_eq!(record.as_receiver(), "abcde");
-        assert!(record.set_cursor(6).is_none());
+        assert!(record.jump_to(6).is_none());
         assert_eq!(record.cursor(), 5);
     }
 
