@@ -95,7 +95,7 @@ impl<R> History<R> {
             return self.record.set_cursor(cursor);
         }
 
-        let mut dst = &self.branches[&branch];
+        let mut dst = self.branches.get(&branch)?;
         let mut path = vec![dst];
         while dst.parent != self.id {
             dst = &self.branches[&dst.parent];
@@ -119,7 +119,7 @@ impl<R> From<R> for History<R> {
 }
 
 /// Builder for a history.
-#[allow(missing_debug_implementations)]
+#[derive(Debug)]
 pub struct HistoryBuilder<R> {
     receiver: PhantomData<R>,
 }
