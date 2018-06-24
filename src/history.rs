@@ -3,6 +3,8 @@ use std::marker::PhantomData;
 use std::ops::RangeFrom;
 use {Command, Error, Record};
 
+const ORIGIN: usize = 0;
+
 #[derive(Debug)]
 struct Branch<R> {
     parent: usize,
@@ -14,6 +16,7 @@ struct Branch<R> {
 #[derive(Debug)]
 pub struct History<R> {
     id: usize,
+    parent: usize,
     next: RangeFrom<usize>,
     record: Record<R>,
     branches: HashMap<usize, Branch<R>>,
@@ -24,7 +27,8 @@ impl<R> History<R> {
     #[inline]
     pub fn new(receiver: impl Into<R>) -> History<R> {
         History {
-            id: 0,
+            id: ORIGIN,
+            parent: ORIGIN,
             next: 1..,
             record: Record::new(receiver),
             branches: HashMap::new(),
@@ -95,16 +99,26 @@ impl<R> History<R> {
             return self.record.set_cursor(cursor);
         }
 
-        let mut dst = self.branches.get(&branch)?;
-        let mut path = vec![dst];
-        while dst.parent != self.id {
-            dst = &self.branches[&dst.parent];
-            path.push(dst);
+        let mut dest = self.branches.get(&branch)?;
+        let mut path = vec![dest];
+        while dest.parent != ORIGIN {
+            dest = &self.branches[&dest.parent];
+            path.push(dest);
         }
 
-        while let Some(last) = path.pop() {
-            let _ = last.parent;
-            let _ = last.cursor;
+        if self.id != ORIGIN {
+            let mut start = &self.branches[&self.parent];
+            let mut tmp = vec![start];
+            while start.parent != ORIGIN {
+                start = &self.branches[&start.parent];
+                tmp.push(start);
+            }
+            tmp.reverse();
+            path.append(&mut tmp);
+        }
+
+        while let Some(_) = path.pop() {
+            // Walk the path from `start` to `dest`.
         }
 
         unimplemented!()
