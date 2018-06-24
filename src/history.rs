@@ -97,6 +97,7 @@ impl<R> History<R> {
             return self.record.set_cursor(cursor);
         }
 
+        // Find the path from `dest` to `ORIGIN`.
         let mut dest = self.branches.remove(&branch)?;
         branch = dest.parent;
         let mut path = vec![dest];
@@ -105,6 +106,7 @@ impl<R> History<R> {
             path.push(dest);
         }
 
+        // Find the path from `start` to `ORIGIN`.
         if self.id != ORIGIN {
             let mut start = self.branches.remove(&self.parent).unwrap();
             branch = start.parent;
@@ -117,13 +119,14 @@ impl<R> History<R> {
             path.append(&mut tmp);
         }
 
-        while let Some(branch) = path.pop() {
-            // Walk the path from `start` to `dest`.
-            if let Err(err) = self.record.set_cursor(branch.cursor).unwrap() {
+        // Walk the path from `start` to `dest`.
+        while let Some(dest) = path.pop() {
+            // Move to `dest.cursor` either by undoing or redoing.
+            if let Err(err) = self.record.set_cursor(dest.cursor).unwrap() {
                 return Some(Err(err));
             }
-
-            for cmd in branch.commands {
+            // Apply the commands in the branch and move older commands into their own branch.
+            for cmd in dest.commands {
                 if let Err(err) = self.apply(cmd) {
                     return Some(Err(err));
                 }
