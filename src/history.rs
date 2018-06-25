@@ -1,7 +1,8 @@
 use fnv::{FnvHashMap, FnvHashSet};
+use std::collections::vec_deque::IntoIter;
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
-use {Command, Error, Record};
+use {Command, Error, Record, Signal};
 
 const ORIGIN: usize = 0;
 
@@ -42,9 +43,8 @@ impl<R> History<R> {
         R: 'static,
     {
         let cursor = self.record.cursor();
-        let commands = self.record.apply(cmd)?;
-        let commands: Vec<_> = commands.collect();
-        if !commands.is_empty() {
+        let commands = self.record.__apply(cmd)?;
+        if commands.len() > 0 {
             let id = self.next;
             self.next += 1;
             self.branches.insert(
@@ -136,6 +136,7 @@ impl<R> History<R> {
         path[len..].reverse();
 
         // Walk the path from `start` to `dest`.
+        let old = self.id;
         for branch in path {
             // Move to `dest.cursor` either by undoing or redoing.
             if let Err(err) = self.record.jump_to(branch.cursor).unwrap() {
@@ -144,12 +145,11 @@ impl<R> History<R> {
             // Apply the commands in the branch and move older commands into their own branch.
             for cmd in branch.commands {
                 let cursor = self.record.cursor();
-                let commands = match self.record.apply(cmd) {
+                let commands = match self.record.__apply(cmd) {
                     Ok(commands) => commands,
                     Err(err) => return Some(Err(err)),
                 };
-                let commands: Vec<_> = commands.collect();
-                if !commands.is_empty() {
+                if commands.len() > 0 {
                     self.branches.insert(
                         self.id,
                         Branch {
@@ -166,6 +166,10 @@ impl<R> History<R> {
                     self.id = branch.parent;
                 }
             }
+        }
+
+        if let Some(ref mut f) = self.record.signal {
+            f(Signal::Branch { old, new: self.id });
         }
 
         Some(Ok(()))
@@ -189,7 +193,7 @@ impl<R> From<R> for History<R> {
 struct Branch<R> {
     parent: usize,
     cursor: usize,
-    commands: Vec<Box<dyn Command<R> + 'static>>,
+    commands: IntoIter<Box<dyn Command<R> + 'static>>,
 }
 
 impl<R> Debug for Branch<R> {

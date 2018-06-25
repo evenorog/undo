@@ -10,6 +10,7 @@ extern crate fnv;
 mod history;
 mod merge;
 mod record;
+mod signal;
 
 use std::{
     error, fmt::{self, Debug, Display, Formatter},
@@ -17,7 +18,8 @@ use std::{
 
 pub use history::{History, HistoryBuilder};
 pub use merge::{Merged, Merger};
-pub use record::{Record, RecordBuilder, Signal};
+pub use record::{Record, RecordBuilder};
+pub use signal::Signal;
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]

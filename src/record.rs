@@ -1,45 +1,11 @@
-use std::collections::vec_deque::VecDeque;
+use std::collections::vec_deque::{IntoIter, VecDeque};
 #[cfg(feature = "display")]
 use std::fmt::Display;
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
-use {merge::Merged, Command, Error};
+use {merge::Merged, Command, Error, Signal};
 
 const NO_LIMIT: usize = 0;
-
-/// The signal sent when the record or the receiver changes.
-///
-/// When one of these states changes in the record or the receiver, they will send a corresponding
-/// signal to the user. For example, if the record can no longer redo any commands, it sends a
-/// `Signal::Redo(false)` signal to tell the user. The signal can be handled in the [`signal`]
-/// method.
-///
-/// [`signal`]: struct.RecordBuilder.html#method.signal
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub enum Signal {
-    /// Says if the record can undo.
-    ///
-    /// This signal will be emitted when the records ability to undo changes.
-    Undo(bool),
-    /// Says if the record can redo.
-    ///
-    /// This signal will be emitted when the records ability to redo changes.
-    Redo(bool),
-    /// Says if the receiver is in a saved state.
-    ///
-    /// This signal will be emitted when the record enters or leaves its receivers saved state.
-    Saved(bool),
-    /// Says if the current command has changed.
-    ///
-    /// This signal will be emitted when the records cursor has changed. This includes
-    /// when two commands have been merged, in which case `old == new`.
-    Cursor {
-        /// The position of the old command.
-        old: usize,
-        /// The position of the new command.
-        new: usize,
-    },
-}
 
 /// A record of commands.
 ///
@@ -101,7 +67,7 @@ pub struct Record<R> {
     cursor: usize,
     limit: usize,
     saved: Option<usize>,
-    signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
+    pub(crate) signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
 }
 
 impl<R> Record<R> {
@@ -301,8 +267,19 @@ impl<R> Record<R> {
     #[inline]
     pub fn apply(
         &mut self,
-        mut cmd: impl Command<R> + 'static,
+        cmd: impl Command<R> + 'static,
     ) -> Result<impl Iterator<Item = Box<dyn Command<R> + 'static>>, Error<R>>
+    where
+        R: 'static,
+    {
+        self.__apply(cmd)
+    }
+
+    #[inline]
+    pub(crate) fn __apply(
+        &mut self,
+        mut cmd: impl Command<R> + 'static,
+    ) -> Result<IntoIter<Box<dyn Command<R> + 'static>>, Error<R>>
     where
         R: 'static,
     {
@@ -745,7 +722,8 @@ impl<R> RecordBuilder<R> {
     ///             Signal::Saved(false) => println!("The receiver is not in a saved state."),
     ///             Signal::Cursor { old, new } => {
     ///                 println!("The current command has changed from {} to {}.", old, new);
-    ///             }
+    ///             },
+    ///             _ => {},
     ///         }
     ///     })
     ///     .default();
@@ -909,54 +887,5 @@ mod tests {
         assert_eq!(record.as_receiver(), "abcde");
         assert!(record.jump_to(6).is_none());
         assert_eq!(record.cursor(), 5);
-    }
-
-    #[test]
-    fn signal() {
-        use std::sync::{
-            atomic::{AtomicBool, AtomicUsize, Ordering}, Arc,
-        };
-
-        let mut record = Record::default();
-        let undo = Arc::new(AtomicBool::new(false));
-        let redo = Arc::new(AtomicBool::new(false));
-        let saved = Arc::new(AtomicBool::new(false));
-        let cursor = Arc::new(AtomicUsize::new(0));
-        {
-            let undo = undo.clone();
-            let redo = redo.clone();
-            let saved = saved.clone();
-            let cursor = cursor.clone();
-            record.set_signal(move |signal| match signal {
-                Signal::Undo(x) => undo.store(x, Ordering::Relaxed),
-                Signal::Redo(x) => redo.store(x, Ordering::Relaxed),
-                Signal::Saved(x) => saved.store(x, Ordering::Relaxed),
-                Signal::Cursor { new, .. } => cursor.store(new, Ordering::Relaxed),
-            });
-        }
-
-        record.apply(Add('a')).unwrap();
-        assert_eq!(undo.load(Ordering::Relaxed), true);
-        assert_eq!(redo.load(Ordering::Relaxed), false);
-        assert_eq!(saved.load(Ordering::Relaxed), false);
-        assert_eq!(cursor.load(Ordering::Relaxed), 1);
-
-        record.undo().unwrap().unwrap();
-        assert_eq!(undo.load(Ordering::Relaxed), false);
-        assert_eq!(redo.load(Ordering::Relaxed), true);
-        assert_eq!(saved.load(Ordering::Relaxed), true);
-        assert_eq!(cursor.load(Ordering::Relaxed), 0);
-
-        record.redo().unwrap().unwrap();
-        assert_eq!(undo.load(Ordering::Relaxed), true);
-        assert_eq!(redo.load(Ordering::Relaxed), false);
-        assert_eq!(saved.load(Ordering::Relaxed), false);
-        assert_eq!(cursor.load(Ordering::Relaxed), 1);
-
-        record.clear();
-        assert_eq!(undo.load(Ordering::Relaxed), false);
-        assert_eq!(redo.load(Ordering::Relaxed), false);
-        assert_eq!(saved.load(Ordering::Relaxed), false);
-        assert_eq!(cursor.load(Ordering::Relaxed), 0);
     }
 }
