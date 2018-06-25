@@ -1,7 +1,6 @@
-use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
-use std::ops::RangeFrom;
+use fnv::{FnvHashMap, FnvHashSet};
 use {Command, Error, Record};
 
 const ORIGIN: usize = 0;
@@ -11,9 +10,9 @@ const ORIGIN: usize = 0;
 pub struct History<R> {
     id: usize,
     parent: usize,
-    next: RangeFrom<usize>,
+    next: usize,
     record: Record<R>,
-    branches: HashMap<usize, Branch<R>>,
+    branches: FnvHashMap<usize, Branch<R>>,
 }
 
 impl<R> History<R> {
@@ -23,9 +22,9 @@ impl<R> History<R> {
         History {
             id: ORIGIN,
             parent: ORIGIN,
-            next: 1..,
+            next: 1,
             record: Record::new(receiver),
-            branches: HashMap::new(),
+            branches: FnvHashMap::default(),
         }
     }
 
@@ -46,7 +45,8 @@ impl<R> History<R> {
         let commands = self.record.apply(cmd)?;
         let commands: Vec<_> = commands.collect();
         if !commands.is_empty() {
-            let id = self.next.next().unwrap();
+            let id = self.next;
+            self.next += 1;
             self.branches.insert(
                 id,
                 Branch {
@@ -99,7 +99,7 @@ impl<R> History<R> {
 
         // All visited nodes.
         let visited = {
-            let mut visited = HashSet::new();
+            let mut visited = FnvHashSet::default();
             // Find the path from `dest` to `ORIGIN`.
             let mut dest = self.branches.get(&branch)?;
             while dest.parent != ORIGIN {

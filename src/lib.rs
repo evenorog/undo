@@ -5,6 +5,8 @@
 #![forbid(unstable_features, bad_style, bare_trait_objects)]
 #![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
 
+extern crate fnv;
+
 mod group;
 mod history;
 mod merge;
