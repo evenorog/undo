@@ -1,6 +1,6 @@
+use fnv::{FnvHashMap, FnvHashSet};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
-use fnv::{FnvHashMap, FnvHashSet};
 use {Command, Error, Record};
 
 const ORIGIN: usize = 0;
@@ -9,8 +9,8 @@ const ORIGIN: usize = 0;
 #[derive(Debug)]
 pub struct History<R> {
     id: usize,
-    parent: usize,
     next: usize,
+    parent: Option<usize>,
     record: Record<R>,
     branches: FnvHashMap<usize, Branch<R>>,
 }
@@ -21,8 +21,8 @@ impl<R> History<R> {
     pub fn new(receiver: impl Into<R>) -> History<R> {
         History {
             id: ORIGIN,
-            parent: ORIGIN,
             next: 1,
+            parent: None,
             record: Record::new(receiver),
             branches: FnvHashMap::default(),
         }
@@ -99,7 +99,8 @@ impl<R> History<R> {
 
         // All visited nodes.
         let visited = {
-            let mut visited = FnvHashSet::default();
+            let mut visited =
+                FnvHashSet::with_capacity_and_hasher(self.record.capacity(), Default::default());
             // Find the path from `dest` to `ORIGIN`.
             let mut dest = self.branches.get(&branch)?;
             while dest.parent != ORIGIN {
@@ -111,8 +112,8 @@ impl<R> History<R> {
 
         let mut path = Vec::with_capacity(visited.len() + self.record.len());
         // Find the path from `start` to the lowest common ancestor of `dest`.
-        if self.id != ORIGIN {
-            let mut start = self.branches.remove(&self.parent).unwrap();
+        if let Some(ref parent) = self.parent {
+            let mut start = self.branches.remove(parent).unwrap();
             branch = start.parent;
             while !visited.contains(&branch) {
                 path.push(start);
@@ -135,13 +136,13 @@ impl<R> History<R> {
         path[len..].reverse();
 
         // Walk the path from `start` to `dest`.
-        for dest in path {
+        for branch in path {
             // Move to `dest.cursor` either by undoing or redoing.
-            if let Err(err) = self.record.jump_to(dest.cursor).unwrap() {
+            if let Err(err) = self.record.jump_to(branch.cursor).unwrap() {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
-            for cmd in dest.commands {
+            for cmd in branch.commands {
                 let cursor = self.record.cursor();
                 let commands = match self.record.apply(cmd) {
                     Ok(commands) => commands,
@@ -152,12 +153,17 @@ impl<R> History<R> {
                     self.branches.insert(
                         self.id,
                         Branch {
-                            parent: dest.parent,
+                            parent: branch.parent,
                             cursor,
                             commands,
                         },
                     );
-                    self.id = dest.parent;
+                    self.parent = if branch.parent == ORIGIN {
+                        None
+                    } else {
+                        Some(self.id)
+                    };
+                    self.id = branch.parent;
                 }
             }
         }
