@@ -7,7 +7,6 @@
 
 extern crate fnv;
 
-mod group;
 mod history;
 mod merge;
 mod record;
@@ -16,7 +15,6 @@ use std::{
     error, fmt::{self, Debug, Display, Formatter},
 };
 
-pub use group::{Group, GroupBuilder};
 pub use history::{History, HistoryBuilder};
 pub use merge::{Merged, Merger};
 pub use record::{Record, RecordBuilder, Signal};
