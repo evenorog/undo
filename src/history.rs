@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::RangeFrom;
@@ -93,8 +93,6 @@ impl<R> History<R> {
     where
         R: 'static,
     {
-        use std::collections::HashSet;
-
         if self.id == branch {
             return self.record.jump_to(cursor);
         }
@@ -111,7 +109,7 @@ impl<R> History<R> {
             visited
         };
 
-        let mut path = vec![];
+        let mut path = Vec::with_capacity(visited.len() + self.record.len());
         // Find the path from `start` to the lowest common ancestor of `dest`.
         if self.id != ORIGIN {
             let mut start = self.branches.remove(&self.parent).unwrap();
@@ -126,15 +124,15 @@ impl<R> History<R> {
         // Find the path from `dest` to the lowest common ancestor of `start`.
         let mut dest = self.branches.remove(&branch)?;
         branch = dest.parent;
-        let mut tmp = vec![dest];
+        let len = path.len();
+        path.push(dest);
         let last = path.last().map_or(ORIGIN, |last| last.parent);
-        while branch != ORIGIN || branch != last {
+        while branch != last {
             dest = self.branches.remove(&branch).unwrap();
             branch = dest.parent;
-            tmp.push(dest);
+            path.push(dest);
         }
-        tmp.reverse();
-        path.append(&mut tmp);
+        path[len..].reverse();
 
         // Walk the path from `start` to `dest`.
         for dest in path {
