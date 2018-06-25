@@ -419,7 +419,7 @@ impl<R> HistoryBuilder<R> {
         self
     }
 
-    /// Creates the record.
+    /// Creates the history.
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> History<R> {
         History {
@@ -436,7 +436,7 @@ impl<R> HistoryBuilder<R> {
 }
 
 impl<R: Default> HistoryBuilder<R> {
-    /// Creates the record with a default `receiver`.
+    /// Creates the history with a default `receiver`.
     #[inline]
     pub fn default(self) -> History<R> {
         self.build(R::default())
