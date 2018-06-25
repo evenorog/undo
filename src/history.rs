@@ -8,6 +8,54 @@ use {Command, Error, Record, RecordBuilder, Signal};
 const ORIGIN: usize = 0;
 
 /// A history of commands.
+///
+/// A history works mostly like a record but also provides branching, like [Vim]s undo-tree.
+///
+/// # Examples
+/// ```
+/// # use std::error::Error;
+/// # use undo::*;
+/// #[derive(Debug)]
+/// struct Add(char);
+///
+/// impl Command<String> for Add {
+///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+///         s.push(self.0);
+///         Ok(())
+///     }
+///
+///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+///         Ok(())
+///     }
+/// }
+///
+/// fn main() -> Result<(), Box<dyn Error>> {
+///     let mut history = History::default();
+///
+///     history.apply(Add('a'))?;
+///     history.apply(Add('b'))?;
+///     history.apply(Add('c'))?;
+///
+///     assert_eq!(history.as_receiver(), "abc");
+///
+///     history.undo().unwrap()?;
+///     history.undo().unwrap()?;
+///     history.undo().unwrap()?;
+///
+///     assert_eq!(history.as_receiver(), "");
+///
+///     history.redo().unwrap()?;
+///     history.redo().unwrap()?;
+///     history.redo().unwrap()?;
+///
+///     assert_eq!(history.into_receiver(), "abc");
+///
+///     Ok(())
+/// }
+/// ```
+///
+/// [Vim]: https://www.vim.org/
 #[derive(Debug)]
 pub struct History<R> {
     id: usize,
