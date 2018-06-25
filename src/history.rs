@@ -93,36 +93,51 @@ impl<R> History<R> {
     where
         R: 'static,
     {
+        use std::collections::HashSet;
+
         if self.id == branch {
             return self.record.jump_to(cursor);
         }
 
-        // Find the path from `dest` to `ORIGIN`.
-        let mut dest = self.branches.remove(&branch)?;
-        branch = dest.parent;
-        let mut path = vec![dest];
-        while branch != ORIGIN {
-            dest = self.branches.remove(&branch).unwrap();
-            branch = dest.parent;
-            path.push(dest);
-        }
+        // All visited nodes.
+        let visited = {
+            let mut visited = HashSet::new();
+            // Find the path from `dest` to `ORIGIN`.
+            let mut dest = self.branches.get(&branch)?;
+            while dest.parent != ORIGIN {
+                assert!(visited.insert(dest.parent));
+                dest = self.branches.get(&dest.parent).unwrap();
+            }
+            visited
+        };
 
-        // Find the path from `start` to `ORIGIN`.
+        let mut path = vec![];
+        // Find the path from `start` to the lowest common ancestor of `dest`.
         if self.id != ORIGIN {
             let mut start = self.branches.remove(&self.parent).unwrap();
             branch = start.parent;
-            let mut tmp = vec![start];
-            while branch != ORIGIN {
+            while !visited.contains(&branch) {
+                path.push(start);
                 start = self.branches.remove(&branch).unwrap();
                 branch = start.parent;
-                tmp.push(start);
             }
-            tmp.reverse();
-            path.append(&mut tmp);
         }
 
+        // Find the path from `dest` to the lowest common ancestor of `start`.
+        let mut dest = self.branches.remove(&branch)?;
+        branch = dest.parent;
+        let mut tmp = vec![dest];
+        let last = path.last().map_or(ORIGIN, |last| last.parent);
+        while branch != ORIGIN || branch != last {
+            dest = self.branches.remove(&branch).unwrap();
+            branch = dest.parent;
+            tmp.push(dest);
+        }
+        tmp.reverse();
+        path.append(&mut tmp);
+
         // Walk the path from `start` to `dest`.
-        while let Some(dest) = path.pop() {
+        for dest in path {
             // Move to `dest.cursor` either by undoing or redoing.
             if let Err(err) = self.record.jump_to(dest.cursor).unwrap() {
                 return Some(Err(err));
