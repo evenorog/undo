@@ -436,7 +436,6 @@ impl<R> Record<R> {
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
-    /// The signal are emitted once after reaching the `cursor`.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
@@ -445,7 +444,7 @@ impl<R> Record<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn jump_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
+    pub fn go_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
         if cursor > self.len() {
             return None;
         }
@@ -500,6 +499,35 @@ impl<R> Record<R> {
             }
         }
         Some(Ok(()))
+    }
+
+    /// Jump directly to the command at `cursor` and executes its [`undo`] or [`redo`] method.
+    ///
+    /// This method can be used if the commands store the whole state of the receiver,
+    /// and does not require the commands in between to be called to get the same result.
+    /// Use [`go_to`] otherwise.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
+    ///
+    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`redo`]: trait.Command.html#method.redo
+    /// [`go_to`]: struct.Record.html#method.go_to
+    #[inline]
+    #[must_use]
+    pub fn jump_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
+        if cursor > self.len() {
+            return None;
+        }
+
+        // Decide if we need to undo or redo to reach cursor.
+        let f = if cursor > self.cursor {
+            Record::redo
+        } else {
+            Record::undo
+        };
+        self.cursor = cursor;
+        f(self)
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
@@ -867,25 +895,25 @@ mod tests {
         record.apply(Add('d')).unwrap();
         record.apply(Add('e')).unwrap();
 
-        record.jump_to(0).unwrap().unwrap();
+        record.go_to(0).unwrap().unwrap();
         assert_eq!(record.cursor(), 0);
         assert_eq!(record.as_receiver(), "");
-        record.jump_to(1).unwrap().unwrap();
+        record.go_to(1).unwrap().unwrap();
         assert_eq!(record.cursor(), 1);
         assert_eq!(record.as_receiver(), "a");
-        record.jump_to(2).unwrap().unwrap();
+        record.go_to(2).unwrap().unwrap();
         assert_eq!(record.cursor(), 2);
         assert_eq!(record.as_receiver(), "ab");
-        record.jump_to(3).unwrap().unwrap();
+        record.go_to(3).unwrap().unwrap();
         assert_eq!(record.cursor(), 3);
         assert_eq!(record.as_receiver(), "abc");
-        record.jump_to(4).unwrap().unwrap();
+        record.go_to(4).unwrap().unwrap();
         assert_eq!(record.cursor(), 4);
         assert_eq!(record.as_receiver(), "abcd");
-        record.jump_to(5).unwrap().unwrap();
+        record.go_to(5).unwrap().unwrap();
         assert_eq!(record.cursor(), 5);
         assert_eq!(record.as_receiver(), "abcde");
-        assert!(record.jump_to(6).is_none());
+        assert!(record.go_to(6).is_none());
         assert_eq!(record.cursor(), 5);
     }
 }

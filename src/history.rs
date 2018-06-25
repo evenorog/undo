@@ -232,15 +232,21 @@ impl<R> History<R> {
         self.record.redo()
     }
 
-    /// Jumps to the command in `branch` at `cursor`.
+    /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `cursor` is reached.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
+    ///
+    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn jump_to(&mut self, mut branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
+    pub fn go_to(&mut self, mut branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
     where
         R: 'static,
     {
         if self.id == branch {
-            return self.record.jump_to(cursor);
+            return self.record.go_to(cursor);
         }
 
         // All visited nodes.
@@ -285,7 +291,7 @@ impl<R> History<R> {
         let old = self.id;
         for branch in path {
             // Move to `dest.cursor` either by undoing or redoing.
-            if let Err(err) = self.record.jump_to(branch.cursor).unwrap() {
+            if let Err(err) = self.record.go_to(branch.cursor).unwrap() {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
@@ -319,6 +325,24 @@ impl<R> History<R> {
         }
 
         Some(Ok(()))
+    }
+
+    /// Jump directly to the command in `branch` at `cursor` and executes its [`undo`] or [`redo`] method.
+    ///
+    /// This method can be used if the commands store the whole state of the receiver,
+    /// and does not require the commands in between to be called to get the same result.
+    /// Use [`go_to`] otherwise.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
+    ///
+    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`redo`]: trait.Command.html#method.redo
+    /// [`go_to`]: struct.History.html#method.go_to
+    #[inline]
+    #[must_use]
+    pub fn jump_to(&mut self, _: usize, _: usize) -> Option<Result<(), Error<R>>> {
+        unimplemented!()
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
@@ -526,6 +550,6 @@ mod tests {
         let b = history.apply(Add('f')).unwrap().unwrap();
         history.apply(Add('g')).unwrap();
 
-        history.jump_to(b, 5).unwrap().unwrap();
+        history.go_to(b, 5).unwrap().unwrap();
     }
 }
