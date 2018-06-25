@@ -1,8 +1,9 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::vec_deque::IntoIter;
+#[cfg(feature = "display")]
+use std::fmt::Display;
 use std::fmt::{self, Debug, Formatter};
-use std::marker::PhantomData;
-use {Command, Error, Record, Signal};
+use {Command, Error, Record, RecordBuilder, Signal};
 
 const ORIGIN: usize = 0;
 
@@ -27,6 +28,103 @@ impl<R> History<R> {
             record: Record::new(receiver),
             branches: FnvHashMap::default(),
         }
+    }
+
+    /// Returns a builder for a history.
+    #[inline]
+    pub fn builder() -> HistoryBuilder<R> {
+        HistoryBuilder {
+            inner: Record::builder(),
+            capacity_for_branching: 0,
+        }
+    }
+
+    /// Reserves capacity for at least `additional` more commands.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.record.reserve(additional);
+    }
+
+    /// Returns the capacity of the history.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.record.capacity()
+    }
+
+    /// Returns the number of commands in the current branch of the history.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.record.len()
+    }
+
+    /// Returns `true` if the current branch of the history is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.record.is_empty()
+    }
+
+    /// Returns the limit of the history.
+    #[inline]
+    pub fn limit(&self) -> usize {
+        self.record.limit()
+    }
+
+    /// Sets the limit of the history and returns the new limit.
+    ///
+    /// If `limit < len` the first commands will be removed until `len == limit`.
+    /// However, if the current active command is going to be removed, the limit is instead
+    /// adjusted to `len - active` so the active command is not removed.
+    #[inline]
+    pub fn set_limit(&mut self, limit: usize) -> usize {
+        self.record.set_limit(limit)
+    }
+
+    /// Sets how the signal should be handled when the state changes.
+    #[inline]
+    pub fn set_signal(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
+        self.record.set_signal(f);
+    }
+
+    /// Returns `true` if the history can undo.
+    #[inline]
+    pub fn can_undo(&self) -> bool {
+        self.record.can_undo()
+    }
+
+    /// Returns `true` if the history can redo.
+    #[inline]
+    pub fn can_redo(&self) -> bool {
+        self.record.can_redo()
+    }
+
+    /// Marks the receiver as currently being in a saved or unsaved state.
+    #[inline]
+    pub fn set_saved(&mut self, saved: bool) {
+        self.record.set_saved(saved)
+    }
+
+    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
+    #[inline]
+    pub fn is_saved(&self) -> bool {
+        self.record.is_saved()
+    }
+
+    /// Returns the position of the current command.
+    #[inline]
+    pub fn cursor(&self) -> usize {
+        self.record.cursor()
+    }
+
+    /// Removes all commands from the history without undoing them.
+    #[inline]
+    pub fn clear(&mut self) {
+        self.record.clear();
+        self.id = ORIGIN;
+        self.parent = None;
+        self.branches.clear();
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -174,6 +272,46 @@ impl<R> History<R> {
 
         Some(Ok(()))
     }
+
+    /// Returns the string of the command which will be undone in the next call to [`undo`].
+    ///
+    /// [`undo`]: struct.History.html#method.undo
+    #[inline]
+    #[must_use]
+    #[cfg(feature = "display")]
+    pub fn to_undo_string(&self) -> Option<String> {
+        self.record.to_undo_string()
+    }
+
+    /// Returns the string of the command which will be redone in the next call to [`redo`].
+    ///
+    /// [`redo`]: struct.History.html#method.redo
+    #[inline]
+    #[must_use]
+    #[cfg(feature = "display")]
+    pub fn to_redo_string(&self) -> Option<String> {
+        self.record.to_redo_string()
+    }
+
+    /// Returns a reference to the `receiver`.
+    #[inline]
+    pub fn as_receiver(&self) -> &R {
+        self.record.as_receiver()
+    }
+
+    /// Returns a mutable reference to the `receiver`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_receiver(&mut self) -> &mut R {
+        self.record.as_mut_receiver()
+    }
+
+    /// Consumes the history, returning the `receiver`.
+    #[inline]
+    pub fn into_receiver(self) -> R {
+        self.record.into_receiver()
+    }
 }
 
 impl<R: Default> Default for History<R> {
@@ -183,10 +321,32 @@ impl<R: Default> Default for History<R> {
     }
 }
 
+impl<R> AsRef<R> for History<R> {
+    #[inline]
+    fn as_ref(&self) -> &R {
+        self.as_receiver()
+    }
+}
+
+impl<R> AsMut<R> for History<R> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut R {
+        self.as_mut_receiver()
+    }
+}
+
 impl<R> From<R> for History<R> {
     #[inline]
     fn from(receiver: R) -> Self {
         History::new(receiver)
+    }
+}
+
+#[cfg(feature = "display")]
+impl<R> Display for History<R> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        (&self.record as &Display).fmt(f)
     }
 }
 
@@ -210,7 +370,77 @@ impl<R> Debug for Branch<R> {
 /// Builder for a history.
 #[derive(Debug)]
 pub struct HistoryBuilder<R> {
-    receiver: PhantomData<R>,
+    inner: RecordBuilder<R>,
+    capacity_for_branching: usize,
+}
+
+impl<R> HistoryBuilder<R> {
+    /// Sets the specified [capacity] for the history.
+    ///
+    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
+    #[inline]
+    pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R> {
+        self.inner = self.inner.capacity(capacity);
+        self
+    }
+
+    /// Sets the specified [capacity] for the branches in the history.
+    ///
+    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
+    #[inline]
+    pub fn capacity_for_branching(mut self, capacity: usize) -> HistoryBuilder<R> {
+        self.capacity_for_branching = capacity;
+        self
+    }
+
+    /// Sets the `limit` for the history.
+    ///
+    /// If this limit is reached it will start popping of commands at the beginning
+    /// of the history when pushing new commands on to the stack. No limit is set by
+    /// default which means it may grow indefinitely.
+    #[inline]
+    pub fn limit(mut self, limit: usize) -> HistoryBuilder<R> {
+        self.inner = self.inner.limit(limit);
+        self
+    }
+
+    /// Sets if the receiver is initially in a saved state.
+    #[inline]
+    pub fn saved(mut self, saved: bool) -> HistoryBuilder<R> {
+        self.inner = self.inner.saved(saved);
+        self
+    }
+
+    /// Decides how the signal should be handled when the state changes.
+    /// By default the history does nothing.
+    #[inline]
+    pub fn signal(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> HistoryBuilder<R> {
+        self.inner = self.inner.signal(f);
+        self
+    }
+
+    /// Creates the record.
+    #[inline]
+    pub fn build(self, receiver: impl Into<R>) -> History<R> {
+        History {
+            id: ORIGIN,
+            next: 1,
+            parent: None,
+            record: self.inner.build(receiver),
+            branches: FnvHashMap::with_capacity_and_hasher(
+                self.capacity_for_branching,
+                Default::default(),
+            ),
+        }
+    }
+}
+
+impl<R: Default> HistoryBuilder<R> {
+    /// Creates the record with a default `receiver`.
+    #[inline]
+    pub fn default(self) -> History<R> {
+        self.build(R::default())
+    }
 }
 
 #[cfg(test)]
