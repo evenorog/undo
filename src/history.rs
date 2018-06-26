@@ -5,7 +5,7 @@ use std::fmt::Display;
 use std::fmt::{self, Debug, Formatter};
 use {Command, Error, Record, RecordBuilder, Signal};
 
-const ORIGIN: usize = 0;
+const ROOT: usize = 0;
 
 /// A history of commands.
 ///
@@ -70,7 +70,7 @@ impl<R> History<R> {
     #[inline]
     pub fn new(receiver: impl Into<R>) -> History<R> {
         History {
-            id: ORIGIN,
+            id: ROOT,
             next: 1,
             parent: None,
             record: Record::new(receiver),
@@ -170,7 +170,7 @@ impl<R> History<R> {
     #[inline]
     pub fn clear(&mut self) {
         self.record.clear();
-        self.id = ORIGIN;
+        self.id = ROOT;
         self.parent = None;
         self.branches.clear();
     }
@@ -195,30 +195,8 @@ impl<R> History<R> {
         // This means that the last command has been removed and
         // we need to check if that command had any child branches.
         if old == self.record.cursor() {
-            let mut dead = FnvHashSet::default();
-            let mut children = vec![];
-            // We need to check if any of the branches had the removed node as root.
-            for (&id, branch) in &self.branches {
-                if branch.cursor == ORIGIN && branch.parent == ORIGIN {
-                    if dead.insert(id) {
-                        children.push(id);
-                    }
-                }
-            }
-            // Add all the children of dead branches so they are removed too.
-            while let Some(parent) = children.pop() {
-                for (&id, branch) in &self.branches {
-                    if branch.parent == parent {
-                        if dead.insert(id) {
-                            children.push(id);
-                        }
-                    }
-                }
-            }
-            // Remove all dead branches.
-            for id in dead {
-                self.branches.remove(&id);
-            }
+            let root = self.root();
+            self.remove_children(root, 0);
         }
 
         if commands.len() != 0 {
@@ -280,13 +258,14 @@ impl<R> History<R> {
             return self.record.go_to(cursor);
         }
 
+        let root = self.root();
         // All visited nodes.
         let visited = {
             let mut visited =
                 FnvHashSet::with_capacity_and_hasher(self.record.capacity(), Default::default());
             // Find the path from `dest` to `ORIGIN`.
             let mut dest = self.branches.get(&branch)?;
-            while dest.parent != ORIGIN {
+            while dest.parent != root {
                 assert!(visited.insert(dest.parent));
                 dest = self.branches.get(&dest.parent).unwrap();
             }
@@ -310,7 +289,7 @@ impl<R> History<R> {
         branch = dest.parent;
         let len = path.len();
         path.push(dest);
-        let last = path.last().map_or(ORIGIN, |last| last.parent);
+        let last = path.last().map_or(root, |last| last.parent);
         while branch != last {
             dest = self.branches.remove(&branch).unwrap();
             branch = dest.parent;
@@ -327,7 +306,7 @@ impl<R> History<R> {
             }
             // Apply the commands in the branch and move older commands into their own branch.
             for cmd in branch.commands {
-                let cursor = self.record.cursor();
+                let old = self.record.cursor();
                 let commands = match self.record.__apply(cmd) {
                     Ok(commands) => commands,
                     Err(err) => return Some(Err(err)),
@@ -337,11 +316,11 @@ impl<R> History<R> {
                         self.id,
                         Branch {
                             parent: branch.parent,
-                            cursor,
+                            cursor: old,
                             commands,
                         },
                     );
-                    self.parent = if branch.parent == ORIGIN {
+                    self.parent = if branch.parent == root {
                         None
                     } else {
                         Some(self.id)
@@ -414,6 +393,50 @@ impl<R> History<R> {
     #[inline]
     pub fn into_receiver(self) -> R {
         self.record.into_receiver()
+    }
+
+    /// Find the root.
+    #[inline]
+    fn root(&self) -> usize {
+        match self.parent {
+            Some(parent) => {
+                let mut root = parent;
+                while let Some(branch) = self.branches.get(&root) {
+                    root = branch.parent;
+                }
+                root
+            },
+            None => self.id,
+        }
+    }
+
+    /// Remove all children of `branch` at `cursor`.
+    #[inline]
+    fn remove_children(&mut self, branch: usize, cursor: usize) {
+        let mut dead = FnvHashSet::default();
+        let mut children = vec![];
+        // We need to check if any of the branches had the removed node as root.
+        for (&id, child) in &self.branches {
+            if child.parent == branch && child.cursor == cursor {
+                if dead.insert(id) {
+                    children.push(id);
+                }
+            }
+        }
+        // Add all the children of dead branches so they are removed too.
+        while let Some(parent) = children.pop() {
+            for (&id, child) in &self.branches {
+                if child.parent == parent {
+                    if dead.insert(id) {
+                        children.push(id);
+                    }
+                }
+            }
+        }
+        // Remove all dead branches.
+        for id in dead {
+            self.branches.remove(&id);
+        }
     }
 }
 
@@ -526,7 +549,7 @@ impl<R> HistoryBuilder<R> {
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> History<R> {
         History {
-            id: ORIGIN,
+            id: ROOT,
             next: 1,
             parent: None,
             record: self.inner.build(receiver),
