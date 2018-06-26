@@ -188,16 +188,47 @@ impl<R> History<R> {
     where
         R: 'static,
     {
-        let cursor = self.record.cursor();
+        let old = self.record.cursor();
         let commands = self.record.__apply(cmd)?;
-        if commands.len() > 0 {
+
+        // Check if the limit has been reached.
+        // This means that the last command has been removed and
+        // we need to check if that command had any child branches.
+        if old == self.record.cursor() {
+            let mut dead = FnvHashSet::default();
+            let mut children = vec![];
+            // We need to check if any of the branches had the removed node as root.
+            for (&id, branch) in &self.branches {
+                if branch.cursor == ORIGIN && branch.parent == ORIGIN {
+                    if dead.insert(id) {
+                        children.push(id);
+                    }
+                }
+            }
+            // Add all the children of dead branches so they are removed too.
+            while let Some(parent) = children.pop() {
+                for (&id, branch) in &self.branches {
+                    if branch.parent == parent {
+                        if dead.insert(id) {
+                            children.push(id);
+                        }
+                    }
+                }
+            }
+            // Remove all dead branches.
+            for id in dead {
+                self.branches.remove(&id);
+            }
+        }
+
+        if commands.len() != 0 {
             let id = self.next;
             self.next += 1;
             self.branches.insert(
                 id,
                 Branch {
                     parent: self.id,
-                    cursor,
+                    cursor: old,
                     commands,
                 },
             );
@@ -301,7 +332,7 @@ impl<R> History<R> {
                     Ok(commands) => commands,
                     Err(err) => return Some(Err(err)),
                 };
-                if commands.len() > 0 {
+                if commands.len() != 0 {
                     self.branches.insert(
                         self.id,
                         Branch {
