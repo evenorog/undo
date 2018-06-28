@@ -188,13 +188,13 @@ impl<R> History<R> {
     where
         R: 'static,
     {
-        let old = self.record.cursor();
+        let old = self.cursor();
         let commands = self.record.__apply(cmd)?;
 
         // Check if the limit has been reached.
         // This means that the last command has been removed and
         // we need to check if that command had any child branches.
-        if old == self.record.cursor() {
+        if old == self.cursor() {
             let root = self.root();
             self.remove_children(root, 0);
         }
@@ -259,11 +259,10 @@ impl<R> History<R> {
         }
 
         let root = self.root();
-        // All visited nodes.
+        // Find the path from `dest` to `root`.
         let visited = {
             let mut visited =
-                FnvHashSet::with_capacity_and_hasher(self.record.capacity(), Default::default());
-            // Find the path from `dest` to `ORIGIN`.
+                FnvHashSet::with_capacity_and_hasher(self.capacity(), Default::default());
             let mut dest = self.branches.get(&branch)?;
             while dest.parent != root {
                 assert!(visited.insert(dest.parent));
@@ -300,13 +299,13 @@ impl<R> History<R> {
         // Walk the path from `start` to `dest`.
         let old = self.id;
         for branch in path {
-            // Move to `dest.cursor` either by undoing or redoing.
+            // Move to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.cursor).unwrap() {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
             for cmd in branch.commands {
-                let old = self.record.cursor();
+                let old = self.cursor();
                 let commands = match self.record.__apply(cmd) {
                     Ok(commands) => commands,
                     Err(err) => return Some(Err(err)),
@@ -399,13 +398,12 @@ impl<R> History<R> {
     #[inline]
     fn root(&self) -> usize {
         match self.parent {
-            Some(parent) => {
-                let mut root = parent;
-                while let Some(branch) = self.branches.get(&root) {
-                    root = branch.parent;
+            Some(mut parent) => {
+                while let Some(branch) = self.branches.get(&parent) {
+                    parent = branch.parent;
                 }
-                root
-            },
+                parent
+            }
             None => self.id,
         }
     }
