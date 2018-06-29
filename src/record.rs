@@ -66,7 +66,7 @@ pub struct Record<R> {
     receiver: R,
     cursor: usize,
     limit: usize,
-    saved: Option<usize>,
+    pub(crate) saved: Option<usize>,
     pub(crate) signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
 }
 

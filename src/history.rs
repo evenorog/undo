@@ -60,6 +60,7 @@ const ROOT: usize = 0;
 pub struct History<R> {
     id: usize,
     next: usize,
+    saved: Option<(usize, usize)>,
     parent: Option<usize>,
     record: Record<R>,
     branches: FnvHashMap<usize, Branch<R>>,
@@ -72,6 +73,7 @@ impl<R> History<R> {
         History {
             id: ROOT,
             next: 1,
+            saved: None,
             parent: None,
             record: Record::new(receiver),
             branches: FnvHashMap::default(),
@@ -161,6 +163,7 @@ impl<R> History<R> {
     pub fn clear(&mut self) {
         self.record.clear();
         self.id = ROOT;
+        self.saved = None;
         self.parent = None;
         self.branches.clear();
     }
@@ -246,6 +249,14 @@ impl<R> History<R> {
     {
         if self.id == branch {
             return self.record.go_to(cursor);
+        }
+
+        if let Some((at, saved)) = self.saved {
+            if at == branch {
+                self.record.saved = Some(saved);
+            }
+        } else if let Some(saved) = self.record.saved {
+            self.saved = Some((self.id, saved));
         }
 
         let root = self.root();
@@ -539,6 +550,7 @@ impl<R> HistoryBuilder<R> {
         History {
             id: ROOT,
             next: 1,
+            saved: None,
             parent: None,
             record: self.inner.build(receiver),
             branches: FnvHashMap::with_capacity_and_hasher(
