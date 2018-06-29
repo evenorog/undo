@@ -25,7 +25,7 @@ const ROOT: usize = 0;
 ///     }
 ///
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
-///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+///         self.0 = s.pop().ok_or("`s` is unexpectedly empty")?;
 ///         Ok(())
 ///     }
 /// }
@@ -41,15 +41,15 @@ const ROOT: usize = 0;
 ///
 ///     history.undo().unwrap()?;
 ///     history.undo().unwrap()?;
-///     history.undo().unwrap()?;
 ///
-///     assert_eq!(history.as_receiver(), "");
+///     let n = history.apply(Add('f'))?.unwrap();
+///     history.apply(Add('g'))?;
 ///
-///     history.redo().unwrap()?;
-///     history.redo().unwrap()?;
-///     history.redo().unwrap()?;
+///     assert_eq!(history.as_receiver(), "afg");
 ///
-///     assert_eq!(history.into_receiver(), "abc");
+///     history.go_to(n, 5).unwrap()?;
+///
+///     assert_eq!(history.as_receiver(), "abc");
 ///
 ///     Ok(())
 /// }
@@ -261,8 +261,8 @@ impl<R> History<R> {
             visited
         };
 
-        let mut path = Vec::with_capacity(visited.len() + self.record.len());
         // Find the path from `start` to the lowest common ancestor of `dest`.
+        let mut path = Vec::with_capacity(visited.len() + self.record.len());
         if let Some(ref parent) = self.parent {
             let mut start = self.branches.remove(parent).unwrap();
             branch = start.parent;
@@ -580,17 +580,18 @@ mod tests {
     #[test]
     fn jump_to() {
         let mut history = History::default();
-        history.apply(Add('a')).unwrap();
-        history.apply(Add('b')).unwrap();
-        history.apply(Add('c')).unwrap();
-        history.apply(Add('d')).unwrap();
-        history.apply(Add('e')).unwrap();
+
+        assert!(history.apply(Add('a')).unwrap().is_none());
+        assert!(history.apply(Add('b')).unwrap().is_none());
+        assert!(history.apply(Add('c')).unwrap().is_none());
+        assert!(history.apply(Add('d')).unwrap().is_none());
+        assert!(history.apply(Add('e')).unwrap().is_none());
 
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
 
         let b = history.apply(Add('f')).unwrap().unwrap();
-        history.apply(Add('g')).unwrap();
+        assert!(history.apply(Add('g')).unwrap().is_none());
 
         history.go_to(b, 5).unwrap().unwrap();
     }

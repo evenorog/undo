@@ -29,7 +29,7 @@ const NO_LIMIT: usize = 0;
 ///     }
 ///
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
-///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+///         self.0 = s.pop().ok_or("`s` is unexpectedly empty")?;
 ///         Ok(())
 ///     }
 /// }
@@ -53,7 +53,7 @@ const NO_LIMIT: usize = 0;
 ///     record.redo().unwrap()?;
 ///     record.redo().unwrap()?;
 ///
-///     assert_eq!(record.into_receiver(), "abc");
+///     assert_eq!(record.as_receiver(), "abc");
 ///
 ///     Ok(())
 /// }
