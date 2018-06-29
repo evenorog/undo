@@ -120,16 +120,6 @@ impl<R> History<R> {
         self.record.limit()
     }
 
-    /// Sets the limit of the history and returns the new limit.
-    ///
-    /// If `limit < len` the first commands will be removed until `len == limit`.
-    /// However, if the current active command is going to be removed, the limit is instead
-    /// adjusted to `len - active` so the active command is not removed.
-    #[inline]
-    pub fn set_limit(&mut self, limit: usize) -> usize {
-        self.record.set_limit(limit)
-    }
-
     /// Sets how the signal should be handled when the state changes.
     #[inline]
     pub fn set_signal(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
@@ -266,7 +256,7 @@ impl<R> History<R> {
             let mut dest = self.branches.get(&branch)?;
             while dest.parent != root {
                 assert!(visited.insert(dest.parent));
-                dest = self.branches.get(&dest.parent).unwrap();
+                dest = &self.branches[&dest.parent];
             }
             visited
         };
