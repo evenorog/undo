@@ -303,7 +303,7 @@ impl<R> History<R> {
         // Walk the path from `start` to `dest`.
         let old = self.id;
         for branch in path {
-            // Move to `branch.cursor` either by undoing or redoing.
+            // Walk to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.cursor).unwrap() {
                 return Some(Err(err));
             }
@@ -354,8 +354,99 @@ impl<R> History<R> {
     /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
     #[must_use]
-    pub fn jump_to(&mut self, _: usize, _: usize) -> Option<Result<(), Error<R>>> {
-        unimplemented!()
+    pub fn jump_to(&mut self, mut branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
+    where
+        R: 'static
+    {
+        if self.id == branch {
+            return self.record.jump_to(cursor);
+        }
+
+        // Handle the saved state when switching to another branch.
+        if let Some((at, saved)) = self.saved {
+            if at == branch {
+                self.record.saved = Some(saved);
+                self.saved = None;
+            }
+        } else if let Some(saved) = self.record.saved {
+            self.saved = Some((self.id, saved));
+            self.record.saved = None;
+        }
+
+        let root = self.root();
+        // Find the path from `dest` to `root`.
+        let visited = {
+            let mut visited =
+                FnvHashSet::with_capacity_and_hasher(self.capacity(), Default::default());
+            let mut dest = self.branches.get(&branch)?;
+            while dest.parent != root {
+                assert!(visited.insert(dest.parent));
+                dest = &self.branches[&dest.parent];
+            }
+            visited
+        };
+
+        // Find the path from `start` to the lowest common ancestor of `dest`.
+        let mut path = Vec::with_capacity(visited.len() + self.record.len());
+        if let Some(ref parent) = self.parent {
+            let mut start = self.branches.remove(parent).unwrap();
+            branch = start.parent;
+            while !visited.contains(&branch) {
+                path.push(start);
+                start = self.branches.remove(&branch).unwrap();
+                branch = start.parent;
+            }
+        }
+
+        // Find the path from `dest` to the lowest common ancestor of `start`.
+        let mut dest = self.branches.remove(&branch)?;
+        branch = dest.parent;
+        let len = path.len();
+        path.push(dest);
+        let last = path.last().map_or(root, |last| last.parent);
+        while branch != last {
+            dest = self.branches.remove(&branch).unwrap();
+            branch = dest.parent;
+            path.push(dest);
+        }
+        path[len..].reverse();
+
+        // Jump the path from `start` to `dest`.
+        let old = self.id;
+        for branch in path {
+            // Jump to `branch.cursor` either by undoing or redoing.
+            if let Err(err) = self.record.jump_to(branch.cursor).unwrap() {
+                return Some(Err(err));
+            }
+
+            let old = self.cursor();
+            let commands = self.record.commands.split_off(old).into_iter();
+            // Apply the commands in the branch and move older commands into their own branch.
+            self.record.commands.extend(branch.commands);
+
+            if commands.len() != 0 {
+                self.branches.insert(
+                    self.id,
+                    Branch {
+                        parent: branch.parent,
+                        cursor: old,
+                        commands,
+                    },
+                );
+                self.parent = if branch.parent == root {
+                    None
+                } else {
+                    Some(self.id)
+                };
+                self.id = branch.parent;
+            }
+        }
+
+        if let Some(ref mut f) = self.record.signal {
+            f(Signal::Branch { old, new: self.id });
+        }
+
+        Some(Ok(()))
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].

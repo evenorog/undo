@@ -62,7 +62,7 @@ const NO_LIMIT: usize = 0;
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
 pub struct Record<R> {
-    commands: VecDeque<Box<dyn Command<R> + 'static>>,
+    pub(crate) commands: VecDeque<Box<dyn Command<R> + 'static>>,
     receiver: R,
     cursor: usize,
     limit: usize,
