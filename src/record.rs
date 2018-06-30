@@ -529,13 +529,13 @@ impl<R> Record<R> {
         let redo = cursor > self.cursor;
         if redo {
             self.cursor = cursor - 1;
-            if let Err(err) = self.redo()? {
+            if let Err(err) = self.redo().unwrap() {
                 self.signal = signal;
                 return Some(Err(err));
             }
         } else {
             self.cursor = cursor + 1;
-            if let Err(err) = self.undo()? {
+            if let Err(err) = self.undo().unwrap() {
                 self.signal = signal;
                 return Some(Err(err));
             }
