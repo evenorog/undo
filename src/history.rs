@@ -85,7 +85,6 @@ impl<R> History<R> {
     pub fn builder() -> HistoryBuilder<R> {
         HistoryBuilder {
             inner: Record::builder(),
-            capacity_for_branching: 0,
         }
     }
 
@@ -251,12 +250,15 @@ impl<R> History<R> {
             return self.record.go_to(cursor);
         }
 
+        // Handle the saved state when switching to another branch.
         if let Some((at, saved)) = self.saved {
             if at == branch {
                 self.record.saved = Some(saved);
+                self.saved = None;
             }
         } else if let Some(saved) = self.record.saved {
             self.saved = Some((self.id, saved));
+            self.record.saved = None;
         }
 
         let root = self.root();
@@ -496,7 +498,6 @@ impl<R> Debug for Branch<R> {
 #[derive(Debug)]
 pub struct HistoryBuilder<R> {
     inner: RecordBuilder<R>,
-    capacity_for_branching: usize,
 }
 
 impl<R> HistoryBuilder<R> {
@@ -506,15 +507,6 @@ impl<R> HistoryBuilder<R> {
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<R> {
         self.inner = self.inner.capacity(capacity);
-        self
-    }
-
-    /// Sets the specified [capacity] for the branches in the history.
-    ///
-    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
-    #[inline]
-    pub fn capacity_for_branching(mut self, capacity: usize) -> HistoryBuilder<R> {
-        self.capacity_for_branching = capacity;
         self
     }
 
@@ -553,10 +545,7 @@ impl<R> HistoryBuilder<R> {
             saved: None,
             parent: None,
             record: self.inner.build(receiver),
-            branches: FnvHashMap::with_capacity_and_hasher(
-                self.capacity_for_branching,
-                Default::default(),
-            ),
+            branches: FnvHashMap::default(),
         }
     }
 }

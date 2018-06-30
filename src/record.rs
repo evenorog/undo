@@ -521,13 +521,13 @@ impl<R> Record<R> {
         }
 
         // Decide if we need to undo or redo to reach cursor.
-        let f = if cursor > self.cursor {
-            Record::redo
+        if cursor > self.cursor {
+            self.cursor = cursor - 1;
+            self.redo()
         } else {
-            Record::undo
-        };
-        self.cursor = cursor;
-        f(self)
+            self.cursor = cursor + 1;
+            self.undo()
+        }
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
@@ -819,6 +819,22 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct JumpAdd(char, String);
+
+    impl Command<String> for JumpAdd {
+        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+            self.1 = receiver.clone();
+            receiver.push(self.0);
+            Ok(())
+        }
+
+        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+            *receiver = self.1.clone();
+            Ok(())
+        }
+    }
+
     #[test]
     fn set_limit() {
         let mut record = Record::default();
@@ -887,7 +903,7 @@ mod tests {
     }
 
     #[test]
-    fn set_cursor() {
+    fn go_to() {
         let mut record = Record::default();
         record.apply(Add('a')).unwrap();
         record.apply(Add('b')).unwrap();
@@ -914,6 +930,37 @@ mod tests {
         assert_eq!(record.cursor(), 5);
         assert_eq!(record.as_receiver(), "abcde");
         assert!(record.go_to(6).is_none());
+        assert_eq!(record.cursor(), 5);
+    }
+
+    #[test]
+    fn jump_to() {
+        let mut record = Record::default();
+        record.apply(JumpAdd('a', Default::default())).unwrap();
+        record.apply(JumpAdd('b', Default::default())).unwrap();
+        record.apply(JumpAdd('c', Default::default())).unwrap();
+        record.apply(JumpAdd('d', Default::default())).unwrap();
+        record.apply(JumpAdd('e', Default::default())).unwrap();
+
+        record.jump_to(0).unwrap().unwrap();
+        assert_eq!(record.cursor(), 0);
+        assert_eq!(record.as_receiver(), "");
+        record.jump_to(1).unwrap().unwrap();
+        assert_eq!(record.cursor(), 1);
+        assert_eq!(record.as_receiver(), "a");
+        record.jump_to(2).unwrap().unwrap();
+        assert_eq!(record.cursor(), 2);
+        assert_eq!(record.as_receiver(), "ab");
+        record.jump_to(3).unwrap().unwrap();
+        assert_eq!(record.cursor(), 3);
+        assert_eq!(record.as_receiver(), "abc");
+        record.jump_to(4).unwrap().unwrap();
+        assert_eq!(record.cursor(), 4);
+        assert_eq!(record.as_receiver(), "abcd");
+        record.jump_to(5).unwrap().unwrap();
+        assert_eq!(record.cursor(), 5);
+        assert_eq!(record.as_receiver(), "abcde");
+        assert!(record.jump_to(6).is_none());
         assert_eq!(record.cursor(), 5);
     }
 }
