@@ -243,7 +243,7 @@ impl<R> History<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, mut branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
+    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
     where
         R: 'static,
     {
@@ -262,47 +262,10 @@ impl<R> History<R> {
             self.record.saved = None;
         }
 
-        let root = self.root();
-        // Find the path from `dest` to `root`.
-        let visited = {
-            let mut visited =
-                FnvHashSet::with_capacity_and_hasher(self.capacity(), Default::default());
-            let mut dest = self.branches.get(&branch)?;
-            while dest.parent != root {
-                assert!(visited.insert(dest.parent));
-                dest = &self.branches[&dest.parent];
-            }
-            visited
-        };
-
-        // Find the path from `start` to the lowest common ancestor of `dest`.
-        let mut path = Vec::with_capacity(visited.len() + self.record.len());
-        if let Some(ref parent) = self.parent {
-            let mut start = self.branches.remove(parent).unwrap();
-            branch = start.parent;
-            while !visited.contains(&branch) {
-                path.push(start);
-                start = self.branches.remove(&branch).unwrap();
-                branch = start.parent;
-            }
-        }
-
-        // Find the path from `dest` to the lowest common ancestor of `start`.
-        let mut dest = self.branches.remove(&branch)?;
-        branch = dest.parent;
-        let len = path.len();
-        path.push(dest);
-        let last = path.last().map_or(root, |last| last.parent);
-        while branch != last {
-            dest = self.branches.remove(&branch).unwrap();
-            branch = dest.parent;
-            path.push(dest);
-        }
-        path[len..].reverse();
-
         // Walk the path from `start` to `dest`.
         let old = self.id;
-        for branch in path {
+        let root = self.root();
+        for branch in self.create_path(branch)? {
             // Walk to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.cursor).unwrap() {
                 return Some(Err(err));
@@ -354,7 +317,7 @@ impl<R> History<R> {
     /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
     #[must_use]
-    pub fn jump_to(&mut self, mut branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
+    pub fn jump_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
     where
         R: 'static
     {
@@ -373,47 +336,10 @@ impl<R> History<R> {
             self.record.saved = None;
         }
 
-        let root = self.root();
-        // Find the path from `dest` to `root`.
-        let visited = {
-            let mut visited =
-                FnvHashSet::with_capacity_and_hasher(self.capacity(), Default::default());
-            let mut dest = self.branches.get(&branch)?;
-            while dest.parent != root {
-                assert!(visited.insert(dest.parent));
-                dest = &self.branches[&dest.parent];
-            }
-            visited
-        };
-
-        // Find the path from `start` to the lowest common ancestor of `dest`.
-        let mut path = Vec::with_capacity(visited.len() + self.record.len());
-        if let Some(ref parent) = self.parent {
-            let mut start = self.branches.remove(parent).unwrap();
-            branch = start.parent;
-            while !visited.contains(&branch) {
-                path.push(start);
-                start = self.branches.remove(&branch).unwrap();
-                branch = start.parent;
-            }
-        }
-
-        // Find the path from `dest` to the lowest common ancestor of `start`.
-        let mut dest = self.branches.remove(&branch)?;
-        branch = dest.parent;
-        let len = path.len();
-        path.push(dest);
-        let last = path.last().map_or(root, |last| last.parent);
-        while branch != last {
-            dest = self.branches.remove(&branch).unwrap();
-            branch = dest.parent;
-            path.push(dest);
-        }
-        path[len..].reverse();
-
         // Jump the path from `start` to `dest`.
         let old = self.id;
-        for branch in path {
+        let root = self.root();
+        for branch in self.create_path(branch)? {
             // Jump to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.jump_to(branch.cursor).unwrap() {
                 return Some(Err(err));
@@ -530,6 +456,50 @@ impl<R> History<R> {
         for id in dead {
             self.branches.remove(&id);
         }
+    }
+
+    /// Create a path between the current branch and the `to` branch.
+    #[inline]
+    #[must_use]
+    fn create_path(&mut self, mut to: usize) -> Option<Vec<Branch<R>>> {
+        // Find the path from `dest` to `root`.
+        let root = self.root();
+        let visited = {
+            let mut visited =
+                FnvHashSet::with_capacity_and_hasher(self.capacity(), Default::default());
+            let mut dest = self.branches.get(&to)?;
+            while dest.parent != root {
+                assert!(visited.insert(dest.parent));
+                dest = &self.branches[&dest.parent];
+            }
+            visited
+        };
+
+        // Find the path from `start` to the lowest common ancestor of `dest`.
+        let mut path = Vec::with_capacity(visited.len() + self.record.len());
+        if let Some(ref parent) = self.parent {
+            let mut start = self.branches.remove(parent).unwrap();
+            to = start.parent;
+            while !visited.contains(&to) {
+                path.push(start);
+                start = self.branches.remove(&to).unwrap();
+                to = start.parent;
+            }
+        }
+
+        // Find the path from `dest` to the lowest common ancestor of `start`.
+        let mut dest = self.branches.remove(&to)?;
+        to = dest.parent;
+        let len = path.len();
+        path.push(dest);
+        let last = path.last().map_or(root, |last| last.parent);
+        while to != last {
+            dest = self.branches.remove(&to).unwrap();
+            to = dest.parent;
+            path.push(dest);
+        }
+        path[len..].reverse();
+        Some(path)
     }
 }
 
