@@ -181,12 +181,13 @@ impl<R> History<R> {
         R: 'static,
     {
         let old = self.cursor();
+        let merges = self.record.merges(&cmd);
         let commands = self.record.__apply(cmd)?;
 
         // Check if the limit has been reached.
         // This means that the last command has been removed and
         // we need to check if that command had any child branches.
-        if old == self.cursor() {
+        if !merges && old == self.cursor() {
             let root = self.root();
             self.remove_children(root, 0);
         }

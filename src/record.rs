@@ -625,6 +625,15 @@ impl<R> Record<R> {
     pub fn into_receiver(self) -> R {
         self.receiver
     }
+
+    /// Returns `true` if the command will be merged when applied to the record.
+    #[inline]
+    pub(crate) fn merges(&self, cmd: &(impl Command<R> + 'static)) -> bool {
+        match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
+            (Some(id1), Some(id2)) => id1 == id2 && !self.is_saved(),
+            _ => false,
+        }
+    }
 }
 
 impl<R: Default> Default for Record<R> {
