@@ -520,14 +520,60 @@ impl<R> Record<R> {
             return None;
         }
 
+        let was_saved = self.is_saved();
+        let old = self.cursor;
+        let len = self.len();
+        // Temporarily remove signal so they are not called each iteration.
+        let signal = self.signal.take();
         // Decide if we need to undo or redo to reach cursor.
-        if cursor > self.cursor {
+        let redo = cursor > self.cursor;
+        if redo {
             self.cursor = cursor - 1;
-            self.redo()
+            if let Err(err) = self.redo()? {
+                return Some(Err(err));
+            }
         } else {
             self.cursor = cursor + 1;
-            self.undo()
+            if let Err(err) = self.undo()? {
+                return Some(Err(err));
+            }
         }
+        // Add signal back.
+        self.signal = signal;
+        let is_saved = self.is_saved();
+        if let Some(ref mut f) = self.signal {
+            // Emit signal if the cursor has changed.
+            if old != self.cursor {
+                f(Signal::Cursor {
+                    old,
+                    new: self.cursor,
+                });
+            }
+            // Check if the receiver went from saved to unsaved, or unsaved to saved.
+            if was_saved != is_saved {
+                f(Signal::Saved(is_saved));
+            }
+            if redo {
+                // Check if the records ability to redo changed.
+                if old == len - 1 {
+                    f(Signal::Redo(false));
+                }
+                // Check if the records ability to undo changed.
+                if old == 0 {
+                    f(Signal::Undo(true));
+                }
+            } else {
+                // Check if the records ability to redo changed.
+                if old == len {
+                    f(Signal::Redo(true));
+                }
+                // Check if the records ability to undo changed.
+                if old == 1 {
+                    f(Signal::Undo(false));
+                }
+            }
+        }
+        Some(Ok(()))
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
