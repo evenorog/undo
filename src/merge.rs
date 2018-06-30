@@ -4,6 +4,48 @@ use std::marker::PhantomData;
 use std::u32;
 use Command;
 
+/// Macro for merging commands.
+///
+/// # Examples
+/// ```
+/// # use std::error::Error;
+/// # use undo::*;
+/// #[derive(Debug)]
+/// struct Add(char);
+///
+/// impl Command<String> for Add {
+///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+///         s.push(self.0);
+///         Ok(())
+///     }
+///
+///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+///         self.0 = s.pop().ok_or("`s` is unexpectedly empty")?;
+///         Ok(())
+///     }
+/// }
+///
+/// fn main() -> Result<(), Box<dyn Error>> {
+///     let mut record = Record::default();
+///     record.apply(merge![Add('a'), Add('b'), Add('c')])?;
+///     assert_eq!(record.as_receiver(), "abc");
+///     record.undo().unwrap()?;
+///     assert_eq!(record.as_receiver(), "");
+///     record.redo().unwrap()?;
+///     assert_eq!(record.as_receiver(), "abc");
+///     Ok(())
+/// }
+/// ```
+#[macro_export]
+macro_rules! merge {
+    ($cmd1:expr, $cmd2:expr) => (
+        Merged::new($cmd1, $cmd2)
+    );
+    ($cmd1:expr, $cmd2:expr, $($tail:expr),+) => (
+        merge![Merged::new($cmd1, $cmd2), $($tail),*]
+    );
+}
+
 /// A command wrapper which always merges with itself.
 ///
 /// This wrapper has an [`id`] of `u32::MAX`.
