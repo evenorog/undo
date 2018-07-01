@@ -1,6 +1,24 @@
 //! An undo-redo library with dynamic dispatch and automatic command merging.
-//! It uses the [command pattern](https://en.wikipedia.org/wiki/Command_pattern)
-//! where the user modifies a receiver by applying commands on it.
+//!
+//! It uses the [command pattern] where the user modifies the receiver by
+//! applying commands on it. Since each command knows how to undo and redo
+//! the changes it applies to the receiver, the state of the receiver can
+//! be rolled forwards or backwards by calling undo or redo in the correct order.
+//!
+//! The [Record] and [History] provides functionality to store and keep track
+//! of the applied commands, and makes it easy to undo and redo changes.
+//! The Record provides a stack based undo-redo functionality, while the
+//! History provides a tree based undo-redo functionality where you can
+//! jump between different branches.
+//!
+//! Commands can be automatically merged using the [`merge!`] macro or the [`id`] method.
+//! When two commands are merged, undoing and redoing them are done in a single step.
+//!
+//! [command pattern]: https://en.wikipedia.org/wiki/Command_pattern
+//! [Record]: struct.Record.html
+//! [History]: struct.History.html
+//! [`merge!`]: macro.merge.html
+//! [`id`]: trait.Command.html#method.id
 
 #![forbid(unstable_features, bad_style, bare_trait_objects)]
 #![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]

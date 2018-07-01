@@ -5,8 +5,22 @@
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 
 An undo-redo library with dynamic dispatch and automatic command merging.
-It uses the [command pattern](https://en.wikipedia.org/wiki/Command_pattern) 
-where the user modifies a receiver by applying commands on it.
+
+It uses the [command pattern] where the user modifies the receiver by
+applying commands on it. Since each command knows how to undo and redo
+the changes it applies to the receiver, the state of the receiver can
+be rolled forwards or backwards by calling undo or redo in the correct order.
+
+The [Record] and [History] provides functionality to store and keep track
+of the applied commands, and makes it easy to undo and redo changes.
+The Record provides a stack based undo-redo functionality, while the
+History provides a tree based undo-redo functionality where you can
+jump between different branches.
+
+Commands can be automatically merged using the [`merge!`] macro or the [`id`] method.
+When two commands are merged, undoing and redoing them are done in a single step.
+
+## Examples
 
  ```rust
 #[derive(Debug)]
@@ -63,3 +77,9 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
 additional terms or conditions.
+
+[command pattern]: https://en.wikipedia.org/wiki/Command_pattern
+[Record]: https://docs.rs/undo/latest/undo/struct.Record.html
+[History]: https://docs.rs/undo/latest/undo/struct.History.html
+[`merge!`]: https://docs.rs/undo/latest/undo/macro.merge.html
+[`id`]: https://docs.rs/undo/latest/undo/trait.Command.html#method.id
