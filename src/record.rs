@@ -890,6 +890,12 @@ mod tests {
             *receiver = self.1.clone();
             Ok(())
         }
+
+        fn redo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+            *receiver = self.1.clone();
+            receiver.push(self.0);
+            Ok(())
+        }
     }
 
     #[test]

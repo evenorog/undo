@@ -350,6 +350,10 @@ impl<R> History<R> {
             // Apply the commands in the branch and move older commands into their own branch.
             self.record.commands.extend(branch.commands);
 
+            if let Err(err) = self.record.jump_to(cursor).unwrap() {
+                return Some(Err(err));
+            }
+
             if commands.len() != 0 {
                 self.branches.insert(
                     self.id,
@@ -643,6 +647,28 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct JumpAdd(char, String);
+
+    impl Command<String> for JumpAdd {
+        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+            self.1 = receiver.clone();
+            receiver.push(self.0);
+            Ok(())
+        }
+
+        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+            *receiver = self.1.clone();
+            Ok(())
+        }
+
+        fn redo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+            *receiver = self.1.clone();
+            receiver.push(self.0);
+            Ok(())
+        }
+    }
+
     #[test]
     fn go_to() {
         let mut history = History::default();
@@ -668,6 +694,36 @@ mod tests {
         assert_eq!(history.as_receiver(), "abcde");
 
         history.go_to(0, 5).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcfg");
+
+        let new = format!("{:?}", history);
+        assert_eq!(old, new);
+    }
+
+    #[test]
+    fn jump_to() {
+        let mut history = History::default();
+
+        assert!(history.apply(JumpAdd('a', Default::default())).unwrap().is_none());
+        assert!(history.apply(JumpAdd('b', Default::default())).unwrap().is_none());
+        assert!(history.apply(JumpAdd('c', Default::default())).unwrap().is_none());
+        assert!(history.apply(JumpAdd('d', Default::default())).unwrap().is_none());
+        assert!(history.apply(JumpAdd('e', Default::default())).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abcde");
+
+        history.undo().unwrap().unwrap();
+        history.undo().unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abc");
+
+        let _ = history.apply(JumpAdd('f', Default::default())).unwrap().unwrap();
+        assert!(history.apply(JumpAdd('g', Default::default())).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abcfg");
+
+        let old = format!("{:?}", history);
+        history.jump_to(1, 5).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcde");
+
+        history.jump_to(0, 5).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfg");
 
         let new = format!("{:?}", history);
