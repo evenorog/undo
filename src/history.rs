@@ -265,7 +265,7 @@ impl<R> History<R> {
         // Walk the path from `start` to `dest`.
         let old = self.id;
         let root = self.root();
-        for branch in self.create_path(branch)? {
+        for (id, branch) in self.create_path(branch)? {
             // Walk to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.cursor).unwrap() {
                 return Some(Err(err));
@@ -281,7 +281,7 @@ impl<R> History<R> {
                     self.branches.insert(
                         self.id,
                         Branch {
-                            parent: branch.parent,
+                            parent: id,
                             cursor: old,
                             commands,
                         },
@@ -291,7 +291,7 @@ impl<R> History<R> {
                     } else {
                         Some(self.id)
                     };
-                    self.id = branch.parent;
+                    self.id = id;
                 }
             }
         }
@@ -339,7 +339,7 @@ impl<R> History<R> {
         // Jump the path from `start` to `dest`.
         let old = self.id;
         let root = self.root();
-        for branch in self.create_path(branch)? {
+        for (id, branch) in self.create_path(branch)? {
             // Jump to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.jump_to(branch.cursor).unwrap() {
                 return Some(Err(err));
@@ -354,7 +354,7 @@ impl<R> History<R> {
                 self.branches.insert(
                     self.id,
                     Branch {
-                        parent: branch.parent,
+                        parent: id,
                         cursor: old,
                         commands,
                     },
@@ -364,7 +364,7 @@ impl<R> History<R> {
                 } else {
                     Some(self.id)
                 };
-                self.id = branch.parent;
+                self.id = id;
             }
         }
 
@@ -461,7 +461,7 @@ impl<R> History<R> {
     /// Create a path between the current branch and the `to` branch.
     #[inline]
     #[must_use]
-    fn create_path(&mut self, mut to: usize) -> Option<Vec<Branch<R>>> {
+    fn create_path(&mut self, mut to: usize) -> Option<Vec<(usize, Branch<R>)>> {
         // Find the path from `dest` to `root`.
         let root = self.root();
         let visited = {
@@ -477,26 +477,29 @@ impl<R> History<R> {
 
         // Find the path from `start` to the lowest common ancestor of `dest`.
         let mut path = Vec::with_capacity(visited.len() + self.record.len());
-        if let Some(ref parent) = self.parent {
-            let mut start = self.branches.remove(parent).unwrap();
+        if let Some(mut id) = self.parent {
+            let mut start = self.branches.remove(&id).unwrap();
             to = start.parent;
             while !visited.contains(&to) {
-                path.push(start);
+                path.push((id, start));
                 start = self.branches.remove(&to).unwrap();
+                id = to;
                 to = start.parent;
             }
         }
 
         // Find the path from `dest` to the lowest common ancestor of `start`.
         let mut dest = self.branches.remove(&to)?;
+        let mut id = to;
         to = dest.parent;
         let len = path.len();
-        path.push(dest);
-        let last = path.last().map_or(root, |last| last.parent);
+        path.push((id, dest));
+        let last = path.last().map_or(root, |&(_, ref last)| last.parent);
         while to != last {
             dest = self.branches.remove(&to).unwrap();
+            id = to;
             to = dest.parent;
-            path.push(dest);
+            path.push((id, dest));
         }
         path[len..].reverse();
         Some(path)
@@ -641,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    fn jump_to() {
+    fn go_to() {
         let mut history = History::default();
 
         assert!(history.apply(Add('a')).unwrap().is_none());
@@ -649,13 +652,25 @@ mod tests {
         assert!(history.apply(Add('c')).unwrap().is_none());
         assert!(history.apply(Add('d')).unwrap().is_none());
         assert!(history.apply(Add('e')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abcde");
 
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abc");
 
-        let b = history.apply(Add('f')).unwrap().unwrap();
+        let _ = history.apply(Add('f')).unwrap().unwrap();
         assert!(history.apply(Add('g')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abcfg");
 
-        history.go_to(b, 5).unwrap().unwrap();
+        let old = format!("{:?}", history);
+
+        history.go_to(1, 5).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcde");
+
+        history.go_to(0, 5).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcfg");
+
+        let new = format!("{:?}", history);
+        assert_eq!(old, new);
     }
 }
