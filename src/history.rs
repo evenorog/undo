@@ -185,8 +185,6 @@ impl<R> History<R> {
         let commands = self.record.__apply(cmd)?;
 
         // Check if the limit has been reached.
-        // This means that the last command has been removed and
-        // we need to check if that command had any child branches.
         if !merges && old == self.cursor() {
             let root = self.root();
             self.remove_children(root, 0);
@@ -251,16 +249,7 @@ impl<R> History<R> {
             return self.record.go_to(cursor);
         }
 
-        // Handle the saved state when switching to another branch.
-        if let Some((at, saved)) = self.saved {
-            if at == branch {
-                self.record.saved = Some(saved);
-                self.saved = None;
-            }
-        } else if let Some(saved) = self.record.saved {
-            self.saved = Some((self.id, saved));
-            self.record.saved = None;
-        }
+        self.toggle_saved(branch);
 
         // Walk the path from `start` to `dest`.
         let old = self.id;
@@ -325,16 +314,7 @@ impl<R> History<R> {
             return self.record.jump_to(cursor);
         }
 
-        // Handle the saved state when switching to another branch.
-        if let Some((at, saved)) = self.saved {
-            if at == branch {
-                self.record.saved = Some(saved);
-                self.saved = None;
-            }
-        } else if let Some(saved) = self.record.saved {
-            self.saved = Some((self.id, saved));
-            self.record.saved = None;
-        }
+        self.toggle_saved(branch);
 
         // Jump the path from `start` to `dest`.
         let old = self.id;
@@ -459,6 +439,20 @@ impl<R> History<R> {
         // Remove all dead branches.
         for id in dead {
             self.branches.remove(&id);
+        }
+    }
+
+    /// Handle the saved state when switching to another branch.
+    #[inline]
+    fn toggle_saved(&mut self, branch: usize) {
+        if let Some((at, saved)) = self.saved {
+            if at == branch {
+                self.record.saved = Some(saved);
+                self.saved = None;
+            }
+        } else if let Some(saved) = self.record.saved {
+            self.saved = Some((self.id, saved));
+            self.record.saved = None;
         }
     }
 
