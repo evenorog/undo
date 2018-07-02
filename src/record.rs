@@ -1,4 +1,4 @@
-use std::collections::vec_deque::{IntoIter, VecDeque};
+use std::collections::VecDeque;
 #[cfg(feature = "display")]
 use std::fmt::Display;
 use std::fmt::{self, Debug, Formatter};
@@ -272,14 +272,14 @@ impl<R> Record<R> {
     where
         R: 'static,
     {
-        self.__apply(cmd)
+        self.__apply(cmd).map(|v| v.into_iter())
     }
 
     #[inline]
     pub(crate) fn __apply(
         &mut self,
         mut cmd: impl Command<R> + 'static,
-    ) -> Result<IntoIter<Box<dyn Command<R> + 'static>>, Error<R>>
+    ) -> Result<VecDeque<Box<dyn Command<R> + 'static>>, Error<R>>
     where
         R: 'static,
     {
@@ -293,7 +293,7 @@ impl<R> Record<R> {
         let was_saved = self.is_saved();
 
         // Pop off all elements after cursor from record.
-        let iter = self.commands.split_off(self.cursor).into_iter();
+        let v = self.commands.split_off(self.cursor);
         debug_assert_eq!(self.cursor, self.len());
 
         // Check if the saved state was popped off.
@@ -341,7 +341,7 @@ impl<R> Record<R> {
                 f(Signal::Saved(false));
             }
         }
-        Ok(iter)
+        Ok(v)
     }
 
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.

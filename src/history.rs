@@ -1,5 +1,5 @@
 use fnv::{FnvHashMap, FnvHashSet};
-use std::collections::vec_deque::IntoIter;
+use std::collections::VecDeque;
 #[cfg(feature = "display")]
 use std::fmt::Display;
 use std::fmt::{self, Debug, Formatter};
@@ -319,16 +319,15 @@ impl<R> History<R> {
         // Jump the path from `start` to `dest`.
         let old = self.id;
         let root = self.root();
-        for (id, branch) in self.create_path(branch)? {
+        for (id, mut branch) in self.create_path(branch)? {
             // Jump to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.jump_to(branch.cursor).unwrap() {
                 return Some(Err(err));
             }
 
             let old = self.cursor();
-            let commands = self.record.commands.split_off(old).into_iter();
-            // Apply the commands in the branch and move older commands into their own branch.
-            self.record.commands.extend(branch.commands);
+            let mut commands = self.record.commands.split_off(old);
+            self.record.commands.append(&mut branch.commands);
 
             if let Err(err) = self.record.jump_to(cursor).unwrap() {
                 return Some(Err(err));
@@ -543,7 +542,7 @@ impl<R> Display for History<R> {
 struct Branch<R> {
     parent: usize,
     cursor: usize,
-    commands: IntoIter<Box<dyn Command<R> + 'static>>,
+    commands: VecDeque<Box<dyn Command<R> + 'static>>,
 }
 
 impl<R> Debug for Branch<R> {
