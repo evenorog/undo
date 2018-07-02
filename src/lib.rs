@@ -11,7 +11,7 @@
 //! History provides a tree based undo-redo functionality where you can
 //! jump between different branches.
 //!
-//! Commands can be automatically merged using the [`merge!`] macro or the [`id`] method.
+//! Commands can be merged using the [`merge!`] macro or the [`id`] method.
 //! When two commands are merged, undoing and redoing them are done in a single step.
 //!
 //! [command pattern]: https://en.wikipedia.org/wiki/Command_pattern

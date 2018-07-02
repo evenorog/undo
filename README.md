@@ -17,7 +17,7 @@ The Record provides a stack based undo-redo functionality, while the
 History provides a tree based undo-redo functionality where you can
 jump between different branches.
 
-Commands can be automatically merged using the [`merge!`] macro or the [`id`] method.
+Commands can be merged using the [`merge!`] macro or the [`id`] method.
 When two commands are merged, undoing and redoing them are done in a single step.
 
 ## Examples
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     record.redo().unwrap()?;
     record.redo().unwrap()?;
 
-    assert_eq!(record.into_receiver(), "abc");
+    assert_eq!(record.as_receiver(), "abc");
 
     Ok(())
 }
