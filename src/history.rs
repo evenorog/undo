@@ -58,9 +58,9 @@ const ROOT: usize = 0;
 /// [Vim]: https://www.vim.org/
 #[derive(Debug)]
 pub struct History<R> {
-    id: usize,
+    current: usize,
     next: usize,
-    saved: Option<(usize, usize)>,
+    saved: Option<At>,
     parent: Option<usize>,
     record: Record<R>,
     branches: FnvHashMap<usize, Branch<R>>,
@@ -71,7 +71,7 @@ impl<R> History<R> {
     #[inline]
     pub fn new(receiver: impl Into<R>) -> History<R> {
         History {
-            id: ROOT,
+            current: ROOT,
             next: 1,
             saved: None,
             parent: None,
@@ -161,7 +161,7 @@ impl<R> History<R> {
     #[inline]
     pub fn clear(&mut self) {
         self.record.clear();
-        self.id = ROOT;
+        self.current = ROOT;
         self.saved = None;
         self.parent = None;
         self.branches.clear();
@@ -187,7 +187,10 @@ impl<R> History<R> {
         // Check if the limit has been reached.
         if !merges && old == self.cursor() {
             let root = self.root();
-            self.remove_children(root, 0);
+            self.remove_children(At {
+                branch: root,
+                cursor: 0,
+            });
         }
 
         if commands.len() != 0 {
@@ -196,8 +199,10 @@ impl<R> History<R> {
             self.branches.insert(
                 id,
                 Branch {
-                    parent: self.id,
-                    cursor: old,
+                    parent: At {
+                        branch: self.current,
+                        cursor: old,
+                    },
                     commands,
                 },
             );
@@ -245,18 +250,18 @@ impl<R> History<R> {
     where
         R: 'static,
     {
-        if self.id == branch {
+        if self.current == branch {
             return self.record.go_to(cursor);
         }
 
         self.toggle_saved(branch);
 
         // Walk the path from `start` to `dest`.
-        let old = self.id;
+        let old = self.current;
         let root = self.root();
         for (id, branch) in self.create_path(branch)? {
             // Walk to `branch.cursor` either by undoing or redoing.
-            if let Err(err) = self.record.go_to(branch.cursor).unwrap() {
+            if let Err(err) = self.record.go_to(branch.parent.cursor).unwrap() {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
@@ -268,25 +273,30 @@ impl<R> History<R> {
                 };
                 if commands.len() != 0 {
                     self.branches.insert(
-                        self.id,
+                        self.current,
                         Branch {
-                            parent: id,
-                            cursor: old,
+                            parent: At {
+                                branch: id,
+                                cursor: old,
+                            },
                             commands,
                         },
                     );
-                    self.parent = if branch.parent == root {
+                    self.parent = if branch.parent.branch == root {
                         None
                     } else {
-                        Some(self.id)
+                        Some(self.current)
                     };
-                    self.id = id;
+                    self.current = id;
                 }
             }
         }
 
         if let Some(ref mut f) = self.record.signal {
-            f(Signal::Branch { old, new: self.id });
+            f(Signal::Branch {
+                old,
+                new: self.current,
+            });
         }
 
         Some(Ok(()))
@@ -308,20 +318,20 @@ impl<R> History<R> {
     #[must_use]
     pub fn jump_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
     where
-        R: 'static
+        R: 'static,
     {
-        if self.id == branch {
+        if self.current == branch {
             return self.record.jump_to(cursor);
         }
 
         self.toggle_saved(branch);
 
         // Jump the path from `start` to `dest`.
-        let old = self.id;
+        let old = self.current;
         let root = self.root();
         for (id, mut branch) in self.create_path(branch)? {
             // Jump to `branch.cursor` either by undoing or redoing.
-            if let Err(err) = self.record.jump_to(branch.cursor).unwrap() {
+            if let Err(err) = self.record.jump_to(branch.parent.cursor).unwrap() {
                 return Some(Err(err));
             }
 
@@ -331,19 +341,21 @@ impl<R> History<R> {
 
             if commands.len() != 0 {
                 self.branches.insert(
-                    self.id,
+                    self.current,
                     Branch {
-                        parent: id,
-                        cursor: old,
+                        parent: At {
+                            branch: id,
+                            cursor: old,
+                        },
                         commands,
                     },
                 );
-                self.parent = if branch.parent == root {
+                self.parent = if branch.parent.branch == root {
                     None
                 } else {
-                    Some(self.id)
+                    Some(self.current)
                 };
-                self.id = id;
+                self.current = id;
             }
         }
 
@@ -352,7 +364,10 @@ impl<R> History<R> {
         }
 
         if let Some(ref mut f) = self.record.signal {
-            f(Signal::Branch { old, new: self.id });
+            f(Signal::Branch {
+                old,
+                new: self.current,
+            });
         }
 
         Some(Ok(()))
@@ -404,22 +419,22 @@ impl<R> History<R> {
         match self.parent {
             Some(mut parent) => {
                 while let Some(branch) = self.branches.get(&parent) {
-                    parent = branch.parent;
+                    parent = branch.parent.branch;
                 }
                 parent
             }
-            None => self.id,
+            None => self.current,
         }
     }
 
     /// Remove all children of `branch` at `cursor`.
     #[inline]
-    fn remove_children(&mut self, branch: usize, cursor: usize) {
+    fn remove_children(&mut self, at: At) {
         let mut dead = FnvHashSet::default();
         let mut children = vec![];
         // We need to check if any of the branches had the removed node as root.
         for (&id, child) in &self.branches {
-            if child.parent == branch && child.cursor == cursor {
+            if child.parent == at {
                 if dead.insert(id) {
                     children.push(id);
                 }
@@ -428,7 +443,7 @@ impl<R> History<R> {
         // Add all the children of dead branches so they are removed too.
         while let Some(parent) = children.pop() {
             for (&id, child) in &self.branches {
-                if child.parent == parent {
+                if child.parent.branch == parent {
                     if dead.insert(id) {
                         children.push(id);
                     }
@@ -444,13 +459,20 @@ impl<R> History<R> {
     /// Handle the saved state when switching to another branch.
     #[inline]
     fn toggle_saved(&mut self, branch: usize) {
-        if let Some((at, saved)) = self.saved {
+        if let Some(At {
+            branch: at,
+            cursor: saved,
+        }) = self.saved
+        {
             if at == branch {
                 self.record.saved = Some(saved);
                 self.saved = None;
             }
         } else if let Some(saved) = self.record.saved {
-            self.saved = Some((self.id, saved));
+            self.saved = Some(At {
+                branch: self.current,
+                cursor: saved,
+            });
             self.record.saved = None;
         }
     }
@@ -465,9 +487,9 @@ impl<R> History<R> {
             let mut visited =
                 FnvHashSet::with_capacity_and_hasher(self.capacity(), Default::default());
             let mut dest = self.branches.get(&to)?;
-            while dest.parent != root {
-                assert!(visited.insert(dest.parent));
-                dest = &self.branches[&dest.parent];
+            while dest.parent.branch != root {
+                assert!(visited.insert(dest.parent.branch));
+                dest = &self.branches[&dest.parent.branch];
             }
             visited
         };
@@ -476,26 +498,28 @@ impl<R> History<R> {
         let mut path = Vec::with_capacity(visited.len() + self.record.len());
         if let Some(mut id) = self.parent {
             let mut start = self.branches.remove(&id).unwrap();
-            to = start.parent;
+            to = start.parent.branch;
             while !visited.contains(&to) {
                 path.push((id, start));
                 start = self.branches.remove(&to).unwrap();
                 id = to;
-                to = start.parent;
+                to = start.parent.branch;
             }
         }
 
         // Find the path from `dest` to the lowest common ancestor of `start`.
         let mut dest = self.branches.remove(&to)?;
         let mut id = to;
-        to = dest.parent;
+        to = dest.parent.branch;
         let len = path.len();
         path.push((id, dest));
-        let last = path.last().map_or(root, |&(_, ref last)| last.parent);
+        let last = path
+            .last()
+            .map_or(root, |&(_, ref last)| last.parent.branch);
         while to != last {
             dest = self.branches.remove(&to).unwrap();
             id = to;
-            to = dest.parent;
+            to = dest.parent.branch;
             path.push((id, dest));
         }
         path[len..].reverse();
@@ -540,8 +564,7 @@ impl<R> Display for History<R> {
 }
 
 struct Branch<R> {
-    parent: usize,
-    cursor: usize,
+    parent: At,
     commands: VecDeque<Box<dyn Command<R> + 'static>>,
 }
 
@@ -550,10 +573,16 @@ impl<R> Debug for Branch<R> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Branch")
             .field("parent", &self.parent)
-            .field("cursor", &self.cursor)
             .field("commands", &self.commands)
             .finish()
     }
+}
+
+/// The position in the tree.
+#[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
+struct At {
+    branch: usize,
+    cursor: usize,
 }
 
 /// Builder for a history.
@@ -602,7 +631,7 @@ impl<R> HistoryBuilder<R> {
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> History<R> {
         History {
-            id: ROOT,
+            current: ROOT,
             next: 1,
             saved: None,
             parent: None,
@@ -697,19 +726,52 @@ mod tests {
     fn jump_to() {
         let mut history = History::default();
 
-        assert!(history.apply(JumpAdd('a', Default::default())).unwrap().is_none());
-        assert!(history.apply(JumpAdd('b', Default::default())).unwrap().is_none());
-        assert!(history.apply(JumpAdd('c', Default::default())).unwrap().is_none());
-        assert!(history.apply(JumpAdd('d', Default::default())).unwrap().is_none());
-        assert!(history.apply(JumpAdd('e', Default::default())).unwrap().is_none());
+        assert!(
+            history
+                .apply(JumpAdd('a', Default::default()))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            history
+                .apply(JumpAdd('b', Default::default()))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            history
+                .apply(JumpAdd('c', Default::default()))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            history
+                .apply(JumpAdd('d', Default::default()))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            history
+                .apply(JumpAdd('e', Default::default()))
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(history.as_receiver(), "abcde");
 
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abc");
 
-        let _ = history.apply(JumpAdd('f', Default::default())).unwrap().unwrap();
-        assert!(history.apply(JumpAdd('g', Default::default())).unwrap().is_none());
+        let _ = history
+            .apply(JumpAdd('f', Default::default()))
+            .unwrap()
+            .unwrap();
+        assert!(
+            history
+                .apply(JumpAdd('g', Default::default()))
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(history.as_receiver(), "abcfg");
 
         let old = format!("{:?}", history);
