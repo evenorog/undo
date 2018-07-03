@@ -329,10 +329,6 @@ impl<R> History<R> {
             let mut commands = self.record.commands.split_off(old);
             self.record.commands.append(&mut branch.commands);
 
-            if let Err(err) = self.record.jump_to(cursor).unwrap() {
-                return Some(Err(err));
-            }
-
             if commands.len() != 0 {
                 self.branches.insert(
                     self.id,
@@ -349,6 +345,10 @@ impl<R> History<R> {
                 };
                 self.id = id;
             }
+        }
+
+        if let Err(err) = self.record.jump_to(cursor).unwrap() {
+            return Some(Err(err));
         }
 
         if let Some(ref mut f) = self.record.signal {
