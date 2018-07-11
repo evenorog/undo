@@ -5,8 +5,6 @@ use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use {merge::Merged, Command, Error, Signal};
 
-const NO_LIMIT: usize = 0;
-
 /// A record of commands.
 ///
 /// The record can roll the receivers state backwards and forwards by using
@@ -78,7 +76,7 @@ impl<R> Record<R> {
             commands: VecDeque::new(),
             receiver: receiver.into(),
             cursor: 0,
-            limit: NO_LIMIT,
+            limit: usize::max_value(),
             saved: Some(0),
             signal: None,
         }
@@ -90,7 +88,7 @@ impl<R> Record<R> {
         RecordBuilder {
             receiver: PhantomData,
             capacity: 0,
-            limit: NO_LIMIT,
+            limit: usize::max_value(),
             saved: true,
             signal: None,
         }
@@ -134,9 +132,13 @@ impl<R> Record<R> {
     /// If `limit < len` the first commands will be removed until `len == limit`.
     /// However, if the current active command is going to be removed, the limit is instead
     /// adjusted to `len - active` so the active command is not removed.
+    ///
+    /// # Panics
+    /// Panics if `limit` is `0`.
     #[inline]
     pub fn set_limit(&mut self, limit: usize) -> usize {
-        if limit != NO_LIMIT && limit < self.len() {
+        assert_ne!(limit, 0);
+        if limit < self.len() {
             let old = self.cursor;
             let could_undo = self.can_undo();
             let was_saved = self.is_saved();
@@ -310,7 +312,7 @@ impl<R> Record<R> {
             }
             _ => {
                 // If commands are not merged push it onto the record.
-                if self.limit != NO_LIMIT && self.limit == self.cursor {
+                if self.limit == self.cursor {
                     // If limit is reached, pop off the first command.
                     self.commands.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
@@ -758,8 +760,12 @@ impl<R> RecordBuilder<R> {
     /// # }
     /// # foo().unwrap();
     /// ```
+    ///
+    /// # Panics
+    /// Panics if `limit` is `0`.
     #[inline]
     pub fn limit(mut self, limit: usize) -> RecordBuilder<R> {
+        assert_ne!(limit, 0);
         self.limit = limit;
         self
     }
@@ -878,6 +884,12 @@ mod tests {
 
     #[derive(Debug)]
     struct JumpAdd(char, String);
+
+    impl JumpAdd {
+        fn new(c: char) -> JumpAdd {
+            JumpAdd(c, Default::default())
+        }
+    }
 
     impl Command<String> for JumpAdd {
         fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
@@ -999,11 +1011,11 @@ mod tests {
     #[test]
     fn jump_to() {
         let mut record = Record::default();
-        record.apply(JumpAdd('a', Default::default())).unwrap();
-        record.apply(JumpAdd('b', Default::default())).unwrap();
-        record.apply(JumpAdd('c', Default::default())).unwrap();
-        record.apply(JumpAdd('d', Default::default())).unwrap();
-        record.apply(JumpAdd('e', Default::default())).unwrap();
+        record.apply(JumpAdd::new('a')).unwrap();
+        record.apply(JumpAdd::new('b')).unwrap();
+        record.apply(JumpAdd::new('c')).unwrap();
+        record.apply(JumpAdd::new('d')).unwrap();
+        record.apply(JumpAdd::new('e')).unwrap();
 
         record.jump_to(0).unwrap().unwrap();
         assert_eq!(record.cursor(), 0);
