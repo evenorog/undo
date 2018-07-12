@@ -270,7 +270,7 @@ impl<R> Record<R> {
     pub fn apply(
         &mut self,
         cmd: impl Command<R> + 'static,
-    ) -> Result<impl Iterator<Item = Box<dyn Command<R> + 'static>>, Error<R>>
+    ) -> Result<impl Iterator<Item = impl Command<R> + 'static>, Error<R>>
     where
         R: 'static,
     {
