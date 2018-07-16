@@ -193,7 +193,7 @@ impl<R> History<R> {
             });
         }
 
-        if commands.len() != 0 {
+        if !commands.is_empty() {
             let id = self.next;
             self.next += 1;
             self.branches.insert(
@@ -271,7 +271,7 @@ impl<R> History<R> {
                     Ok(commands) => commands,
                     Err(err) => return Some(Err(err)),
                 };
-                if commands.len() != 0 {
+                if !commands.is_empty() {
                     self.branches.insert(
                         self.current,
                         Branch {
@@ -339,7 +339,7 @@ impl<R> History<R> {
             let mut commands = self.record.commands.split_off(old);
             self.record.commands.append(&mut branch.commands);
 
-            if commands.len() != 0 {
+            if !commands.is_empty() {
                 self.branches.insert(
                     self.current,
                     Branch {
