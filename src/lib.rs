@@ -21,7 +21,12 @@
 //! [`id`]: trait.Command.html#method.id
 
 #![forbid(unstable_features, bad_style, bare_trait_objects)]
-#![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
+#![deny(
+    missing_debug_implementations,
+    unused_import_braces,
+    unused_qualifications,
+    unsafe_code
+)]
 
 extern crate fnv;
 
@@ -31,7 +36,8 @@ mod record;
 mod signal;
 
 use std::{
-    error, fmt::{self, Debug, Display, Formatter},
+    error,
+    fmt::{self, Debug, Display, Formatter},
 };
 
 pub use history::{History, HistoryBuilder};

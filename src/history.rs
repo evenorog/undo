@@ -672,6 +672,12 @@ mod tests {
     #[derive(Debug)]
     struct JumpAdd(char, String);
 
+    impl From<char> for JumpAdd {
+        fn from(c: char) -> JumpAdd {
+            JumpAdd(c, Default::default())
+        }
+    }
+
     impl Command<String> for JumpAdd {
         fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
             self.1 = receiver.clone();
@@ -726,52 +732,19 @@ mod tests {
     fn jump_to() {
         let mut history = History::default();
 
-        assert!(
-            history
-                .apply(JumpAdd('a', Default::default()))
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            history
-                .apply(JumpAdd('b', Default::default()))
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            history
-                .apply(JumpAdd('c', Default::default()))
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            history
-                .apply(JumpAdd('d', Default::default()))
-                .unwrap()
-                .is_none()
-        );
-        assert!(
-            history
-                .apply(JumpAdd('e', Default::default()))
-                .unwrap()
-                .is_none()
-        );
+        assert!(history.apply(JumpAdd::from('a')).unwrap().is_none());
+        assert!(history.apply(JumpAdd::from('b')).unwrap().is_none());
+        assert!(history.apply(JumpAdd::from('c')).unwrap().is_none());
+        assert!(history.apply(JumpAdd::from('d')).unwrap().is_none());
+        assert!(history.apply(JumpAdd::from('e')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcde");
 
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abc");
 
-        let _ = history
-            .apply(JumpAdd('f', Default::default()))
-            .unwrap()
-            .unwrap();
-        assert!(
-            history
-                .apply(JumpAdd('g', Default::default()))
-                .unwrap()
-                .is_none()
-        );
+        let _ = history.apply(JumpAdd::from('f')).unwrap().unwrap();
+        assert!(history.apply(JumpAdd::from('g')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfg");
 
         let old = format!("{:?}", history);
