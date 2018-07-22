@@ -14,12 +14,12 @@ use Command;
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
 ///         self.0 = s.pop().ok_or("`s` is unexpectedly empty")?;
 ///         Ok(())
 ///     }
@@ -79,17 +79,17 @@ impl<R, C: Command<R> + 'static> From<C> for Merger<R, C> {
 
 impl<R, C: Command<R> + 'static> Command<R> for Merger<R, C> {
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.cmd.apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.cmd.undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.cmd.redo(receiver)
     }
 
@@ -135,19 +135,19 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Merged<R, C1, C2> {
 
 impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Command<R> for Merged<R, C1, C2> {
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.cmd1.apply(receiver)?;
         self.cmd2.apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.cmd2.undo(receiver)?;
         self.cmd1.undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.cmd1.redo(receiver)?;
         self.cmd2.redo(receiver)
     }

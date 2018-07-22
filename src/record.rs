@@ -21,12 +21,12 @@ use {merge::Merged, Command, Error, Signal};
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
 ///         self.0 = s.pop().ok_or("`s` is unexpectedly empty")?;
 ///         Ok(())
 ///     }
@@ -728,12 +728,12 @@ impl<R> RecordBuilder<R> {
     /// # struct Add(char);
     /// #
     /// # impl Command<String> for Add {
-    /// #     fn apply(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #     fn apply(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
     /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
     /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
     /// #     }
@@ -789,12 +789,12 @@ impl<R> RecordBuilder<R> {
     /// # struct Add(char);
     /// #
     /// # impl Command<String> for Add {
-    /// #     fn apply(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #     fn apply(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
     /// #         s.push(self.0);
     /// #         Ok(())
     /// #     }
     /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
     /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
     /// #         Ok(())
     /// #     }
@@ -871,12 +871,12 @@ mod tests {
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
             receiver.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
             self.0 = receiver.pop().ok_or("`receiver` is empty")?;
             Ok(())
         }
@@ -892,18 +892,18 @@ mod tests {
     }
 
     impl Command<String> for JumpAdd {
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
             self.1 = receiver.clone();
             receiver.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
             *receiver = self.1.clone();
             Ok(())
         }
 
-        fn redo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error>> {
+        fn redo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
             *receiver = self.1.clone();
             receiver.push(self.0);
             Ok(())
