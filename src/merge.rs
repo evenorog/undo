@@ -20,7 +20,7 @@ use Command;
 ///     }
 ///
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-///         self.0 = s.pop().ok_or("`s` is unexpectedly empty")?;
+///         self.0 = s.pop().ok_or("`s` is empty")?;
 ///         Ok(())
 ///     }
 /// }

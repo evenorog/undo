@@ -27,13 +27,13 @@ When two commands are merged, undoing and redoing them are done in a single step
 struct Add(char);
 
 impl Command<String> for Add {
-    fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
+    fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
         s.push(self.0);
         Ok(())
     }
 
-    fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error>> {
-        self.0 = s.pop().ok_or("`s` is unexpectedly empty")?;
+    fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        self.0 = s.pop().ok_or("`s` is empty")?;
         Ok(())
     }
 }

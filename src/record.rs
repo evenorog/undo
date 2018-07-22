@@ -27,7 +27,7 @@ use {merge::Merged, Command, Error, Signal};
 ///     }
 ///
 ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-///         self.0 = s.pop().ok_or("`s` is unexpectedly empty")?;
+///         self.0 = s.pop().ok_or("`s` is empty")?;
 ///         Ok(())
 ///     }
 /// }
@@ -734,7 +734,7 @@ impl<R> RecordBuilder<R> {
     /// #     }
     /// #
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
-    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #         self.0 = s.pop().ok_or("`s` is empty")?;
     /// #         Ok(())
     /// #     }
     /// # }
@@ -795,7 +795,7 @@ impl<R> RecordBuilder<R> {
     /// #     }
     /// #
     /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
-    /// #         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    /// #         self.0 = s.pop().ok_or("`s` is empty")?;
     /// #         Ok(())
     /// #     }
     /// # }
