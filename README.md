@@ -22,6 +22,15 @@ When two commands are merged, undoing and redoing them are done in a single step
 
 ## Examples
 
+Add this to `Cargo.toml`:
+
+```toml
+[dependencies]
+undo = "0.23"
+```
+
+And this to `main.rs`:
+
  ```rust
 #[derive(Debug)]
 struct Add(char);
