@@ -1,7 +1,6 @@
 use std::error::Error;
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
-use std::u32;
 use Command;
 
 /// Macro for merging commands.
@@ -51,9 +50,10 @@ macro_rules! merge {
 
 /// A command wrapper which always merges with itself.
 ///
-/// This wrapper has an [`id`] of `u32::MAX`.
+/// This wrapper has an [`id`] of [`u32::max_value`].
 ///
 /// [`id`]: trait.Command.html#method.id
+/// [`u32::max_value`]: https://doc.rust-lang.org/std/primitive.u32.html#method.max_value
 pub struct Merger<R, C: Command<R> + 'static> {
     cmd: C,
     _marker: PhantomData<Box<dyn Command<R> + 'static>>,
@@ -67,6 +67,12 @@ impl<R, C: Command<R> + 'static> Merger<R, C> {
             cmd,
             _marker: PhantomData,
         }
+    }
+
+    /// Returns the inner command.
+    #[inline]
+    pub fn into_command(self) -> C {
+        self.cmd
     }
 }
 
@@ -95,7 +101,7 @@ impl<R, C: Command<R> + 'static> Command<R> for Merger<R, C> {
 
     #[inline]
     fn id(&self) -> Option<u32> {
-        Some(u32::MAX)
+        Some(u32::max_value())
     }
 }
 
@@ -115,6 +121,8 @@ impl<R, C: Command<R> + 'static> fmt::Display for Merger<R, C> {
 }
 
 /// The result of merging two commands.
+///
+/// The [`merge!`](macro.merge.html) macro can be used for convenience when merging commands.
 pub struct Merged<R, C1: Command<R> + 'static, C2: Command<R> + 'static> {
     cmd1: C1,
     cmd2: C2,
@@ -123,6 +131,10 @@ pub struct Merged<R, C1: Command<R> + 'static, C2: Command<R> + 'static> {
 
 impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Merged<R, C1, C2> {
     /// Merges `cmd1` and `cmd2` into a single command.
+    ///
+    /// The [`id`] of the command will be the `cmd1`s [`id`].
+    ///
+    /// [`id`]: trait.Command.html#method.id
     #[inline]
     pub fn new(cmd1: C1, cmd2: C2) -> Merged<R, C1, C2> {
         Merged {
@@ -130,6 +142,12 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Merged<R, C1, C2> {
             cmd2,
             _marker: PhantomData,
         }
+    }
+
+    /// Returns the two merged commands.
+    #[inline]
+    pub fn into_commands(self) -> (C1, C2) {
+        (self.cmd1, self.cmd2)
     }
 }
 
