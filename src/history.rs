@@ -58,7 +58,7 @@ const ROOT: usize = 0;
 /// [Vim]: https://www.vim.org/
 #[derive(Debug)]
 pub struct History<R> {
-    current: usize,
+    branch: usize,
     next: usize,
     saved: Option<At>,
     parent: Option<usize>,
@@ -71,7 +71,7 @@ impl<R> History<R> {
     #[inline]
     pub fn new(receiver: impl Into<R>) -> History<R> {
         History {
-            current: ROOT,
+            branch: ROOT,
             next: 1,
             saved: None,
             parent: None,
@@ -161,7 +161,8 @@ impl<R> History<R> {
     #[inline]
     pub fn clear(&mut self) {
         self.record.clear();
-        self.current = ROOT;
+        self.branch = ROOT;
+        self.next = 1;
         self.saved = None;
         self.parent = None;
         self.branches.clear();
@@ -200,7 +201,7 @@ impl<R> History<R> {
                 id,
                 Branch {
                     parent: At {
-                        branch: self.current,
+                        branch: self.branch,
                         cursor: old,
                     },
                     commands,
@@ -250,14 +251,14 @@ impl<R> History<R> {
     where
         R: 'static,
     {
-        if self.current == branch {
+        if self.branch == branch {
             return self.record.go_to(cursor);
         }
 
         self.toggle_saved(branch);
 
         // Walk the path from `start` to `dest`.
-        let old = self.current;
+        let old = self.branch;
         let root = self.root();
         for (id, branch) in self.create_path(branch)? {
             // Walk to `branch.cursor` either by undoing or redoing.
@@ -273,7 +274,7 @@ impl<R> History<R> {
                 };
                 if !commands.is_empty() {
                     self.branches.insert(
-                        self.current,
+                        self.branch,
                         Branch {
                             parent: At {
                                 branch: id,
@@ -285,9 +286,9 @@ impl<R> History<R> {
                     self.parent = if branch.parent.branch == root {
                         None
                     } else {
-                        Some(self.current)
+                        Some(self.branch)
                     };
-                    self.current = id;
+                    self.branch = id;
                 }
             }
         }
@@ -295,7 +296,7 @@ impl<R> History<R> {
         if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch {
                 old,
-                new: self.current,
+                new: self.branch,
             });
         }
 
@@ -320,14 +321,14 @@ impl<R> History<R> {
     where
         R: 'static,
     {
-        if self.current == branch {
+        if self.branch == branch {
             return self.record.jump_to(cursor);
         }
 
         self.toggle_saved(branch);
 
         // Jump the path from `start` to `dest`.
-        let old = self.current;
+        let old = self.branch;
         let root = self.root();
         for (id, mut branch) in self.create_path(branch)? {
             // Jump to `branch.cursor` either by undoing or redoing.
@@ -341,7 +342,7 @@ impl<R> History<R> {
 
             if !commands.is_empty() {
                 self.branches.insert(
-                    self.current,
+                    self.branch,
                     Branch {
                         parent: At {
                             branch: id,
@@ -353,9 +354,9 @@ impl<R> History<R> {
                 self.parent = if branch.parent.branch == root {
                     None
                 } else {
-                    Some(self.current)
+                    Some(self.branch)
                 };
-                self.current = id;
+                self.branch = id;
             }
         }
 
@@ -366,7 +367,7 @@ impl<R> History<R> {
         if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch {
                 old,
-                new: self.current,
+                new: self.branch,
             });
         }
 
@@ -423,7 +424,7 @@ impl<R> History<R> {
                 }
                 parent
             }
-            None => self.current,
+            None => self.branch,
         }
     }
 
@@ -470,7 +471,7 @@ impl<R> History<R> {
             }
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At {
-                branch: self.current,
+                branch: self.branch,
                 cursor: saved,
             });
             self.record.saved = None;
@@ -631,7 +632,7 @@ impl<R> HistoryBuilder<R> {
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> History<R> {
         History {
-            current: ROOT,
+            branch: ROOT,
             next: 1,
             saved: None,
             parent: None,
