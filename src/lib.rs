@@ -36,7 +36,7 @@ mod record;
 mod signal;
 
 use std::{
-    error,
+    error::Error as StdError,
     fmt::{self, Debug, Display, Formatter},
 };
 
@@ -50,11 +50,11 @@ pub use signal::Signal;
 pub trait Command<R>: Debug + Send + Sync {
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error + Send + Sync>>;
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
     /// Restores the state of the receiver as it was before the command was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error + Send + Sync>>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
     /// Reapplies the command on the receiver and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
@@ -63,7 +63,7 @@ pub trait Command<R>: Debug + Send + Sync {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         self.apply(receiver)
     }
 
@@ -125,12 +125,12 @@ pub trait Command<R>: Debug + Send + Sync {
 
 #[cfg(feature = "display")]
 pub trait Command<R>: Debug + Display + Send + Sync {
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error + Send + Sync>>;
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error + Send + Sync>>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         self.apply(receiver)
     }
 
@@ -142,17 +142,17 @@ pub trait Command<R>: Debug + Display + Send + Sync {
 
 impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         (**self).apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         (**self).undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         (**self).redo(receiver)
     }
 
@@ -163,7 +163,7 @@ impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
 }
 
 /// An error which holds the command that caused it.
-pub struct Error<R>(pub Box<dyn Command<R> + 'static>, pub Box<dyn error::Error + Send + Sync>);
+pub struct Error<R>(pub Box<dyn Command<R> + 'static>, pub Box<dyn StdError + Send + Sync>);
 
 impl<R> Debug for Error<R> {
     #[inline]
@@ -196,14 +196,14 @@ impl<R> Display for Error<R> {
     }
 }
 
-impl<R> error::Error for Error<R> {
+impl<R> StdError for Error<R> {
     #[inline]
     fn description(&self) -> &str {
         self.1.description()
     }
 
     #[inline]
-    fn cause(&self) -> Option<&dyn error::Error> {
+    fn cause(&self) -> Option<&dyn StdError> {
         self.1.cause()
     }
 }

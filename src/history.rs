@@ -435,19 +435,15 @@ impl<R> History<R> {
         let mut children = vec![];
         // We need to check if any of the branches had the removed node as root.
         for (&id, child) in &self.branches {
-            if child.parent == at {
-                if dead.insert(id) {
-                    children.push(id);
-                }
+            if child.parent == at && dead.insert(id) {
+                children.push(id);
             }
         }
         // Add all the children of dead branches so they are removed too.
         while let Some(parent) = children.pop() {
             for (&id, child) in &self.branches {
-                if child.parent.branch == parent {
-                    if dead.insert(id) {
-                        children.push(id);
-                    }
+                if child.parent.branch == parent && dead.insert(id) {
+                    children.push(id);
                 }
             }
         }
