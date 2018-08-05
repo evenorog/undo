@@ -163,7 +163,10 @@ impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
 }
 
 /// An error which holds the command that caused it.
-pub struct Error<R>(pub Box<dyn Command<R> + 'static>, pub Box<dyn StdError + Send + Sync>);
+pub struct Error<R>(
+    pub Box<dyn Command<R> + 'static>,
+    pub Box<dyn StdError + Send + Sync>,
+);
 
 impl<R> Debug for Error<R> {
     #[inline]

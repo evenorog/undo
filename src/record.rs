@@ -521,6 +521,9 @@ impl<R> Record<R> {
         if cursor > self.len() {
             return None;
         }
+        if cursor == self.cursor {
+            return Some(Ok(()));
+        }
 
         let was_saved = self.is_saved();
         let old = self.cursor;
@@ -989,23 +992,23 @@ mod tests {
         record.go_to(0).unwrap().unwrap();
         assert_eq!(record.cursor(), 0);
         assert_eq!(record.as_receiver(), "");
+        record.go_to(5).unwrap().unwrap();
+        assert_eq!(record.cursor(), 5);
+        assert_eq!(record.as_receiver(), "abcde");
         record.go_to(1).unwrap().unwrap();
         assert_eq!(record.cursor(), 1);
         assert_eq!(record.as_receiver(), "a");
+        record.go_to(4).unwrap().unwrap();
+        assert_eq!(record.cursor(), 4);
+        assert_eq!(record.as_receiver(), "abcd");
         record.go_to(2).unwrap().unwrap();
         assert_eq!(record.cursor(), 2);
         assert_eq!(record.as_receiver(), "ab");
         record.go_to(3).unwrap().unwrap();
         assert_eq!(record.cursor(), 3);
         assert_eq!(record.as_receiver(), "abc");
-        record.go_to(4).unwrap().unwrap();
-        assert_eq!(record.cursor(), 4);
-        assert_eq!(record.as_receiver(), "abcd");
-        record.go_to(5).unwrap().unwrap();
-        assert_eq!(record.cursor(), 5);
-        assert_eq!(record.as_receiver(), "abcde");
         assert!(record.go_to(6).is_none());
-        assert_eq!(record.cursor(), 5);
+        assert_eq!(record.cursor(), 3);
     }
 
     #[test]
@@ -1020,22 +1023,22 @@ mod tests {
         record.jump_to(0).unwrap().unwrap();
         assert_eq!(record.cursor(), 0);
         assert_eq!(record.as_receiver(), "");
+        record.jump_to(5).unwrap().unwrap();
+        assert_eq!(record.cursor(), 5);
+        assert_eq!(record.as_receiver(), "abcde");
         record.jump_to(1).unwrap().unwrap();
         assert_eq!(record.cursor(), 1);
         assert_eq!(record.as_receiver(), "a");
+        record.jump_to(4).unwrap().unwrap();
+        assert_eq!(record.cursor(), 4);
+        assert_eq!(record.as_receiver(), "abcd");
         record.jump_to(2).unwrap().unwrap();
         assert_eq!(record.cursor(), 2);
         assert_eq!(record.as_receiver(), "ab");
         record.jump_to(3).unwrap().unwrap();
         assert_eq!(record.cursor(), 3);
         assert_eq!(record.as_receiver(), "abc");
-        record.jump_to(4).unwrap().unwrap();
-        assert_eq!(record.cursor(), 4);
-        assert_eq!(record.as_receiver(), "abcd");
-        record.jump_to(5).unwrap().unwrap();
-        assert_eq!(record.cursor(), 5);
-        assert_eq!(record.as_receiver(), "abcde");
         assert!(record.jump_to(6).is_none());
-        assert_eq!(record.cursor(), 5);
+        assert_eq!(record.cursor(), 3);
     }
 }

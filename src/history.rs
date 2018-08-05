@@ -56,12 +56,11 @@ const ROOT: usize = 0;
 /// ```
 ///
 /// [Vim]: https://www.vim.org/
-#[derive(Debug)]
 pub struct History<R> {
     branch: usize,
     next: usize,
     saved: Option<At>,
-    parent: Option<usize>,
+    parent: Option<At>,
     record: Record<R>,
     branches: FnvHashMap<usize, Branch<R>>,
 }
@@ -195,7 +194,9 @@ impl<R> History<R> {
         }
 
         if !commands.is_empty() {
-            let id = self.next;
+            let id = self.branch;
+            let next = self.next;
+            self.set_branch(next);
             self.next += 1;
             self.branches.insert(
                 id,
@@ -247,12 +248,12 @@ impl<R> History<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
+    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<usize, Error<R>>>
     where
         R: 'static,
     {
         if self.branch == branch {
-            return self.record.go_to(cursor);
+            return self.record.go_to(cursor).map(|r| r.map(|_| branch));
         }
 
         self.toggle_saved(branch);
@@ -286,9 +287,12 @@ impl<R> History<R> {
                     self.parent = if branch.parent.branch == root {
                         None
                     } else {
-                        Some(self.branch)
+                        Some(At {
+                            branch: self.branch,
+                            cursor: branch.parent.cursor,
+                        })
                     };
-                    self.branch = id;
+                    self.set_branch(id);
                 }
             }
         }
@@ -299,8 +303,7 @@ impl<R> History<R> {
                 new: self.branch,
             });
         }
-
-        Some(Ok(()))
+        Some(Ok(old))
     }
 
     /// Jump directly to the command in `branch` at `cursor` and executes its [`undo`] or [`redo`] method.
@@ -317,12 +320,12 @@ impl<R> History<R> {
     /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
     #[must_use]
-    pub fn jump_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
+    pub fn jump_to(&mut self, branch: usize, cursor: usize) -> Option<Result<usize, Error<R>>>
     where
         R: 'static,
     {
         if self.branch == branch {
-            return self.record.jump_to(cursor);
+            return self.record.jump_to(cursor).map(|r| r.map(|_| branch));
         }
 
         self.toggle_saved(branch);
@@ -354,9 +357,12 @@ impl<R> History<R> {
                 self.parent = if branch.parent.branch == root {
                     None
                 } else {
-                    Some(self.branch)
+                    Some(At {
+                        branch: self.branch,
+                        cursor: branch.parent.cursor,
+                    })
                 };
-                self.branch = id;
+                self.set_branch(id);
             }
         }
 
@@ -370,8 +376,7 @@ impl<R> History<R> {
                 new: self.branch,
             });
         }
-
-        Some(Ok(()))
+        Some(Ok(old))
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
@@ -418,7 +423,9 @@ impl<R> History<R> {
     #[inline]
     fn root(&self) -> usize {
         match self.parent {
-            Some(mut parent) => {
+            Some(At {
+                branch: mut parent, ..
+            }) => {
                 while let Some(branch) = self.branches.get(&parent) {
                     parent = branch.parent.branch;
                 }
@@ -426,6 +433,29 @@ impl<R> History<R> {
             }
             None => self.branch,
         }
+    }
+
+    /// Sets the branch to `new`.
+    #[inline]
+    fn set_branch(&mut self, new: usize) {
+        let old = (self.branch, self.cursor());
+        for branch in self
+            .branches
+            .values_mut()
+            .filter(|branch| branch.parent.branch == old.0 && branch.parent.cursor <= old.1)
+        {
+            branch.parent.branch = new;
+        }
+
+        if self
+            .saved
+            .map_or(false, |at| at.branch == old.0 && at.cursor <= old.1)
+        {
+            self.saved.as_mut().map(|at| {
+                at.branch = new;
+            });
+        }
+        self.branch = new;
     }
 
     /// Remove all children of `branch` at `cursor`.
@@ -493,7 +523,7 @@ impl<R> History<R> {
 
         // Find the path from `start` to the lowest common ancestor of `dest`.
         let mut path = Vec::with_capacity(visited.len() + self.record.len());
-        if let Some(mut id) = self.parent {
+        if let Some(At { branch: mut id, .. }) = self.parent {
             let mut start = self.branches.remove(&id).unwrap();
             to = start.parent.branch;
             while !visited.contains(&to) {
@@ -549,6 +579,21 @@ impl<R> From<R> for History<R> {
     #[inline]
     fn from(receiver: R) -> Self {
         History::new(receiver)
+    }
+}
+
+impl<R: Debug> Debug for History<R> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("History")
+            .field("branch", &self.branch)
+            .field("next", &self.next)
+            .field("saved", &self.saved)
+            .field("parent", &self.parent)
+            .field("root", &self.root())
+            .field("record", &self.record)
+            .field("branches", &self.branches)
+            .finish()
     }
 }
 
@@ -696,62 +741,81 @@ mod tests {
 
     #[test]
     fn go_to() {
+        //          m
+        //          |
+        //    j  k  l
+        //     \ | /
+        //       i
+        //       |
+        // e  g  h
+        // |  | /
+        // d  f  p - q *
+        // | /  /
+        // c  n - o
+        // | /
+        // b
+        // |
+        // a
         let mut history = History::default();
-
         assert!(history.apply(Add('a')).unwrap().is_none());
         assert!(history.apply(Add('b')).unwrap().is_none());
         assert!(history.apply(Add('c')).unwrap().is_none());
         assert!(history.apply(Add('d')).unwrap().is_none());
         assert!(history.apply(Add('e')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcde");
-
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abc");
-
-        let _ = history.apply(Add('f')).unwrap().unwrap();
+        let abcde = history.apply(Add('f')).unwrap().unwrap();
         assert!(history.apply(Add('g')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfg");
+        history.undo().unwrap().unwrap();
+        let abcfg = history.apply(Add('h')).unwrap().unwrap();
+        assert!(history.apply(Add('i')).unwrap().is_none());
+        assert!(history.apply(Add('j')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abcfhij");
+        history.undo().unwrap().unwrap();
+        let abcfhij = history.apply(Add('k')).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcfhik");
+        history.undo().unwrap().unwrap();
+        let abcfhik = history.apply(Add('l')).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcfhil");
+        assert!(history.apply(Add('m')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abcfhilm");
 
-        let old = format!("{:?}", history);
+        println!("{:#?}", history);
+        assert_eq!(history.go_to(0, 2).unwrap().unwrap(), 4);
+        println!("{:#?}", history);
+        let abcfhilm = history.apply(Add('n')).unwrap().unwrap();
+        println!("{:#?}", history);
 
-        history.go_to(1, 5).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcde");
-
-        history.go_to(0, 5).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcfg");
-
-        let new = format!("{:?}", history);
-        assert_eq!(old, new);
+        assert!(history.apply(Add('o')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abno");
+        history.undo().unwrap().unwrap();
+        let abno = history.apply(Add('p')).unwrap().unwrap();
+        assert!(history.apply(Add('q')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abnpq");
     }
 
     #[test]
     fn jump_to() {
         let mut history = History::default();
-
         assert!(history.apply(JumpAdd::from('a')).unwrap().is_none());
         assert!(history.apply(JumpAdd::from('b')).unwrap().is_none());
         assert!(history.apply(JumpAdd::from('c')).unwrap().is_none());
         assert!(history.apply(JumpAdd::from('d')).unwrap().is_none());
         assert!(history.apply(JumpAdd::from('e')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcde");
-
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abc");
-
-        let _ = history.apply(JumpAdd::from('f')).unwrap().unwrap();
+        let abcde = history.apply(JumpAdd::from('f')).unwrap().unwrap();
         assert!(history.apply(JumpAdd::from('g')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfg");
-
-        let old = format!("{:?}", history);
-        history.jump_to(1, 5).unwrap().unwrap();
+        let abcfg = history.jump_to(abcde, 5).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcde");
 
-        history.jump_to(0, 5).unwrap().unwrap();
+        history.jump_to(abcfg, 5).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfg");
-
-        let new = format!("{:?}", history);
-        assert_eq!(old, new);
     }
 }
