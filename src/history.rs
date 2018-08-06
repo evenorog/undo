@@ -46,9 +46,7 @@ const ROOT: usize = 0;
 ///     history.apply(Add('g'))?;
 ///
 ///     assert_eq!(history.as_receiver(), "afg");
-///
-///     history.go_to(n, 5).unwrap()?;
-///
+///     history.go_to(n, 3).unwrap()?;
 ///     assert_eq!(history.as_receiver(), "abc");
 ///
 ///     Ok(())
@@ -196,8 +194,8 @@ impl<R> History<R> {
         if !commands.is_empty() {
             let id = self.branch;
             let next = self.next;
-            self.set_branch(next);
             self.next += 1;
+            self.set_branch(next, old);
             self.branches.insert(
                 id,
                 Branch {
@@ -256,8 +254,6 @@ impl<R> History<R> {
             return self.record.go_to(cursor).map(|r| r.map(|_| branch));
         }
 
-        self.toggle_saved(branch);
-
         // Walk the path from `start` to `dest`.
         let old = self.branch;
         let root = self.root();
@@ -292,9 +288,13 @@ impl<R> History<R> {
                             cursor: branch.parent.cursor,
                         })
                     };
-                    self.set_branch(id);
+                    self.set_branch(id, old);
                 }
             }
+        }
+
+        if let Err(err) = self.record.go_to(cursor)? {
+            return Some(Err(err));
         }
 
         if let Some(ref mut f) = self.record.signal {
@@ -328,8 +328,6 @@ impl<R> History<R> {
             return self.record.jump_to(cursor).map(|r| r.map(|_| branch));
         }
 
-        self.toggle_saved(branch);
-
         // Jump the path from `start` to `dest`.
         let old = self.branch;
         let root = self.root();
@@ -362,11 +360,11 @@ impl<R> History<R> {
                         cursor: branch.parent.cursor,
                     })
                 };
-                self.set_branch(id);
+                self.set_branch(id, old);
             }
         }
 
-        if let Err(err) = self.record.jump_to(cursor).unwrap() {
+        if let Err(err) = self.record.jump_to(cursor)? {
             return Some(Err(err));
         }
 
@@ -437,23 +435,21 @@ impl<R> History<R> {
 
     /// Sets the branch to `new`.
     #[inline]
-    fn set_branch(&mut self, new: usize) {
-        let old = (self.branch, self.cursor());
+    fn set_branch(&mut self, new: usize, cursor: usize) {
+        let old = self.branch;
         for branch in self
             .branches
             .values_mut()
-            .filter(|branch| branch.parent.branch == old.0 && branch.parent.cursor <= old.1)
+            .filter(|branch| branch.parent.branch == old && branch.parent.cursor <= cursor)
         {
             branch.parent.branch = new;
         }
 
         if self
             .saved
-            .map_or(false, |at| at.branch == old.0 && at.cursor <= old.1)
+            .map_or(false, |at| at.branch == old && at.cursor <= cursor)
         {
-            self.saved.as_mut().map(|at| {
-                at.branch = new;
-            });
+            self.toggle_saved(new);
         }
         self.branch = new;
     }
@@ -462,7 +458,7 @@ impl<R> History<R> {
     #[inline]
     fn remove_children(&mut self, at: At) {
         let mut dead = FnvHashSet::default();
-        let mut children = vec![];
+        let mut children = Vec::new();
         // We need to check if any of the branches had the removed node as root.
         for (&id, child) in &self.branches {
             if child.parent == at && dead.insert(id) {
@@ -770,35 +766,45 @@ mod tests {
         assert!(history.apply(Add('g')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfg");
         history.undo().unwrap().unwrap();
-        let abcfg = history.apply(Add('h')).unwrap().unwrap();
+        let _ = history.apply(Add('h')).unwrap().unwrap();
         assert!(history.apply(Add('i')).unwrap().is_none());
         assert!(history.apply(Add('j')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfhij");
         history.undo().unwrap().unwrap();
-        let abcfhij = history.apply(Add('k')).unwrap().unwrap();
+        let _ = history.apply(Add('k')).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfhik");
         history.undo().unwrap().unwrap();
-        let abcfhik = history.apply(Add('l')).unwrap().unwrap();
+        let _ = history.apply(Add('l')).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfhil");
         assert!(history.apply(Add('m')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfhilm");
-
-        println!("{:#?}", history);
-        assert_eq!(history.go_to(0, 2).unwrap().unwrap(), 4);
-        println!("{:#?}", history);
-        let abcfhilm = history.apply(Add('n')).unwrap().unwrap();
-        println!("{:#?}", history);
-
+        assert_eq!(history.go_to(abcde, 2).unwrap().unwrap(), 4);
+        let _ = history.apply(Add('n')).unwrap().unwrap();
         assert!(history.apply(Add('o')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abno");
         history.undo().unwrap().unwrap();
-        let abno = history.apply(Add('p')).unwrap().unwrap();
+        let _ = history.apply(Add('p')).unwrap().unwrap();
         assert!(history.apply(Add('q')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abnpq");
     }
 
     #[test]
     fn jump_to() {
+        //          m
+        //          |
+        //    j  k  l
+        //     \ | /
+        //       i
+        //       |
+        // e  g  h
+        // |  | /
+        // d  f  p - q *
+        // | /  /
+        // c  n - o
+        // | /
+        // b
+        // |
+        // a
         let mut history = History::default();
         assert!(history.apply(JumpAdd::from('a')).unwrap().is_none());
         assert!(history.apply(JumpAdd::from('b')).unwrap().is_none());
@@ -812,10 +818,26 @@ mod tests {
         let abcde = history.apply(JumpAdd::from('f')).unwrap().unwrap();
         assert!(history.apply(JumpAdd::from('g')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfg");
-        let abcfg = history.jump_to(abcde, 5).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcde");
-
-        history.jump_to(abcfg, 5).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcfg");
+        history.undo().unwrap().unwrap();
+        let _ = history.apply(JumpAdd::from('h')).unwrap().unwrap();
+        assert!(history.apply(JumpAdd::from('i')).unwrap().is_none());
+        assert!(history.apply(JumpAdd::from('j')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abcfhij");
+        history.undo().unwrap().unwrap();
+        let _ = history.apply(JumpAdd::from('k')).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcfhik");
+        history.undo().unwrap().unwrap();
+        let _ = history.apply(JumpAdd::from('l')).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcfhil");
+        assert!(history.apply(JumpAdd::from('m')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abcfhilm");
+        assert_eq!(history.jump_to(abcde, 2).unwrap().unwrap(), 4);
+        let _ = history.apply(JumpAdd::from('n')).unwrap().unwrap();
+        assert!(history.apply(JumpAdd::from('o')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abno");
+        history.undo().unwrap().unwrap();
+        let _ = history.apply(JumpAdd::from('p')).unwrap().unwrap();
+        assert!(history.apply(JumpAdd::from('q')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abnpq");
     }
 }
