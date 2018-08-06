@@ -304,23 +304,20 @@ impl<R> Record<R> {
         }
 
         // Try to merge commands unless the receiver is in a saved state.
-        match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
-            (Some(id1), Some(id2)) if id1 == id2 && !was_saved => {
-                // Merge the command with the one on the top of the stack.
-                let merged = Merged::new(self.commands.pop_back().unwrap(), cmd);
-                self.commands.push_back(Box::new(merged));
+        if self.merges(&cmd) {
+            // Merge the command with the one on the top of the stack.
+            let merged = Merged::new(self.commands.pop_back().unwrap(), cmd);
+            self.commands.push_back(Box::new(merged));
+        } else {
+            // If commands are not merged push it onto the record.
+            if self.limit == self.cursor {
+                // If limit is reached, pop off the first command.
+                self.commands.pop_front();
+                self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
+            } else {
+                self.cursor += 1;
             }
-            _ => {
-                // If commands are not merged push it onto the record.
-                if self.limit == self.cursor {
-                    // If limit is reached, pop off the first command.
-                    self.commands.pop_front();
-                    self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
-                } else {
-                    self.cursor += 1;
-                }
-                self.commands.push_back(Box::new(cmd));
-            }
+            self.commands.push_back(Box::new(cmd));
         }
 
         debug_assert_eq!(self.cursor, self.len());
