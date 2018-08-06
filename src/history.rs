@@ -5,8 +5,6 @@ use std::fmt::Display;
 use std::fmt::{self, Debug, Formatter};
 use {Command, Error, Record, RecordBuilder, Signal};
 
-const ROOT: usize = 0;
-
 /// A history of commands.
 ///
 /// A history works mostly like a record but also provides branching, like [Vim]s undo-tree.
@@ -68,7 +66,7 @@ impl<R> History<R> {
     #[inline]
     pub fn new(receiver: impl Into<R>) -> History<R> {
         History {
-            branch: ROOT,
+            branch: 0,
             next: 1,
             saved: None,
             parent: None,
@@ -158,7 +156,7 @@ impl<R> History<R> {
     #[inline]
     pub fn clear(&mut self) {
         self.record.clear();
-        self.branch = ROOT;
+        self.branch = 0;
         self.next = 1;
         self.saved = None;
         self.parent = None;
@@ -296,6 +294,7 @@ impl<R> History<R> {
         if let Err(err) = self.record.go_to(cursor)? {
             return Some(Err(err));
         }
+        self.parent = None;
 
         if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch {
@@ -367,6 +366,7 @@ impl<R> History<R> {
         if let Err(err) = self.record.jump_to(cursor)? {
             return Some(Err(err));
         }
+        self.parent = None;
 
         if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch {
@@ -427,6 +427,7 @@ impl<R> History<R> {
                 while let Some(branch) = self.branches.get(&parent) {
                     parent = branch.parent.branch;
                 }
+                debug_assert_eq!(parent, self.branch);
                 parent
             }
             None => self.branch,
@@ -507,29 +508,34 @@ impl<R> History<R> {
         // Find the path from `dest` to `root`.
         let root = self.root();
         let visited = {
-            let mut visited =
-                FnvHashSet::with_capacity_and_hasher(self.capacity(), Default::default());
+            let mut visited = Vec::with_capacity(self.capacity());
             let mut dest = self.branches.get(&to)?;
             while dest.parent.branch != root {
-                assert!(visited.insert(dest.parent.branch));
+                visited.push(dest.parent.branch);
                 dest = &self.branches[&dest.parent.branch];
             }
             visited
         };
-
         // Find the path from `start` to the lowest common ancestor of `dest`.
         let mut path = Vec::with_capacity(visited.len() + self.record.len());
-        if let Some(At { branch: mut id, .. }) = self.parent {
-            let mut start = self.branches.remove(&id).unwrap();
-            to = start.parent.branch;
-            while !visited.contains(&to) {
-                path.push((id, start));
-                start = self.branches.remove(&to).unwrap();
-                id = to;
+        match self.parent {
+            Some(At { branch: mut id, .. }) => {
+                let mut start = self.branches.remove(&id).unwrap();
                 to = start.parent.branch;
+                while !visited.contains(&to) {
+                    path.push((id, start));
+                    start = self.branches.remove(&to).unwrap();
+                    id = to;
+                    to = start.parent.branch;
+                }
+            }
+            None => {
+                for id in visited {
+                    let branch = self.branches.remove(&id).unwrap();
+                    path.push((id, branch));
+                }
             }
         }
-
         // Find the path from `dest` to the lowest common ancestor of `start`.
         let mut dest = self.branches.remove(&to)?;
         let mut id = to;
@@ -586,7 +592,6 @@ impl<R: Debug> Debug for History<R> {
             .field("next", &self.next)
             .field("saved", &self.saved)
             .field("parent", &self.parent)
-            .field("root", &self.root())
             .field("record", &self.record)
             .field("branches", &self.branches)
             .finish()
@@ -669,7 +674,7 @@ impl<R> HistoryBuilder<R> {
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> History<R> {
         History {
-            branch: ROOT,
+            branch: 0,
             next: 1,
             saved: None,
             parent: None,
@@ -766,25 +771,40 @@ mod tests {
         assert!(history.apply(Add('g')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfg");
         history.undo().unwrap().unwrap();
-        let _ = history.apply(Add('h')).unwrap().unwrap();
+        let abcfg = history.apply(Add('h')).unwrap().unwrap();
         assert!(history.apply(Add('i')).unwrap().is_none());
         assert!(history.apply(Add('j')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfhij");
         history.undo().unwrap().unwrap();
-        let _ = history.apply(Add('k')).unwrap().unwrap();
+        let abcfhij = history.apply(Add('k')).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfhik");
         history.undo().unwrap().unwrap();
-        let _ = history.apply(Add('l')).unwrap().unwrap();
+        let abcfhik = history.apply(Add('l')).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfhil");
         assert!(history.apply(Add('m')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfhilm");
-        assert_eq!(history.go_to(abcde, 2).unwrap().unwrap(), 4);
-        let _ = history.apply(Add('n')).unwrap().unwrap();
+        let abcfhilm = history.go_to(abcde, 2).unwrap().unwrap();
+        history.apply(Add('n')).unwrap().unwrap();
         assert!(history.apply(Add('o')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abno");
         history.undo().unwrap().unwrap();
-        let _ = history.apply(Add('p')).unwrap().unwrap();
+        let abno = history.apply(Add('p')).unwrap().unwrap();
         assert!(history.apply(Add('q')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abnpq");
+
+        let abnpq = history.go_to(abcde, 5).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcde");
+        assert_eq!(history.go_to(abcfg, 5).unwrap().unwrap(), abcde);
+        assert_eq!(history.as_receiver(), "abcfg");
+        assert_eq!(history.go_to(abcfhij, 7).unwrap().unwrap(), abcfg);
+        assert_eq!(history.as_receiver(), "abcfhij");
+        assert_eq!(history.go_to(abcfhik, 7).unwrap().unwrap(), abcfhij);
+        assert_eq!(history.as_receiver(), "abcfhik");
+        assert_eq!(history.go_to(abcfhilm, 8).unwrap().unwrap(), abcfhik);
+        assert_eq!(history.as_receiver(), "abcfhilm");
+        assert_eq!(history.go_to(abno, 4).unwrap().unwrap(), abcfhilm);
+        assert_eq!(history.as_receiver(), "abno");
+        assert_eq!(history.go_to(abnpq, 5).unwrap().unwrap(), abno);
         assert_eq!(history.as_receiver(), "abnpq");
     }
 
@@ -819,25 +839,40 @@ mod tests {
         assert!(history.apply(JumpAdd::from('g')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfg");
         history.undo().unwrap().unwrap();
-        let _ = history.apply(JumpAdd::from('h')).unwrap().unwrap();
+        let abcfg = history.apply(JumpAdd::from('h')).unwrap().unwrap();
         assert!(history.apply(JumpAdd::from('i')).unwrap().is_none());
         assert!(history.apply(JumpAdd::from('j')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfhij");
         history.undo().unwrap().unwrap();
-        let _ = history.apply(JumpAdd::from('k')).unwrap().unwrap();
+        let abcfhij = history.apply(JumpAdd::from('k')).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfhik");
         history.undo().unwrap().unwrap();
-        let _ = history.apply(JumpAdd::from('l')).unwrap().unwrap();
+        let abcfhik = history.apply(JumpAdd::from('l')).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfhil");
         assert!(history.apply(JumpAdd::from('m')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abcfhilm");
-        assert_eq!(history.jump_to(abcde, 2).unwrap().unwrap(), 4);
-        let _ = history.apply(JumpAdd::from('n')).unwrap().unwrap();
+        let abcfhilm = history.go_to(abcde, 2).unwrap().unwrap();
+        history.apply(JumpAdd::from('n')).unwrap().unwrap();
         assert!(history.apply(JumpAdd::from('o')).unwrap().is_none());
         assert_eq!(history.as_receiver(), "abno");
         history.undo().unwrap().unwrap();
-        let _ = history.apply(JumpAdd::from('p')).unwrap().unwrap();
+        let abno = history.apply(JumpAdd::from('p')).unwrap().unwrap();
         assert!(history.apply(JumpAdd::from('q')).unwrap().is_none());
+        assert_eq!(history.as_receiver(), "abnpq");
+
+        let abnpq = history.jump_to(abcde, 5).unwrap().unwrap();
+        assert_eq!(history.as_receiver(), "abcde");
+        assert_eq!(history.jump_to(abcfg, 5).unwrap().unwrap(), abcde);
+        assert_eq!(history.as_receiver(), "abcfg");
+        assert_eq!(history.jump_to(abcfhij, 7).unwrap().unwrap(), abcfg);
+        assert_eq!(history.as_receiver(), "abcfhij");
+        assert_eq!(history.jump_to(abcfhik, 7).unwrap().unwrap(), abcfhij);
+        assert_eq!(history.as_receiver(), "abcfhik");
+        assert_eq!(history.jump_to(abcfhilm, 8).unwrap().unwrap(), abcfhik);
+        assert_eq!(history.as_receiver(), "abcfhilm");
+        assert_eq!(history.jump_to(abno, 4).unwrap().unwrap(), abcfhilm);
+        assert_eq!(history.as_receiver(), "abno");
+        assert_eq!(history.jump_to(abnpq, 5).unwrap().unwrap(), abno);
         assert_eq!(history.as_receiver(), "abnpq");
     }
 }
