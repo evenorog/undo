@@ -53,10 +53,9 @@ use {Command, Error, Record, RecordBuilder, Signal};
 ///
 /// [Vim]: https://www.vim.org/
 pub struct History<R> {
-    branch: usize,
+    root: usize,
     next: usize,
     saved: Option<At>,
-    parent: Option<At>,
     record: Record<R>,
     branches: FnvHashMap<usize, Branch<R>>,
 }
@@ -66,10 +65,9 @@ impl<R> History<R> {
     #[inline]
     pub fn new(receiver: impl Into<R>) -> History<R> {
         History {
-            branch: 0,
+            root: 0,
             next: 1,
             saved: None,
-            parent: None,
             record: Record::new(receiver),
             branches: FnvHashMap::default(),
         }
@@ -156,10 +154,9 @@ impl<R> History<R> {
     #[inline]
     pub fn clear(&mut self) {
         self.record.clear();
-        self.branch = 0;
+        self.root = 0;
         self.next = 1;
         self.saved = None;
-        self.parent = None;
         self.branches.clear();
     }
 
@@ -182,7 +179,7 @@ impl<R> History<R> {
 
         // Check if the limit has been reached.
         if !merges && old == self.cursor() {
-            let root = self.root();
+            let root = self.root;
             self.remove_children(At {
                 branch: root,
                 cursor: 0,
@@ -190,21 +187,21 @@ impl<R> History<R> {
         }
 
         if !commands.is_empty() {
-            let id = self.branch;
+            let root = self.root;
             let next = self.next;
             self.next += 1;
             self.set_branch(next, old);
             self.branches.insert(
-                id,
+                root,
                 Branch {
                     parent: At {
-                        branch: self.branch,
+                        branch: self.root,
                         cursor: old,
                     },
                     commands,
                 },
             );
-            Ok(Some(id))
+            Ok(Some(root))
         } else {
             Ok(None)
         }
@@ -248,13 +245,12 @@ impl<R> History<R> {
     where
         R: 'static,
     {
-        if self.branch == branch {
+        if self.root == branch {
             return self.record.go_to(cursor).map(|r| r.map(|_| branch));
         }
 
         // Walk the path from `start` to `dest`.
-        let old = self.branch;
-        let root = self.root();
+        let old = self.root;
         for (id, branch) in self.create_path(branch)? {
             // Walk to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.parent.cursor).unwrap() {
@@ -269,7 +265,7 @@ impl<R> History<R> {
                 };
                 if !commands.is_empty() {
                     self.branches.insert(
-                        self.branch,
+                        self.root,
                         Branch {
                             parent: At {
                                 branch: id,
@@ -278,14 +274,6 @@ impl<R> History<R> {
                             commands,
                         },
                     );
-                    self.parent = if branch.parent.branch == root {
-                        None
-                    } else {
-                        Some(At {
-                            branch: self.branch,
-                            cursor: branch.parent.cursor,
-                        })
-                    };
                     self.set_branch(id, old);
                 }
             }
@@ -294,12 +282,11 @@ impl<R> History<R> {
         if let Err(err) = self.record.go_to(cursor)? {
             return Some(Err(err));
         }
-        self.parent = None;
 
         if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch {
                 old,
-                new: self.branch,
+                new: self.root,
             });
         }
         Some(Ok(old))
@@ -323,13 +310,12 @@ impl<R> History<R> {
     where
         R: 'static,
     {
-        if self.branch == branch {
+        if self.root == branch {
             return self.record.jump_to(cursor).map(|r| r.map(|_| branch));
         }
 
         // Jump the path from `start` to `dest`.
-        let old = self.branch;
-        let root = self.root();
+        let old = self.root;
         for (id, mut branch) in self.create_path(branch)? {
             // Jump to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.jump_to(branch.parent.cursor).unwrap() {
@@ -342,7 +328,7 @@ impl<R> History<R> {
 
             if !commands.is_empty() {
                 self.branches.insert(
-                    self.branch,
+                    self.root,
                     Branch {
                         parent: At {
                             branch: id,
@@ -351,14 +337,6 @@ impl<R> History<R> {
                         commands,
                     },
                 );
-                self.parent = if branch.parent.branch == root {
-                    None
-                } else {
-                    Some(At {
-                        branch: self.branch,
-                        cursor: branch.parent.cursor,
-                    })
-                };
                 self.set_branch(id, old);
             }
         }
@@ -366,12 +344,11 @@ impl<R> History<R> {
         if let Err(err) = self.record.jump_to(cursor)? {
             return Some(Err(err));
         }
-        self.parent = None;
 
         if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch {
                 old,
-                new: self.branch,
+                new: self.root,
             });
         }
         Some(Ok(old))
@@ -417,27 +394,10 @@ impl<R> History<R> {
         self.record.into_receiver()
     }
 
-    /// Find the root.
-    #[inline]
-    fn root(&self) -> usize {
-        match self.parent {
-            Some(At {
-                branch: mut parent, ..
-            }) => {
-                while let Some(branch) = self.branches.get(&parent) {
-                    parent = branch.parent.branch;
-                }
-                debug_assert_eq!(parent, self.branch);
-                parent
-            }
-            None => self.branch,
-        }
-    }
-
     /// Sets the branch to `new`.
     #[inline]
     fn set_branch(&mut self, new: usize, cursor: usize) {
-        let old = self.branch;
+        let old = self.root;
         for branch in self
             .branches
             .values_mut()
@@ -452,7 +412,7 @@ impl<R> History<R> {
         {
             self.toggle_saved(new);
         }
-        self.branch = new;
+        self.root = new;
     }
 
     /// Remove all children of `branch` at `cursor`.
@@ -494,7 +454,7 @@ impl<R> History<R> {
             }
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At {
-                branch: self.branch,
+                branch: self.root,
                 cursor: saved,
             });
             self.record.saved = None;
@@ -506,7 +466,7 @@ impl<R> History<R> {
     #[must_use]
     fn create_path(&mut self, mut to: usize) -> Option<Vec<(usize, Branch<R>)>> {
         // Find the path from `dest` to `root`.
-        let root = self.root();
+        let root = self.root;
         let visited = {
             let mut visited = Vec::with_capacity(self.capacity());
             let mut dest = self.branches.get(&to)?;
@@ -518,24 +478,11 @@ impl<R> History<R> {
         };
         // Find the path from `start` to the lowest common ancestor of `dest`.
         let mut path = Vec::with_capacity(visited.len() + self.record.len());
-        match self.parent {
-            Some(At { branch: mut id, .. }) => {
-                let mut start = self.branches.remove(&id).unwrap();
-                to = start.parent.branch;
-                while !visited.contains(&to) {
-                    path.push((id, start));
-                    start = self.branches.remove(&to).unwrap();
-                    id = to;
-                    to = start.parent.branch;
-                }
-            }
-            None => {
-                for id in visited {
-                    let branch = self.branches.remove(&id).unwrap();
-                    path.push((id, branch));
-                }
-            }
+        for id in visited {
+            let branch = self.branches.remove(&id).unwrap();
+            path.push((id, branch));
         }
+
         // Find the path from `dest` to the lowest common ancestor of `start`.
         let mut dest = self.branches.remove(&to)?;
         let mut id = to;
@@ -588,10 +535,9 @@ impl<R: Debug> Debug for History<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("History")
-            .field("branch", &self.branch)
+            .field("branch", &self.root)
             .field("next", &self.next)
             .field("saved", &self.saved)
-            .field("parent", &self.parent)
             .field("record", &self.record)
             .field("branches", &self.branches)
             .finish()
@@ -674,10 +620,9 @@ impl<R> HistoryBuilder<R> {
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> History<R> {
         History {
-            branch: 0,
+            root: 0,
             next: 1,
             saved: None,
-            parent: None,
             record: self.inner.build(receiver),
             branches: FnvHashMap::default(),
         }
