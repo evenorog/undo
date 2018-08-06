@@ -52,6 +52,7 @@ use {Command, Error, Record, RecordBuilder, Signal};
 /// ```
 ///
 /// [Vim]: https://www.vim.org/
+#[derive(Debug)]
 pub struct History<R> {
     root: usize,
     next: usize,
@@ -144,6 +145,12 @@ impl<R> History<R> {
         self.record.is_saved()
     }
 
+    /// Returns the current branch.
+    #[inline]
+    pub fn root(&self) -> usize {
+        self.root
+    }
+
     /// Returns the position of the current command.
     #[inline]
     pub fn cursor(&self) -> usize {
@@ -190,7 +197,7 @@ impl<R> History<R> {
             let root = self.root;
             let next = self.next;
             self.next += 1;
-            self.set_branch(next, old);
+            self.set_root(next, old);
             self.branches.insert(
                 root,
                 Branch {
@@ -274,7 +281,7 @@ impl<R> History<R> {
                             commands,
                         },
                     );
-                    self.set_branch(id, old);
+                    self.set_root(id, old);
                 }
             }
         }
@@ -337,7 +344,7 @@ impl<R> History<R> {
                         commands,
                     },
                 );
-                self.set_branch(id, old);
+                self.set_root(id, old);
             }
         }
 
@@ -394,25 +401,37 @@ impl<R> History<R> {
         self.record.into_receiver()
     }
 
-    /// Sets the branch to `new`.
+    /// Sets the `root`.
     #[inline]
-    fn set_branch(&mut self, new: usize, cursor: usize) {
+    fn set_root(&mut self, root: usize, cursor: usize) {
         let old = self.root;
         for branch in self
             .branches
             .values_mut()
             .filter(|branch| branch.parent.branch == old && branch.parent.cursor <= cursor)
         {
-            branch.parent.branch = new;
+            branch.parent.branch = root;
         }
 
-        if self
+        if let Some(At {
+            branch: at,
+            cursor: saved,
+        }) = self
             .saved
-            .map_or(false, |at| at.branch == old && at.cursor <= cursor)
+            .filter(|at| at.branch == old && at.cursor <= cursor)
         {
-            self.toggle_saved(new);
+            if at == root {
+                self.record.saved = Some(saved);
+                self.saved = None;
+            }
+        } else if let Some(saved) = self.record.saved {
+            self.saved = Some(At {
+                branch: self.root,
+                cursor: saved,
+            });
+            self.record.saved = None;
         }
-        self.root = new;
+        self.root = root;
     }
 
     /// Remove all children of `branch` at `cursor`.
@@ -437,27 +456,6 @@ impl<R> History<R> {
         // Remove all dead branches.
         for id in dead {
             self.branches.remove(&id);
-        }
-    }
-
-    /// Handle the saved state when switching to another branch.
-    #[inline]
-    fn toggle_saved(&mut self, branch: usize) {
-        if let Some(At {
-            branch: at,
-            cursor: saved,
-        }) = self.saved
-        {
-            if at == branch {
-                self.record.saved = Some(saved);
-                self.saved = None;
-            }
-        } else if let Some(saved) = self.record.saved {
-            self.saved = Some(At {
-                branch: self.root,
-                cursor: saved,
-            });
-            self.record.saved = None;
         }
     }
 
@@ -528,19 +526,6 @@ impl<R> From<R> for History<R> {
     #[inline]
     fn from(receiver: R) -> Self {
         History::new(receiver)
-    }
-}
-
-impl<R: Debug> Debug for History<R> {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("History")
-            .field("branch", &self.root)
-            .field("next", &self.next)
-            .field("saved", &self.saved)
-            .field("record", &self.record)
-            .field("branches", &self.branches)
-            .finish()
     }
 }
 

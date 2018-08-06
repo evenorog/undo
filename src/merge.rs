@@ -48,78 +48,6 @@ macro_rules! merge {
     );
 }
 
-/// A command wrapper which always merges with itself.
-///
-/// This wrapper has an [`id`] of [`u32::max_value`].
-///
-/// [`id`]: trait.Command.html#method.id
-/// [`u32::max_value`]: https://doc.rust-lang.org/std/primitive.u32.html#method.max_value
-pub struct Merger<R, C: Command<R> + 'static> {
-    cmd: C,
-    _marker: PhantomData<Box<dyn Command<R> + 'static>>,
-}
-
-impl<R, C: Command<R> + 'static> Merger<R, C> {
-    /// Returns a new merger command.
-    #[inline]
-    pub fn new(cmd: C) -> Merger<R, C> {
-        Merger {
-            cmd,
-            _marker: PhantomData,
-        }
-    }
-
-    /// Returns the inner command.
-    #[inline]
-    pub fn into_command(self) -> C {
-        self.cmd
-    }
-}
-
-impl<R, C: Command<R> + 'static> From<C> for Merger<R, C> {
-    #[inline]
-    fn from(cmd: C) -> Self {
-        Merger::new(cmd)
-    }
-}
-
-impl<R, C: Command<R> + 'static> Command<R> for Merger<R, C> {
-    #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
-        self.cmd.apply(receiver)
-    }
-
-    #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
-        self.cmd.undo(receiver)
-    }
-
-    #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
-        self.cmd.redo(receiver)
-    }
-
-    #[inline]
-    fn id(&self) -> Option<u32> {
-        Some(u32::max_value())
-    }
-}
-
-impl<R, C: Command<R> + 'static> Debug for Merger<R, C> {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Merger").field("cmd", &self.cmd).finish()
-    }
-}
-
-#[cfg(feature = "display")]
-impl<R, C: Command<R> + 'static> fmt::Display for Merger<R, C> {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        (&self.cmd as &fmt::Display).fmt(f)
-    }
-}
-
 /// The result of merging two commands.
 ///
 /// The [`merge!`](macro.merge.html) macro can be used for convenience when merging commands.
@@ -191,5 +119,77 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Display for Mer
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{cmd1} + {cmd2}", cmd1 = self.cmd1, cmd2 = self.cmd2)
+    }
+}
+
+/// A command wrapper which always merges with itself.
+///
+/// This wrapper has an [`id`] of [`u32::max_value`].
+///
+/// [`id`]: trait.Command.html#method.id
+/// [`u32::max_value`]: https://doc.rust-lang.org/std/primitive.u32.html#method.max_value
+pub struct Merger<R, C: Command<R> + 'static> {
+    cmd: C,
+    _marker: PhantomData<Box<dyn Command<R> + 'static>>,
+}
+
+impl<R, C: Command<R> + 'static> Merger<R, C> {
+    /// Returns a new merger command.
+    #[inline]
+    pub fn new(cmd: C) -> Merger<R, C> {
+        Merger {
+            cmd,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Returns the inner command.
+    #[inline]
+    pub fn into_command(self) -> C {
+        self.cmd
+    }
+}
+
+impl<R, C: Command<R> + 'static> From<C> for Merger<R, C> {
+    #[inline]
+    fn from(cmd: C) -> Self {
+        Merger::new(cmd)
+    }
+}
+
+impl<R, C: Command<R> + 'static> Command<R> for Merger<R, C> {
+    #[inline]
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
+        self.cmd.apply(receiver)
+    }
+
+    #[inline]
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
+        self.cmd.undo(receiver)
+    }
+
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
+        self.cmd.redo(receiver)
+    }
+
+    #[inline]
+    fn id(&self) -> Option<u32> {
+        Some(u32::max_value())
+    }
+}
+
+impl<R, C: Command<R> + 'static> Debug for Merger<R, C> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Merger").field("cmd", &self.cmd).finish()
+    }
+}
+
+#[cfg(feature = "display")]
+impl<R, C: Command<R> + 'static> fmt::Display for Merger<R, C> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        (&self.cmd as &fmt::Display).fmt(f)
     }
 }
