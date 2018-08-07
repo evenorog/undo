@@ -30,23 +30,16 @@ use {Command, Error, Record, RecordBuilder, Signal};
 ///
 /// fn main() -> Result<(), Box<dyn Error>> {
 ///     let mut history = History::default();
-///
 ///     history.apply(Add('a'))?;
 ///     history.apply(Add('b'))?;
 ///     history.apply(Add('c'))?;
-///
 ///     assert_eq!(history.as_receiver(), "abc");
-///
-///     history.undo().unwrap()?;
-///     history.undo().unwrap()?;
-///
-///     let n = history.apply(Add('f'))?.unwrap();
+///     history.go_to(0, 1).unwrap()?;
+///     let abc = history.apply(Add('f'))?.unwrap();
 ///     history.apply(Add('g'))?;
-///
 ///     assert_eq!(history.as_receiver(), "afg");
-///     history.go_to(n, 3).unwrap()?;
+///     history.go_to(abc, 3).unwrap()?;
 ///     assert_eq!(history.as_receiver(), "abc");
-///
 ///     Ok(())
 /// }
 /// ```
@@ -405,6 +398,7 @@ impl<R> History<R> {
     #[inline]
     fn set_root(&mut self, root: usize, cursor: usize) {
         let old = self.root;
+        // Handle the child branches.
         for branch in self
             .branches
             .values_mut()
@@ -412,18 +406,13 @@ impl<R> History<R> {
         {
             branch.parent.branch = root;
         }
-
-        if let Some(At {
-            branch: at,
-            cursor: saved,
-        }) = self
+        // Handle the saved state.
+        if let Some(At { cursor: saved, .. }) = self
             .saved
-            .filter(|at| at.branch == old && at.cursor <= cursor)
+            .filter(|at| at.branch == root && at.cursor <= cursor)
         {
-            if at == root {
-                self.record.saved = Some(saved);
-                self.saved = None;
-            }
+            self.record.saved = Some(saved);
+            self.saved = None;
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At {
                 branch: self.root,
