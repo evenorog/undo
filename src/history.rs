@@ -176,7 +176,6 @@ impl<R> History<R> {
         let old = self.cursor();
         let merges = self.record.merges(&cmd);
         let commands = self.record.__apply(cmd)?;
-
         // Check if the limit has been reached.
         if !merges && old == self.cursor() {
             let root = self.root;
@@ -185,7 +184,7 @@ impl<R> History<R> {
                 cursor: 0,
             });
         }
-
+        // Handle new branch.
         if !commands.is_empty() {
             let root = self.root;
             let next = self.next;
@@ -201,6 +200,14 @@ impl<R> History<R> {
                     commands,
                 },
             );
+
+            if let Some(ref mut f) = self.record.signal {
+                f(Signal::Branch {
+                    old: root,
+                    new: self.root,
+                })
+            }
+
             Ok(Some(root))
         } else {
             Ok(None)
@@ -263,6 +270,7 @@ impl<R> History<R> {
                     Ok(commands) => commands,
                     Err(err) => return Some(Err(err)),
                 };
+                // Handle new branch.
                 if !commands.is_empty() {
                     self.branches.insert(
                         self.root,
@@ -325,7 +333,7 @@ impl<R> History<R> {
             let old = self.cursor();
             let mut commands = self.record.commands.split_off(old);
             self.record.commands.append(&mut branch.commands);
-
+            // Handle new branch.
             if !commands.is_empty() {
                 self.branches.insert(
                     self.root,
