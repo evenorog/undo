@@ -129,7 +129,8 @@ impl<R> History<R> {
     /// Marks the receiver as currently being in a saved or unsaved state.
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
-        self.record.set_saved(saved)
+        self.record.set_saved(saved);
+        self.saved = None;
     }
 
     /// Returns `true` if the receiver is in a saved state, `false` otherwise.
@@ -153,11 +154,16 @@ impl<R> History<R> {
     /// Removes all commands from the history without undoing them.
     #[inline]
     pub fn clear(&mut self) {
-        self.record.clear();
+        let old = self.root;
         self.root = 0;
         self.next = 1;
         self.saved = None;
+        self.record.clear();
         self.branches.clear();
+
+        if let Some(ref mut f) = self.record.signal {
+            f(Signal::Branch { old, new: 0 })
+        }
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -421,12 +427,18 @@ impl<R> History<R> {
         {
             self.record.saved = Some(saved);
             self.saved = None;
+            if let Some(ref mut f) = self.record.signal {
+                f(Signal::Saved(true));
+            }
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At {
                 branch: self.root,
                 cursor: saved,
             });
             self.record.saved = None;
+            if let Some(ref mut f) = self.record.signal {
+                f(Signal::Saved(false));
+            }
         }
         self.root = root;
     }
@@ -453,6 +465,7 @@ impl<R> History<R> {
         // Remove all dead branches.
         for id in dead {
             self.branches.remove(&id);
+            self.saved = self.saved.filter(|saved| saved.branch != id);
         }
     }
 
