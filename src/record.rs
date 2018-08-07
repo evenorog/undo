@@ -274,14 +274,14 @@ impl<R> Record<R> {
     where
         R: 'static,
     {
-        self.__apply(cmd).map(|v| v.into_iter())
+        self.__apply(cmd).map(|(_, v)| v.into_iter())
     }
 
     #[inline]
     pub(crate) fn __apply(
         &mut self,
         mut cmd: impl Command<R> + 'static,
-    ) -> Result<VecDeque<Box<dyn Command<R> + 'static>>, Error<R>>
+    ) -> Result<(bool, VecDeque<Box<dyn Command<R> + 'static>>), Error<R>>
     where
         R: 'static,
     {
@@ -304,7 +304,8 @@ impl<R> Record<R> {
         }
 
         // Try to merge commands unless the receiver is in a saved state.
-        if self.merges(&cmd) {
+        let merges = self.merges(&cmd);
+        if merges {
             // Merge the command with the one on the top of the stack.
             let merged = Merged::new(self.commands.pop_back().unwrap(), cmd);
             self.commands.push_back(Box::new(merged));
@@ -340,7 +341,7 @@ impl<R> Record<R> {
                 f(Signal::Saved(false));
             }
         }
-        Ok(v)
+        Ok((merges, v))
     }
 
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
@@ -630,7 +631,7 @@ impl<R> Record<R> {
 
     /// Returns `true` if the command will be merged when applied to the record.
     #[inline]
-    pub(crate) fn merges(&self, cmd: &(impl Command<R> + 'static)) -> bool {
+    fn merges(&self, cmd: &(impl Command<R> + 'static)) -> bool {
         match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
             (Some(id1), Some(id2)) => id1 == id2 && !self.is_saved(),
             _ => false,
@@ -739,7 +740,7 @@ impl<R> RecordBuilder<R> {
     /// #     }
     /// # }
     /// #
-    /// # fn foo() -> Result<(), Box<Error>> {
+    /// # fn main() -> Result<(), Box<Error>> {
     /// let mut record = Record::builder()
     ///     .capacity(2)
     ///     .limit(2)
@@ -758,7 +759,6 @@ impl<R> RecordBuilder<R> {
     /// assert_eq!(record.into_receiver(), "a");
     /// # Ok(())
     /// # }
-    /// # foo().unwrap();
     /// ```
     ///
     /// # Panics
@@ -885,8 +885,8 @@ mod tests {
     #[derive(Debug)]
     struct JumpAdd(char, String);
 
-    impl JumpAdd {
-        fn new(c: char) -> JumpAdd {
+    impl From<char> for JumpAdd {
+        fn from(c: char) -> JumpAdd {
             JumpAdd(c, Default::default())
         }
     }
@@ -1011,11 +1011,11 @@ mod tests {
     #[test]
     fn jump_to() {
         let mut record = Record::default();
-        record.apply(JumpAdd::new('a')).unwrap();
-        record.apply(JumpAdd::new('b')).unwrap();
-        record.apply(JumpAdd::new('c')).unwrap();
-        record.apply(JumpAdd::new('d')).unwrap();
-        record.apply(JumpAdd::new('e')).unwrap();
+        record.apply(JumpAdd::from('a')).unwrap();
+        record.apply(JumpAdd::from('b')).unwrap();
+        record.apply(JumpAdd::from('c')).unwrap();
+        record.apply(JumpAdd::from('d')).unwrap();
+        record.apply(JumpAdd::from('e')).unwrap();
 
         record.jump_to(0).unwrap().unwrap();
         assert_eq!(record.cursor(), 0);

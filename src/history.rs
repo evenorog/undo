@@ -1,8 +1,7 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::VecDeque;
 #[cfg(feature = "display")]
-use std::fmt::Display;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Display, Formatter};
 use {Command, Error, Record, RecordBuilder, Signal};
 
 /// A history of commands.
@@ -180,10 +179,9 @@ impl<R> History<R> {
         R: 'static,
     {
         let old = self.cursor();
-        let merges = self.record.merges(&cmd);
-        let commands = self.record.__apply(cmd)?;
+        let (merged, commands) = self.record.__apply(cmd)?;
         // Check if the limit has been reached.
-        if !merges && old == self.cursor() {
+        if !merged && old == self.cursor() {
             let root = self.root;
             self.remove_children(At {
                 branch: root,
@@ -273,7 +271,7 @@ impl<R> History<R> {
             for cmd in branch.commands {
                 let old = self.cursor();
                 let commands = match self.record.__apply(cmd) {
-                    Ok(commands) => commands,
+                    Ok((_, commands)) => commands,
                     Err(err) => return Some(Err(err)),
                 };
                 // Handle new branch.
@@ -543,23 +541,15 @@ impl<R> From<R> for History<R> {
 impl<R> Display for History<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        (&self.record as &Display).fmt(f)
+        (&self.record as &dyn Display).fmt(f)
     }
 }
 
+/// A branch in the history.
+#[derive(Debug)]
 struct Branch<R> {
     parent: At,
     commands: VecDeque<Box<dyn Command<R> + 'static>>,
-}
-
-impl<R> Debug for Branch<R> {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("Branch")
-            .field("parent", &self.parent)
-            .field("commands", &self.commands)
-            .finish()
-    }
 }
 
 /// The position in the tree.

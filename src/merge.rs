@@ -190,6 +190,6 @@ impl<R, C: Command<R> + 'static> Debug for Merger<R, C> {
 impl<R, C: Command<R> + 'static> fmt::Display for Merger<R, C> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        (&self.cmd as &fmt::Display).fmt(f)
+        (&self.cmd as &dyn fmt::Display).fmt(f)
     }
 }
