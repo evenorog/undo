@@ -187,6 +187,13 @@ impl<R> History<R> {
                 branch: root,
                 cursor: 0,
             });
+            for branch in self
+                .branches
+                .values_mut()
+                .filter(|branch| branch.parent.branch == root)
+            {
+                branch.parent.cursor -= 1;
+            }
         }
         // Handle new branch.
         if !commands.is_empty() {
@@ -445,19 +452,21 @@ impl<R> History<R> {
     #[inline]
     fn remove_children(&mut self, at: At) {
         let mut dead = FnvHashSet::default();
-        let mut children = Vec::new();
         // We need to check if any of the branches had the removed node as root.
-        for (&id, child) in &self.branches {
-            if child.parent == at && dead.insert(id) {
-                children.push(id);
-            }
-        }
+        let mut children = self
+            .branches
+            .iter()
+            .filter(|&(&id, child)| child.parent == at && dead.insert(id))
+            .map(|(&id, _)| id)
+            .collect::<Vec<_>>();
         // Add all the children of dead branches so they are removed too.
         while let Some(parent) = children.pop() {
-            for (&id, child) in &self.branches {
-                if child.parent.branch == parent && dead.insert(id) {
-                    children.push(id);
-                }
+            for (&id, _) in self
+                .branches
+                .iter()
+                .filter(|&(&id, child)| child.parent.branch == parent && dead.insert(id))
+            {
+                children.push(id);
             }
         }
         // Remove all dead branches.
