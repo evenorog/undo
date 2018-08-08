@@ -1,29 +1,60 @@
 //! An undo-redo library with dynamic dispatch and automatic command merging.
-//! It uses the [command pattern](https://en.wikipedia.org/wiki/Command_pattern)
-//! where the user modifies a receiver by applying commands on it.
+//!
+//! It uses the [command pattern] where the user modifies the receiver by
+//! applying commands on it. Since each command knows how to undo and redo
+//! the changes it applies to the receiver, the state of the receiver can
+//! be rolled forwards or backwards by calling undo or redo in the correct order.
+//!
+//! The [Record] and [History] provides functionality to store and keep track
+//! of the applied commands, and makes it easy to undo and redo changes.
+//! The Record provides a stack based undo-redo functionality, while the
+//! History provides a tree based undo-redo functionality where you can
+//! jump between different branches.
+//!
+//! Commands can be merged using the [`merge!`] macro or the [`id`] method.
+//! When two commands are merged, undoing and redoing them are done in a single step.
+//!
+//! [command pattern]: https://en.wikipedia.org/wiki/Command_pattern
+//! [Record]: struct.Record.html
+//! [History]: struct.History.html
+//! [`merge!`]: macro.merge.html
+//! [`id`]: trait.Command.html#method.id
 
-#![forbid(unstable_features, bad_style)]
-#![deny(missing_debug_implementations, unused_import_braces, unused_qualifications, unsafe_code)]
+#![forbid(unstable_features, bad_style, bare_trait_objects)]
+#![deny(
+    missing_debug_implementations,
+    unused_import_braces,
+    unused_qualifications,
+    unsafe_code
+)]
 
-mod group;
+extern crate fnv;
+
+mod history;
 mod merge;
 mod record;
+mod signal;
 
-use std::{error, fmt::{self, Debug, Display, Formatter}};
+use std::{
+    error::Error as StdError,
+    fmt::{self, Debug, Display, Formatter},
+};
 
-pub use group::{Group, GroupBuilder};
-pub use record::{Record, RecordBuilder, Signal};
+pub use history::{History, HistoryBuilder};
+pub use merge::{Merged, Merger};
+pub use record::{Record, RecordBuilder};
+pub use signal::Signal;
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
 pub trait Command<R>: Debug + Send + Sync {
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
     /// Restores the state of the receiver as it was before the command was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
     /// Reapplies the command on the receiver and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
@@ -32,7 +63,7 @@ pub trait Command<R>: Debug + Send + Sync {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         self.apply(receiver)
     }
 
@@ -50,13 +81,13 @@ pub trait Command<R>: Debug + Send + Sync {
     /// struct Add(char);
     ///
     /// impl Command<String> for Add {
-    ///     fn apply(&mut self, s: &mut String) -> Result<(), Box<Error>> {
+    ///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
     ///         s.push(self.0);
     ///         Ok(())
     ///     }
     ///
-    ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error>> {
-    ///         self.0 = s.pop().ok_or("`String` is unexpectedly empty")?;
+    ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ///         self.0 = s.pop().ok_or("`s` is empty")?;
     ///         Ok(())
     ///     }
     ///
@@ -65,7 +96,7 @@ pub trait Command<R>: Debug + Send + Sync {
     ///     }
     /// }
     ///
-    /// fn main() -> Result<(), Box<Error>> {
+    /// fn main() -> Result<(), Box<dyn Error>> {
     ///     let mut record = Record::default();
     ///
     ///     // The `a`, `b`, and `c` commands are merged.
@@ -81,7 +112,7 @@ pub trait Command<R>: Debug + Send + Sync {
     ///
     ///     // Calling `redo` once will redo all merged commands.
     ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.into_receiver(), "abc");
+    ///     assert_eq!(record.as_receiver(), "abc");
     ///
     ///     Ok(())
     /// }
@@ -94,12 +125,12 @@ pub trait Command<R>: Debug + Send + Sync {
 
 #[cfg(feature = "display")]
 pub trait Command<R>: Debug + Display + Send + Sync {
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>>;
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         self.apply(receiver)
     }
 
@@ -111,17 +142,17 @@ pub trait Command<R>: Debug + Display + Send + Sync {
 
 impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         (**self).apply(receiver)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         (**self).undo(receiver)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<error::Error>> {
+    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         (**self).redo(receiver)
     }
 
@@ -132,7 +163,10 @@ impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
 }
 
 /// An error which holds the command that caused it.
-pub struct Error<R>(pub Box<Command<R> + 'static>, pub Box<error::Error>);
+pub struct Error<R>(
+    pub Box<dyn Command<R> + 'static>,
+    pub Box<dyn StdError + Send + Sync>,
+);
 
 impl<R> Debug for Error<R> {
     #[inline]
@@ -148,7 +182,7 @@ impl<R> Debug for Error<R> {
 impl<R> Display for Error<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        (&self.1 as &Display).fmt(f)
+        (&self.1 as &dyn Display).fmt(f)
     }
 }
 
@@ -156,18 +190,23 @@ impl<R> Display for Error<R> {
 impl<R> Display for Error<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "`{error}` caused by `{command}`", error = self.1, command = self.0)
+        write!(
+            f,
+            "`{error}` caused by `{command}`",
+            error = self.1,
+            command = self.0
+        )
     }
 }
 
-impl<R> error::Error for Error<R> {
+impl<R> StdError for Error<R> {
     #[inline]
     fn description(&self) -> &str {
         self.1.description()
     }
 
     #[inline]
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn StdError> {
         self.1.cause()
     }
 }
