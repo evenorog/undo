@@ -41,10 +41,10 @@ use Command;
 #[macro_export]
 macro_rules! merge {
     ($cmd1:expr, $cmd2:expr) => (
-        Merged::new($cmd1, $cmd2)
+        $crate::Merged::new($cmd1, $cmd2)
     );
     ($cmd1:expr, $cmd2:expr, $($tail:expr),+) => (
-        merge![Merged::new($cmd1, $cmd2), $($tail),*]
+        merge![$crate::Merged::new($cmd1, $cmd2), $($tail),*]
     );
 }
 
