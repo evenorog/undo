@@ -149,9 +149,7 @@ impl<R> Record<R> {
             self.cursor -= begin;
 
             // Check if the saved state has been removed.
-            if self.saved.map_or(false, |saved| saved > 0 && saved < begin) {
-                self.saved = None;
-            }
+            self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
 
             let new = self.cursor;
             let can_undo = self.can_undo();
@@ -237,8 +235,8 @@ impl<R> Record<R> {
         let could_redo = self.can_redo();
 
         self.commands.clear();
-        self.cursor = 0;
         self.saved = if self.is_saved() { Some(0) } else { None };
+        self.cursor = 0;
 
         if let Some(ref mut f) = self.signal {
             // Emit signal if the cursor has changed.
@@ -299,9 +297,7 @@ impl<R> Record<R> {
         debug_assert_eq!(self.cursor, self.len());
 
         // Check if the saved state was popped off.
-        if self.saved.map_or(false, |saved| saved > self.cursor) {
-            self.saved = None;
-        }
+        self.saved = self.saved.filter(|&saved| saved <= self.cursor);
 
         // Try to merge commands unless the receiver is in a saved state.
         let merges = self.merges(&cmd);
