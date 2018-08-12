@@ -509,7 +509,7 @@ impl<R> History<R> {
     /// Create a path between the current branch and the `to` branch.
     #[inline]
     #[must_use]
-    fn create_path(&mut self, mut to: usize) -> Option<Vec<(usize, Branch<R>)>> {
+    fn create_path(&mut self, to: usize) -> Option<Vec<(usize, Branch<R>)>> {
         // Find the path from `dest` to `root`.
         let root = self.root;
         let visited = {
@@ -531,19 +531,19 @@ impl<R> History<R> {
         // Find the path from `dest` to the lowest common ancestor of `start`.
         let mut dest = self.branches.remove(&to)?;
         let mut id = to;
-        to = dest.parent.branch;
-        let len = path.len();
+        let mut parent = dest.parent.branch;
+        let mid = path.len();
         path.push((id, dest));
         let last = path
             .last()
             .map_or(root, |&(_, ref last)| last.parent.branch);
-        while to != last {
-            dest = self.branches.remove(&to).unwrap();
-            id = to;
-            to = dest.parent.branch;
+        while parent != last {
+            dest = self.branches.remove(&parent).unwrap();
+            id = parent;
+            parent = dest.parent.branch;
             path.push((id, dest));
         }
-        path[len..].reverse();
+        path[mid..].reverse();
         Some(path)
     }
 }
