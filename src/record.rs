@@ -625,9 +625,15 @@ impl<R> Record<R> {
         self.receiver
     }
 
+    /// Returns an iterator over the commands in the record.
+    #[inline]
+    pub fn commands(&self) -> impl Iterator<Item = &impl Command<R>> {
+        self.commands.iter()
+    }
+
     /// Returns `true` if the command will be merged when applied to the record.
     #[inline]
-    fn merges(&self, cmd: &(impl Command<R> + 'static)) -> bool {
+    fn merges(&self, cmd: &impl Command<R>) -> bool {
         match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
             (Some(id1), Some(id2)) => id1 == id2 && !self.is_saved(),
             _ => false,
