@@ -38,21 +38,17 @@ use {merge::Merged, Command, Error, Signal};
 ///     record.apply(Add('a'))?;
 ///     record.apply(Add('b'))?;
 ///     record.apply(Add('c'))?;
-///
 ///     assert_eq!(record.as_receiver(), "abc");
 ///
 ///     record.undo().unwrap()?;
 ///     record.undo().unwrap()?;
 ///     record.undo().unwrap()?;
-///
 ///     assert_eq!(record.as_receiver(), "");
 ///
 ///     record.redo().unwrap()?;
 ///     record.redo().unwrap()?;
 ///     record.redo().unwrap()?;
-///
 ///     assert_eq!(record.as_receiver(), "abc");
-///
 ///     Ok(())
 /// }
 /// ```
@@ -128,6 +124,10 @@ impl<R> Record<R> {
     }
 
     /// Sets the limit of the record and returns the new limit.
+    ///
+    /// If this limit is reached it will start popping of commands at the beginning
+    /// of the record when new commands are applied. No limit is set by
+    /// default which means it may grow indefinitely.
     ///
     /// If `limit < len` the first commands will be removed until `len == limit`.
     /// However, if the current active command is going to be removed, the limit is instead
@@ -701,9 +701,7 @@ pub struct RecordBuilder<R> {
 }
 
 impl<R> RecordBuilder<R> {
-    /// Sets the specified [capacity] for the record.
-    ///
-    /// [capacity]: https://doc.rust-lang.org/std/vec/struct.Vec.html#capacity-and-reallocation
+    /// Sets the capacity for the record.
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R> {
         self.capacity = capacity;
@@ -711,51 +709,6 @@ impl<R> RecordBuilder<R> {
     }
 
     /// Sets the `limit` for the record.
-    ///
-    /// If this limit is reached it will start popping of commands at the beginning
-    /// of the record when pushing new commands on to the stack. No limit is set by
-    /// default which means it may grow indefinitely.
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::error::Error;
-    /// # use undo::*;
-    /// #
-    /// # #[derive(Debug)]
-    /// # struct Add(char);
-    /// #
-    /// # impl Command<String> for Add {
-    /// #     fn apply(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
-    /// #         s.push(self.0);
-    /// #         Ok(())
-    /// #     }
-    /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
-    /// #         self.0 = s.pop().ok_or("`s` is empty")?;
-    /// #         Ok(())
-    /// #     }
-    /// # }
-    /// #
-    /// # fn main() -> Result<(), Box<Error>> {
-    /// let mut record = Record::builder()
-    ///     .capacity(2)
-    ///     .limit(2)
-    ///     .default();
-    ///
-    /// record.apply(Add('a'))?;
-    /// record.apply(Add('b'))?;
-    /// record.apply(Add('c'))?; // 'a' is removed from the record since limit is 2.
-    ///
-    /// assert_eq!(record.as_receiver(), "abc");
-    ///
-    /// record.undo().unwrap()?;
-    /// record.undo().unwrap()?;
-    /// assert!(record.undo().is_none());
-    ///
-    /// assert_eq!(record.into_receiver(), "a");
-    /// # Ok(())
-    /// # }
-    /// ```
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
@@ -767,6 +720,7 @@ impl<R> RecordBuilder<R> {
     }
 
     /// Sets if the receiver is initially in a saved state.
+    /// By default the receiver is in a saved state.
     #[inline]
     pub fn saved(mut self, saved: bool) -> RecordBuilder<R> {
         self.saved = saved;
@@ -774,57 +728,14 @@ impl<R> RecordBuilder<R> {
     }
 
     /// Decides how the signal should be handled when the state changes.
-    /// By default the record does nothing.
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::error::Error;
-    /// # use undo::*;
-    /// #
-    /// # #[derive(Debug)]
-    /// # struct Add(char);
-    /// #
-    /// # impl Command<String> for Add {
-    /// #     fn apply(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
-    /// #         s.push(self.0);
-    /// #         Ok(())
-    /// #     }
-    /// #
-    /// #     fn undo(&mut self, s: &mut String) -> Result<(), Box<Error + Send + Sync>> {
-    /// #         self.0 = s.pop().ok_or("`s` is empty")?;
-    /// #         Ok(())
-    /// #     }
-    /// # }
-    /// #
-    /// # fn main() -> Result<(), Box<Error>> {
-    /// # let mut record =
-    /// Record::builder()
-    ///     .signal(|signal| {
-    ///         match signal {
-    ///             Signal::Undo(true) => println!("The record can undo."),
-    ///             Signal::Undo(false) => println!("The record can not undo."),
-    ///             Signal::Redo(true) => println!("The record can redo."),
-    ///             Signal::Redo(false) => println!("The record can not redo."),
-    ///             Signal::Saved(true) => println!("The receiver is in a saved state."),
-    ///             Signal::Saved(false) => println!("The receiver is not in a saved state."),
-    ///             Signal::Cursor { old, new } => {
-    ///                 println!("The current command has changed from {} to {}.", old, new);
-    ///             },
-    ///             _ => {},
-    ///         }
-    ///     })
-    ///     .default();
-    /// # record.apply(Add('a'))?;
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// By default the record does not handle any signals.
     #[inline]
     pub fn signal(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> RecordBuilder<R> {
         self.signal = Some(Box::new(f));
         self
     }
 
-    /// Creates the record.
+    /// Builds the record.
     #[inline]
     pub fn build(self, receiver: impl Into<R>) -> Record<R> {
         Record {
@@ -867,13 +778,13 @@ mod tests {
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-            receiver.push(self.0);
+        fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+            s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-            self.0 = receiver.pop().ok_or("`receiver` is empty")?;
+        fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+            self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }
     }
@@ -888,20 +799,20 @@ mod tests {
     }
 
     impl Command<String> for JumpAdd {
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-            self.1 = receiver.clone();
-            receiver.push(self.0);
+        fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+            self.1 = s.clone();
+            s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-            *receiver = self.1.clone();
+        fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+            *s = self.1.clone();
             Ok(())
         }
 
-        fn redo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-            *receiver = self.1.clone();
-            receiver.push(self.0);
+        fn redo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+            *s = self.1.clone();
+            s.push(self.0);
             Ok(())
         }
     }
