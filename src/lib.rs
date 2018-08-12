@@ -113,7 +113,6 @@ pub trait Command<R>: Debug + Send + Sync {
     ///     // Calling `redo` once will redo all merged commands.
     ///     record.redo().unwrap()?;
     ///     assert_eq!(record.as_receiver(), "abc");
-    ///
     ///     Ok(())
     /// }
     /// ```
