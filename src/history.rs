@@ -107,6 +107,36 @@ impl<R> History<R> {
         self.record.limit()
     }
 
+    /// Sets the limit of the history and returns the new limit.
+    ///
+    /// If `limit < len` the first commands will be removed until `len == limit`.
+    /// However, if the current active command is going to be removed, the limit is instead
+    /// adjusted to `len - active` so the active command is not removed.
+    ///
+    /// # Panics
+    /// Panics if `limit` is `0`.
+    #[inline]
+    pub fn set_limit(&mut self, limit: usize) -> usize {
+        let len = self.len();
+        let limit = self.record.set_limit(limit);
+        let diff = len - self.len();
+        let root = self.root();
+        for cursor in 0..diff {
+            self.remove_children(At {
+                branch: root,
+                cursor,
+            });
+        }
+        for branch in self
+            .branches
+            .values_mut()
+            .filter(|branch| branch.parent.branch == root)
+        {
+            branch.parent.cursor -= diff;
+        }
+        limit
+    }
+
     /// Sets how the signal should be handled when the state changes.
     #[inline]
     pub fn set_signal(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
