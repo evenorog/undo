@@ -32,6 +32,10 @@ undo = "0.24"
 And this to `main.rs`:
 
  ```rust
+extern crate undo;
+
+use undo::{Command, Record};
+
 #[derive(Debug)]
 struct Add(char);
 
