@@ -98,7 +98,6 @@ pub trait Command<R>: Debug + Send + Sync {
     ///
     /// fn main() -> Result<(), Box<dyn Error>> {
     ///     let mut record = Record::default();
-    ///
     ///     // The `a`, `b`, and `c` commands are merged.
     ///     record.apply(Add('a'))?;
     ///     record.apply(Add('b'))?;

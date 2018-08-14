@@ -26,7 +26,6 @@ use Command;
 ///
 /// fn main() -> Result<(), Box<dyn Error>> {
 ///     let mut record = Record::default();
-///
 ///     let cmd = merge![Add('a'), Add('b'), Add('c')];
 ///     record.apply(cmd)?;
 ///     assert_eq!(record.as_receiver(), "abc");

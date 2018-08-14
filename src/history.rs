@@ -29,7 +29,6 @@ use {Command, Error, Record, RecordBuilder, Signal};
 ///
 /// fn main() -> Result<(), Box<dyn Error>> {
 ///     let mut history = History::default();
-///
 ///     history.apply(Add('a'))?;
 ///     history.apply(Add('b'))?;
 ///     history.apply(Add('c'))?;

@@ -49,7 +49,6 @@ impl Command<String> for Add {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut record = Record::default();
-
     record.apply(Add('a'))?;
     record.apply(Add('b'))?;
     record.apply(Add('c'))?;
