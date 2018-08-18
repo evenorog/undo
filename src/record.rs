@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::fmt::Display;
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
-use {merge::Merged, Command, Error, Signal};
+use {merge::Merged, Command, Error, History, Signal};
 
 /// A record of commands.
 ///
@@ -668,6 +668,13 @@ impl<R> From<R> for Record<R> {
     }
 }
 
+impl<R> From<History<R>> for Record<R> {
+    #[inline]
+    fn from(history: History<R>) -> Self {
+        history.into()
+    }
+}
+
 impl<R: Debug> Debug for Record<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -685,11 +692,12 @@ impl<R: Debug> Debug for Record<R> {
 impl<R> Display for Record<R> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        for (i, cmd) in self.commands.iter().enumerate().rev() {
-            if i + 1 == self.cursor {
-                writeln!(f, "* {}", cmd)?;
+        for (mut i, cmd) in self.commands.iter().enumerate().rev() {
+            i += 1;
+            if i == self.cursor() {
+                writeln!(f, "[*][{}] {}", i, cmd)?;
             } else {
-                writeln!(f, "  {}", cmd)?;
+                writeln!(f, "[ ][{}] {}", i, cmd)?;
             }
         }
         Ok(())

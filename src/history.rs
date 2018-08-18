@@ -592,6 +592,19 @@ impl<R> From<R> for History<R> {
     }
 }
 
+impl<R> From<Record<R>> for History<R> {
+    #[inline]
+    fn from(record: Record<R>) -> Self {
+        History {
+            root: 0,
+            next: 1,
+            saved: None,
+            record,
+            branches: FnvHashMap::default(),
+        }
+    }
+}
+
 #[cfg(feature = "display")]
 impl<R> Display for History<R> {
     #[inline]
