@@ -11,8 +11,9 @@ keywords = ["undo", "redo"]
 categories = ["data-structures"]
 
 [dependencies]
+bitflags = { version = "1", optional = true }
 fnv = "1"
 
 [features]
 default = []
-display = []
+display = ["bitflags"]

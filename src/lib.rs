@@ -20,26 +20,32 @@
 //! [`merge!`]: macro.merge.html
 //! [`id`]: trait.Command.html#method.id
 
-#![forbid(unstable_features, bad_style, bare_trait_objects)]
 #![deny(
+    bad_style,
+    bare_trait_objects,
     missing_debug_implementations,
     unused_import_braces,
     unused_qualifications,
-    unsafe_code
+    unsafe_code,
+    unstable_features,
 )]
 
+#[cfg(feature = "display")]
+#[macro_use]
+extern crate bitflags;
 extern crate fnv;
 
+#[cfg(feature = "display")]
+mod display;
 mod history;
 mod merge;
 mod record;
 mod signal;
 
-use std::{
-    error::Error as StdError,
-    fmt::{self, Debug, Display, Formatter},
-};
+use std::{error::Error as StdError, fmt};
 
+#[cfg(feature = "display")]
+pub use display::Display;
 pub use history::{History, HistoryBuilder};
 pub use merge::{Merged, Merger};
 pub use record::{Record, RecordBuilder};
@@ -47,7 +53,7 @@ pub use signal::Signal;
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
-pub trait Command<R>: Debug + Send + Sync {
+pub trait Command<R>: fmt::Debug + Send + Sync {
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
@@ -122,7 +128,7 @@ pub trait Command<R>: Debug + Send + Sync {
 }
 
 #[cfg(feature = "display")]
-pub trait Command<R>: Debug + Display + Send + Sync {
+pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
     fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
@@ -166,9 +172,9 @@ pub struct Error<R>(
     pub Box<dyn StdError + Send + Sync>,
 );
 
-impl<R> Debug for Error<R> {
+impl<R> fmt::Debug for Error<R> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_tuple("Error")
             .field(&self.0)
             .field(&self.1)
@@ -177,17 +183,17 @@ impl<R> Debug for Error<R> {
 }
 
 #[cfg(not(feature = "display"))]
-impl<R> Display for Error<R> {
+impl<R> fmt::Display for Error<R> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        (&self.1 as &dyn Display).fmt(f)
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (&self.1 as &dyn fmt::Display).fmt(f)
     }
 }
 
 #[cfg(feature = "display")]
-impl<R> Display for Error<R> {
+impl<R> fmt::Display for Error<R> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "`{error}` caused by `{command}`",

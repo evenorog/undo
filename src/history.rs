@@ -1,7 +1,9 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::VecDeque;
 #[cfg(feature = "display")]
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+#[cfg(feature = "display")]
+use Display;
 use {Command, Error, Record, RecordBuilder, Signal};
 
 /// A history of commands.
@@ -54,9 +56,9 @@ use {Command, Error, Record, RecordBuilder, Signal};
 pub struct History<R> {
     root: usize,
     next: usize,
-    saved: Option<At>,
-    record: Record<R>,
-    branches: FnvHashMap<usize, Branch<R>>,
+    pub(crate) saved: Option<At>,
+    pub(crate) record: Record<R>,
+    pub(crate) branches: FnvHashMap<usize, Branch<R>>,
 }
 
 impl<R> History<R> {
@@ -433,6 +435,13 @@ impl<R> History<R> {
         self.record.to_redo_string()
     }
 
+    /// Returns a structure for more advanced display of the history.
+    #[inline]
+    #[cfg(feature = "display")]
+    pub fn display(&self) -> Display<Self> {
+        Display::from(self)
+    }
+
     /// Returns a reference to the `receiver`.
     #[inline]
     pub fn as_receiver(&self) -> &R {
@@ -587,14 +596,14 @@ impl<R> AsMut<R> for History<R> {
 
 impl<R> From<R> for History<R> {
     #[inline]
-    fn from(receiver: R) -> Self {
+    fn from(receiver: R) -> History<R> {
         History::new(receiver)
     }
 }
 
 impl<R> From<Record<R>> for History<R> {
     #[inline]
-    fn from(record: Record<R>) -> Self {
+    fn from(record: Record<R>) -> History<R> {
         History {
             root: 0,
             next: 1,
@@ -606,25 +615,34 @@ impl<R> From<Record<R>> for History<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> Display for History<R> {
+impl<R> fmt::Display for History<R> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        (&self.record as &dyn Display).fmt(f)
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (mut i, cmd) in self.record.commands.iter().enumerate().rev() {
+            i += 1;
+            let root = self.root();
+            if i == self.cursor() {
+                writeln!(f, "[*][{}:{}] {}", root, i, cmd)?;
+            } else {
+                writeln!(f, "[ ][{}:{}] {}", root, i, cmd)?;
+            }
+        }
+        Ok(())
     }
 }
 
 /// A branch in the history.
 #[derive(Debug)]
-struct Branch<R> {
-    parent: At,
-    commands: VecDeque<Box<dyn Command<R> + 'static>>,
+pub(crate) struct Branch<R> {
+    pub(crate) parent: At,
+    pub(crate) commands: VecDeque<Box<dyn Command<R> + 'static>>,
 }
 
 /// The position in the tree.
 #[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct At {
-    branch: usize,
-    cursor: usize,
+pub(crate) struct At {
+    pub(crate) branch: usize,
+    pub(crate) cursor: usize,
 }
 
 /// Builder for a History.
@@ -688,7 +706,7 @@ impl<R: Default> HistoryBuilder<R> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "display")))]
 mod tests {
     use super::*;
     use std::error::Error;

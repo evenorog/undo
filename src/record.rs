@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
-#[cfg(feature = "display")]
-use std::fmt::Display;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt;
 use std::marker::PhantomData;
+#[cfg(feature = "display")]
+use Display;
 use {merge::Merged, Command, Error, History, Signal};
 
 /// A record of commands.
@@ -604,6 +604,13 @@ impl<R> Record<R> {
         }
     }
 
+    /// Returns a structure for advanced display of the history.
+    #[inline]
+    #[cfg(feature = "display")]
+    pub fn display(&self) -> Display<Self> {
+        Display::from(self)
+    }
+
     /// Returns a reference to the `receiver`.
     #[inline]
     pub fn as_receiver(&self) -> &R {
@@ -671,13 +678,13 @@ impl<R> From<R> for Record<R> {
 impl<R> From<History<R>> for Record<R> {
     #[inline]
     fn from(history: History<R>) -> Self {
-        history.into()
+        history.record
     }
 }
 
-impl<R: Debug> Debug for Record<R> {
+impl<R: fmt::Debug> fmt::Debug for Record<R> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
             .field("commands", &self.commands)
             .field("receiver", &self.receiver)
@@ -689,9 +696,9 @@ impl<R: Debug> Debug for Record<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> Display for Record<R> {
+impl<R> fmt::Display for Record<R> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (mut i, cmd) in self.commands.iter().enumerate().rev() {
             i += 1;
             if i == self.cursor() {
@@ -770,9 +777,9 @@ impl<R: Default> RecordBuilder<R> {
     }
 }
 
-impl<R: Debug> Debug for RecordBuilder<R> {
+impl<R: fmt::Debug> fmt::Debug for RecordBuilder<R> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("RecordBuilder")
             .field("receiver", &self.receiver)
             .field("capacity", &self.capacity)
@@ -782,7 +789,7 @@ impl<R: Debug> Debug for RecordBuilder<R> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "display")))]
 mod tests {
     use super::*;
     use std::error::Error;
