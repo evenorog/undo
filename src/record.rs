@@ -699,15 +699,7 @@ impl<R: fmt::Debug> fmt::Debug for Record<R> {
 impl<R> fmt::Display for Record<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (mut i, cmd) in self.commands.iter().enumerate().rev() {
-            i += 1;
-            if i == self.cursor() {
-                writeln!(f, "[*][{}] {}", i, cmd)?;
-            } else {
-                writeln!(f, "[ ][{}] {}", i, cmd)?;
-            }
-        }
-        Ok(())
+        (&self.display() as &dyn fmt::Display).fmt(f)
     }
 }
 

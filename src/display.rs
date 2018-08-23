@@ -1,6 +1,6 @@
 use history::At;
 use std::fmt::{self, Write};
-use History;
+use {History, Record};
 
 #[derive(Debug)]
 pub struct Display<'a, T: 'a> {
@@ -85,6 +85,42 @@ impl<'a, T: 'a> From<&'a T> for Display<'a, T> {
             data,
             view: View::default(),
         }
+    }
+}
+
+impl<'a, R> fmt::Display for Display<'a, Record<R>> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, cmd) in self.data.commands.iter().enumerate().rev() {
+            let at = At {
+                branch: 0,
+                cursor: i + 1,
+            };
+            let mark = self.view.mark();
+            let position = self.view.position(at);
+            let current = self.view.current(
+                at,
+                At {
+                    branch: 0,
+                    cursor: self.data.cursor(),
+                },
+            );
+            let saved = self.view.saved(
+                at,
+                self.data.saved.map(|saved| At {
+                    branch: 0,
+                    cursor: saved,
+                }),
+            );
+            write!(f, "{}{}{}{}", mark, position, current, saved)?;
+            let msg = self.view.message(&cmd, 0)?;
+            if self.view.contains(View::DETAILED) {
+                write!(f, "\n{}", msg)?;
+            } else {
+                writeln!(f, " {}", msg)?;
+            }
+        }
+        Ok(())
     }
 }
 
