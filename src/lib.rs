@@ -33,6 +33,8 @@
 #[cfg(feature = "display")]
 #[macro_use]
 extern crate bitflags;
+#[cfg(feature = "display")]
+extern crate colored;
 extern crate fnv;
 
 #[cfg(feature = "display")]

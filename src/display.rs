@@ -1,32 +1,95 @@
+use colored::*;
 use history::At;
 use std::fmt::{self, Write};
 use {History, Record};
 
-#[derive(Debug)]
+/// Configurable formatting of structures.
+#[derive(Copy, Clone, Debug)]
 pub struct Display<'a, T: 'a> {
     data: &'a T,
     view: View,
 }
 
+impl<'a, T: 'a> Display<'a, T> {
+    /// Show colored output (off by default).
+    #[inline]
+    pub fn colored(&mut self, on: bool) -> &mut Self {
+        if on {
+            self.view.insert(View::COLORED);
+        } else {
+            self.view.remove(View::COLORED);
+        }
+        self
+    }
+
+    /// Show detailed output (on by default).
+    #[inline]
+    pub fn detailed(&mut self, on: bool) -> &mut Self {
+        if on {
+            self.view.insert(View::DETAILED);
+        } else {
+            self.view.remove(View::DETAILED);
+        }
+        self
+    }
+
+    /// Show the position of the command (on by default).
+    #[inline]
+    pub fn position(&mut self, on: bool) -> &mut Self {
+        if on {
+            self.view.insert(View::POSITION);
+        } else {
+            self.view.remove(View::POSITION);
+        }
+        self
+    }
+
+    /// Show the saved command (on by default).
+    #[inline]
+    pub fn saved(&mut self, on: bool) -> &mut Self {
+        if on {
+            self.view.insert(View::SAVED);
+        } else {
+            self.view.remove(View::SAVED);
+        }
+        self
+    }
+}
+
+impl<'a, R> Display<'a, History<R>> {
+    /// Show the history as a graph (on by default).
+    #[inline]
+    pub fn graph(&mut self, on: bool) -> &mut Self {
+        if on {
+            self.view.insert(View::GRAPH);
+        } else {
+            self.view.remove(View::GRAPH);
+        }
+        self
+    }
+}
+
 impl<'a, R> Display<'a, History<R>> {
     #[inline]
-    fn list(
+    fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
         at: At,
         cmd: &impl fmt::Display,
         level: usize,
     ) -> fmt::Result {
-        let mark = self.view.mark();
-        let position = self.view.position(at);
-        let current = self.view.current(
+        self.view.mark(f)?;
+        self.view.position(f, at, true)?;
+        self.view.current(
+            f,
             at,
             At {
                 branch: self.data.root(),
                 cursor: self.data.cursor(),
             },
-        );
-        let saved = self.view.saved(
+        )?;
+        self.view.saved(
+            f,
             at,
             self.data
                 .record
@@ -35,18 +98,19 @@ impl<'a, R> Display<'a, History<R>> {
                     branch: self.data.root(),
                     cursor: saved,
                 }).or(self.data.saved),
-        );
-        write!(f, "{}{}{}{}", mark, position, current, saved)?;
-        let msg = self.view.message(&cmd, level)?;
+        )?;
         if self.view.contains(View::DETAILED) {
-            write!(f, "\n{}", msg)
+            writeln!(f)?;
+            self.view.message(f, &cmd, level)
         } else {
-            writeln!(f, " {}", msg)
+            f.write_char(' ')?;
+            self.view.message(f, &cmd, level)?;
+            writeln!(f)
         }
     }
 
     #[inline]
-    fn graph(
+    fn fmt_graph(
         &self,
         f: &mut fmt::Formatter,
         at: At,
@@ -64,17 +128,20 @@ impl<'a, R> Display<'a, History<R>> {
                     branch: i,
                     cursor: j + branch.parent.cursor + 1,
                 };
-                self.graph(f, at, cmd, level + 1)?;
+                self.fmt_graph(f, at, cmd, level + 1)?;
             }
-            for _ in 0..level {
-                write!(f, "{} ", self.view.edge())?;
+            for j in 0..level {
+                self.view.edge(f, j)?;
+                f.write_char(' ')?;
             }
-            writeln!(f, "{}", self.view.split())?;
+            self.view.split(f, level)?;
+            writeln!(f)?;
         }
-        for _ in 0..level {
-            write!(f, "{} ", self.view.edge())?;
+        for i in 0..level {
+            self.view.edge(f, i)?;
+            f.write_char(' ')?;
         }
-        self.list(f, at, cmd, level)
+        self.fmt_list(f, at, cmd, level)
     }
 }
 
@@ -96,28 +163,31 @@ impl<'a, R> fmt::Display for Display<'a, Record<R>> {
                 branch: 0,
                 cursor: i + 1,
             };
-            let mark = self.view.mark();
-            let position = self.view.position(at);
-            let current = self.view.current(
+            self.view.mark(f)?;
+            self.view.position(f, at, false)?;
+            self.view.current(
+                f,
                 at,
                 At {
                     branch: 0,
                     cursor: self.data.cursor(),
                 },
-            );
-            let saved = self.view.saved(
+            )?;
+            self.view.saved(
+                f,
                 at,
                 self.data.saved.map(|saved| At {
                     branch: 0,
                     cursor: saved,
                 }),
-            );
-            write!(f, "{}{}{}{}", mark, position, current, saved)?;
-            let msg = self.view.message(&cmd, 0)?;
+            )?;
             if self.view.contains(View::DETAILED) {
-                write!(f, "\n{}", msg)?;
+                writeln!(f)?;
+                self.view.message(f, &cmd, 0)?;
             } else {
-                writeln!(f, " {}", msg)?;
+                f.write_char(' ')?;
+                self.view.message(f, &cmd, 0)?;
+                writeln!(f)?;
             }
         }
         Ok(())
@@ -133,9 +203,9 @@ impl<'a, R> fmt::Display for Display<'a, History<R>> {
                 cursor: i + 1,
             };
             if self.view.contains(View::GRAPH) {
-                self.graph(f, at, cmd, 0)?;
+                self.fmt_graph(f, at, cmd, 0)?;
             } else {
-                self.list(f, at, cmd, 0)?;
+                self.fmt_list(f, at, cmd, 0)?;
             }
         }
         Ok(())
@@ -144,90 +214,137 @@ impl<'a, R> fmt::Display for Display<'a, History<R>> {
 
 bitflags! {
     struct View: u8 {
-        const COLORS    = 0b00000001;
-        const CURRENT   = 0b00000010;
-        const DETAILED  = 0b00000100;
-        const GRAPH     = 0b00001000;
-        const LIGATURES = 0b00010000;
-        const MARK      = 0b00100000;
-        const POSITION  = 0b01000000;
-        const SAVED     = 0b10000000;
+        const COLORED   = 0b_0000_0001;
+        const CURRENT   = 0b_0000_0010;
+        const DETAILED  = 0b_0000_0100;
+        const GRAPH     = 0b_0000_1000;
+        const LIGATURES = 0b_0001_0000;
+        const MARK      = 0b_0010_0000;
+        const POSITION  = 0b_0100_0000;
+        const SAVED     = 0b_1000_0000;
     }
 }
 
 impl Default for View {
     #[inline]
     fn default() -> Self {
-        View::all()
+        View::CURRENT | View::DETAILED | View::GRAPH | View::MARK | View::POSITION | View::SAVED
     }
 }
 
 impl View {
     #[inline]
-    fn message(&self, cmd: &impl ToString, level: usize) -> Result<String, fmt::Error> {
-        let cmd = cmd.to_string();
-        let lines = cmd.lines();
+    fn message(self, f: &mut fmt::Formatter, string: &impl ToString, level: usize) -> fmt::Result {
+        let string = string.to_string();
+        let lines = string.lines();
         if self.contains(View::DETAILED) {
-            let mut msg = String::new();
             for line in lines {
-                for _ in 0..level + 1 {
-                    write!(msg, "{} ", self.edge())?;
+                for i in 0..level + 1 {
+                    self.edge(f, i)?;
+                    f.write_str(" ")?;
                 }
-                writeln!(msg, "{}", line.trim())?;
+                writeln!(f, "{}", line.trim())?;
             }
-            Ok(msg)
-        } else {
-            Ok(lines
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .next()
-                .map_or_else(String::new, |s| s.to_string()))
+        } else if let Some(string) = lines.map(|s| s.trim()).find(|s| !s.is_empty()) {
+            f.write_str(&string)?;
         }
+        Ok(())
     }
 
     #[inline]
-    fn mark(&self) -> &str {
+    fn mark(self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.contains(View::MARK) {
-            "*"
+            f.write_str("*")
         } else {
-            ""
+            Ok(())
         }
     }
 
     #[inline]
-    fn edge(&self) -> &str {
-        "|"
+    fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
+        if self.contains(View::COLORED) {
+            write!(f, "{}", "|".color(color(level)))
+        } else {
+            f.write_str("|")
+        }
     }
 
     #[inline]
-    fn split(&self) -> &str {
-        "|/"
+    fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
+        if self.contains(View::COLORED) {
+            write!(
+                f,
+                "{}{}",
+                "|".color(color(level)),
+                "/".color(color(level + 1))
+            )
+        } else {
+            f.write_str("|/")
+        }
     }
 
     #[inline]
-    fn position(&self, at: At) -> String {
+    fn position(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
         if self.contains(View::POSITION) {
-            format!(" [{}:{}]", at.branch, at.cursor)
+            if self.contains(View::COLORED) {
+                let position = if use_branch {
+                    format!("[{}:{}]", at.branch, at.cursor)
+                } else {
+                    format!("[{}]", at.cursor)
+                };
+                write!(f, " {}", position.yellow())
+            } else if use_branch {
+                write!(f, " [{}:{}]", at.branch, at.cursor)
+            } else {
+                write!(f, " [{}]", at.cursor)
+            }
         } else {
-            String::new()
+            Ok(())
         }
     }
 
     #[inline]
-    fn current(&self, at: At, current: At) -> &str {
+    fn current(self, f: &mut fmt::Formatter, at: At, current: At) -> fmt::Result {
         if self.contains(View::CURRENT) && at == current {
-            " (current)"
+            if self.contains(View::COLORED) {
+                write!(f, " {}{}{}", "(".yellow(), "current".cyan(), ")".yellow())
+            } else {
+                f.write_str(" (current)")
+            }
         } else {
-            ""
+            Ok(())
         }
     }
 
     #[inline]
-    fn saved(&self, at: At, saved: Option<At>) -> &str {
+    fn saved(self, f: &mut fmt::Formatter, at: At, saved: Option<At>) -> fmt::Result {
         if self.contains(View::SAVED) && saved.map_or(false, |saved| saved == at) {
-            " (saved)"
+            if self.contains(View::COLORED) {
+                write!(
+                    f,
+                    " {}{}{}",
+                    "(".yellow(),
+                    "saved".bright_green(),
+                    ")".yellow()
+                )
+            } else {
+                f.write_str(" (saved)")
+            }
         } else {
-            ""
+            Ok(())
         }
+    }
+}
+
+#[inline]
+fn color(i: usize) -> Color {
+    match i % 6 {
+        0 => Color::Red,
+        1 => Color::Blue,
+        2 => Color::Magenta,
+        3 => Color::Yellow,
+        4 => Color::Green,
+        5 => Color::Cyan,
+        _ => unreachable!(),
     }
 }

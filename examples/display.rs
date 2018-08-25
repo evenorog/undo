@@ -112,7 +112,7 @@ fn main() {
 
     #[cfg(feature = "display")]
     {
-        println!("{}", history.display());
+        println!("{}", history.display().colored(true));
     }
     /*
     let mut history = History::default();
