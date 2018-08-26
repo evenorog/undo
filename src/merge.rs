@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt;
 use std::marker::PhantomData;
 use Command;
 
@@ -104,9 +104,9 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Command<R> for Merge
     }
 }
 
-impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Debug for Merged<R, C1, C2> {
+impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Debug for Merged<R, C1, C2> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Merged")
             .field("cmd1", &self.cmd1)
             .field("cmd2", &self.cmd2)
@@ -117,7 +117,7 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Debug for Merged<R, 
 #[cfg(feature = "display")]
 impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Display for Merged<R, C1, C2> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{cmd1} + {cmd2}", cmd1 = self.cmd1, cmd2 = self.cmd2)
     }
 }
@@ -179,9 +179,9 @@ impl<R, C: Command<R> + 'static> Command<R> for Merger<R, C> {
     }
 }
 
-impl<R, C: Command<R> + 'static> Debug for Merger<R, C> {
+impl<R, C: Command<R> + 'static> fmt::Debug for Merger<R, C> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Merger").field("cmd", &self.cmd).finish()
     }
 }
@@ -189,7 +189,7 @@ impl<R, C: Command<R> + 'static> Debug for Merger<R, C> {
 #[cfg(feature = "display")]
 impl<R, C: Command<R> + 'static> fmt::Display for Merger<R, C> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.cmd as &dyn fmt::Display).fmt(f)
     }
 }

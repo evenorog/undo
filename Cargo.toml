@@ -1,6 +1,6 @@
 [package]
 name = "undo"
-version = "0.24.3"
+version = "0.25.0"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "An undo-redo library with dynamic dispatch and automatic command merging."
 documentation = "https://docs.rs/undo"
@@ -11,8 +11,10 @@ keywords = ["undo", "redo"]
 categories = ["data-structures"]
 
 [dependencies]
+bitflags = { version = "1", optional = true }
+colored = { version = "1", optional = true }
 fnv = "1"
 
 [features]
 default = []
-display = []
+display = ["bitflags", "colored"]
