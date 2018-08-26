@@ -670,14 +670,14 @@ impl<R> AsMut<R> for Record<R> {
 
 impl<R> From<R> for Record<R> {
     #[inline]
-    fn from(receiver: R) -> Self {
+    fn from(receiver: R) -> Record<R> {
         Record::new(receiver)
     }
 }
 
 impl<R> From<History<R>> for Record<R> {
     #[inline]
-    fn from(history: History<R>) -> Self {
+    fn from(history: History<R>) -> Record<R> {
         history.record
     }
 }
