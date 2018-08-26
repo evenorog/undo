@@ -604,7 +604,7 @@ impl<R> Record<R> {
         }
     }
 
-    /// Returns a structure for advanced display of the record.
+    /// Returns a structure for configurable formatting of the record.
     #[inline]
     #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {

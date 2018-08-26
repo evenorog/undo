@@ -460,7 +460,7 @@ impl<R> History<R> {
         self.record.to_redo_string()
     }
 
-    /// Returns a structure for more advanced display of the history.
+    /// Returns a structure for configurable formatting of the history.
     #[inline]
     #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
