@@ -566,40 +566,16 @@ impl<R> History<R> {
     #[inline]
     #[must_use]
     fn create_path(&mut self, to: usize) -> Option<Vec<(usize, Branch<R>)>> {
-        // Find the path from `dest` to `root`.
-        let root = self.root();
-        let visited = {
-            let mut visited = Vec::with_capacity(self.capacity());
-            let mut dest = self.branches.get(&to)?;
-            while dest.parent.branch != root {
-                visited.push(dest.parent.branch);
-                dest = &self.branches[&dest.parent.branch];
-            }
-            visited
-        };
-        // Find the path from `start` to the lowest common ancestor of `dest`.
-        let mut path = Vec::with_capacity(visited.len() + self.record.len());
-        for id in visited {
-            let branch = self.branches.remove(&id).unwrap();
-            path.push((id, branch));
+        let mut path = vec![];
+        let dest = self.branches.remove(&to)?;
+        let mut i = dest.parent.branch;
+        while i != self.root() {
+            let branch = self.branches.remove(&i).unwrap();
+            let j = i;
+            i = branch.parent.branch;
+            path.push((j, branch));
         }
-
-        // Find the path from `dest` to the lowest common ancestor of `start`.
-        let mut dest = self.branches.remove(&to)?;
-        let mut id = to;
-        let mut parent = dest.parent.branch;
-        let mid = path.len();
-        path.push((id, dest));
-        let last = path
-            .last()
-            .map_or(root, |&(_, ref last)| last.parent.branch);
-        while parent != last {
-            dest = self.branches.remove(&parent).unwrap();
-            id = parent;
-            parent = dest.parent.branch;
-            path.push((id, dest));
-        }
-        path[mid..].reverse();
+        path.push((to, dest));
         Some(path)
     }
 }
