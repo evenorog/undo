@@ -3,7 +3,7 @@ use std::fmt;
 use std::marker::PhantomData;
 #[cfg(feature = "display")]
 use Display;
-use {merge::Merged, Command, Error, History, Signal};
+use {merge::Merged, Command, Error, History, Meta, Signal};
 
 /// A record of commands.
 ///
@@ -55,7 +55,7 @@ use {merge::Merged, Command, Error, History, Signal};
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
 pub struct Record<R> {
-    pub(crate) commands: VecDeque<Box<dyn Command<R> + 'static>>,
+    pub(crate) commands: VecDeque<Meta<R>>,
     receiver: R,
     cursor: usize,
     limit: usize,
@@ -278,7 +278,7 @@ impl<R> Record<R> {
     pub(crate) fn __apply(
         &mut self,
         mut cmd: impl Command<R> + 'static,
-    ) -> Result<(bool, VecDeque<Box<dyn Command<R> + 'static>>), Error<R>>
+    ) -> Result<(bool, VecDeque<Meta<R>>), Error<R>>
     where
         R: 'static,
     {
@@ -303,7 +303,7 @@ impl<R> Record<R> {
         if merges {
             // Merge the command with the one on the top of the stack.
             let merged = Merged::new(self.commands.pop_back().unwrap(), cmd);
-            self.commands.push_back(Box::new(merged));
+            self.commands.push_back(Meta::new(merged));
         } else {
             // If commands are not merged push it onto the record.
             if self.limit == self.cursor {
@@ -313,7 +313,7 @@ impl<R> Record<R> {
             } else {
                 self.cursor += 1;
             }
-            self.commands.push_back(Box::new(cmd));
+            self.commands.push_back(Meta::new(cmd));
         }
 
         debug_assert_eq!(self.cursor, self.len());
@@ -354,7 +354,7 @@ impl<R> Record<R> {
 
         if let Err(err) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
             let cmd = self.commands.remove(self.cursor - 1).unwrap();
-            return Some(Err(Error(cmd, err)));
+            return Some(Err(Error(cmd.command, err)));
         }
 
         let was_saved = self.is_saved();
@@ -400,7 +400,7 @@ impl<R> Record<R> {
 
         if let Err(err) = self.commands[self.cursor].redo(&mut self.receiver) {
             let cmd = self.commands.remove(self.cursor).unwrap();
-            return Some(Err(Error(cmd, err)));
+            return Some(Err(Error(cmd.command, err)));
         }
 
         let was_saved = self.is_saved();

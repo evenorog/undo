@@ -33,6 +33,7 @@
 #[cfg(feature = "display")]
 #[macro_use]
 extern crate bitflags;
+extern crate chrono;
 #[cfg(feature = "display")]
 extern crate colored;
 extern crate fnv;
@@ -44,6 +45,7 @@ mod merge;
 mod record;
 mod signal;
 
+use chrono::{DateTime, Local};
 use std::{error::Error as StdError, fmt};
 
 #[cfg(feature = "display")]
@@ -146,25 +148,58 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
     }
 }
 
-impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
+struct Meta<R> {
+    command: Box<dyn Command<R> + 'static>,
+    timestamp: DateTime<Local>,
+}
+
+impl<R> Meta<R> {
+    #[inline]
+    fn new(command: impl Command<R> + 'static) -> Meta<R> {
+        Meta {
+            command: Box::new(command),
+            timestamp: Local::now(),
+        }
+    }
+}
+
+#[cfg(feature = "display")]
+impl<R> fmt::Display for Meta<R> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (&self.command as &dyn fmt::Display).fmt(f)
+    }
+}
+
+impl<R> fmt::Debug for Meta<R> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Meta")
+            .field("command", &self.command)
+            .field("timestamp", &self.timestamp)
+            .finish()
+    }
+}
+
+impl<R> Command<R> for Meta<R> {
     #[inline]
     fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
-        (**self).apply(receiver)
+        self.command.apply(receiver)
     }
 
     #[inline]
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
-        (**self).undo(receiver)
+        self.command.undo(receiver)
     }
 
     #[inline]
     fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
-        (**self).redo(receiver)
+        self.command.redo(receiver)
     }
 
     #[inline]
     fn id(&self) -> Option<u32> {
-        (**self).id()
+        self.command.id()
     }
 }
 

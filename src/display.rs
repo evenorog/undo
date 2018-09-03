@@ -1,7 +1,8 @@
+use chrono::{DateTime, Local};
 use colored::{Color, Colorize};
 use history::At;
 use std::fmt::{self, Write};
-use {History, Record};
+use {History, Meta, Record};
 
 /// Configurable display formatting of structures.
 #[derive(Copy, Clone, Debug)]
@@ -71,9 +72,12 @@ impl<'a, R> Display<'a, History<R>> {
 
 impl<'a, R> Display<'a, Record<R>> {
     #[inline]
-    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, msg: &impl ToString) -> fmt::Result {
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, meta: &Meta<R>) -> fmt::Result {
         self.view.mark(f)?;
         self.view.position(f, at, false)?;
+        if self.view.contains(View::DETAILED) {
+            self.view.timestamp(f, &meta.timestamp)?;
+        }
         self.view.current(
             f,
             at,
@@ -92,10 +96,10 @@ impl<'a, R> Display<'a, Record<R>> {
         )?;
         if self.view.contains(View::DETAILED) {
             writeln!(f)?;
-            self.view.message(f, msg, 0)
+            self.view.message(f, meta, 0)
         } else {
             f.write_char(' ')?;
-            self.view.message(f, msg, 0)?;
+            self.view.message(f, meta, 0)?;
             writeln!(f)
         }
     }
@@ -107,11 +111,14 @@ impl<'a, R> Display<'a, History<R>> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        msg: &impl ToString,
+        meta: &Meta<R>,
         level: usize,
     ) -> fmt::Result {
         self.view.mark(f)?;
         self.view.position(f, at, true)?;
+        if self.view.contains(View::DETAILED) {
+            self.view.timestamp(f, &meta.timestamp)?;
+        }
         self.view.current(
             f,
             at,
@@ -133,10 +140,10 @@ impl<'a, R> Display<'a, History<R>> {
         )?;
         if self.view.contains(View::DETAILED) {
             writeln!(f)?;
-            self.view.message(f, msg, level)
+            self.view.message(f, meta, level)
         } else {
             f.write_char(' ')?;
-            self.view.message(f, msg, level)?;
+            self.view.message(f, meta, level)?;
             writeln!(f)
         }
     }
@@ -146,7 +153,7 @@ impl<'a, R> Display<'a, History<R>> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        msg: &impl ToString,
+        meta: &Meta<R>,
         level: usize,
     ) -> fmt::Result {
         for (&i, branch) in self
@@ -173,7 +180,7 @@ impl<'a, R> Display<'a, History<R>> {
             self.view.edge(f, i)?;
             f.write_char(' ')?;
         }
-        self.fmt_list(f, at, msg, level)
+        self.fmt_list(f, at, meta, level)
     }
 }
 
@@ -252,8 +259,8 @@ impl View {
                 }
                 writeln!(f, "{}", line.trim())?;
             }
-        } else if let Some(string) = lines.map(|s| s.trim()).find(|s| !s.is_empty()) {
-            f.write_str(&string)?;
+        } else if let Some(line) = lines.map(|s| s.trim()).find(|s| !s.is_empty()) {
+            f.write_str(&line)?;
         }
         Ok(())
     }
@@ -339,6 +346,16 @@ impl View {
             }
         } else {
             Ok(())
+        }
+    }
+
+    #[inline]
+    fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Local>) -> fmt::Result {
+        if self.contains(View::COLORED) {
+            let ts = format!("[{}]", timestamp.format("%T %F"));
+            write!(f, " {}", ts.yellow())
+        } else {
+            write!(f, " [{}]", timestamp.format("%T %F"))
         }
     }
 }

@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use std::fmt;
 #[cfg(feature = "display")]
 use Display;
-use {Command, Error, Record, RecordBuilder, Signal};
+use {Command, Error, Meta, Record, RecordBuilder, Signal};
 
 /// A history of commands.
 ///
@@ -633,7 +633,7 @@ impl<R> fmt::Display for History<R> {
 #[derive(Debug)]
 pub(crate) struct Branch<R> {
     pub(crate) parent: At,
-    pub(crate) commands: VecDeque<Box<dyn Command<R> + 'static>>,
+    pub(crate) commands: VecDeque<Meta<R>>,
 }
 
 /// The position in the tree.
