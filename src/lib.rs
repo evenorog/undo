@@ -204,17 +204,17 @@ impl<R> Command<R> for Meta<R> {
 }
 
 /// An error which holds the command that caused it.
-pub struct Error<R>(
-    pub Box<dyn Command<R> + 'static>,
-    pub Box<dyn StdError + Send + Sync>,
-);
+pub struct Error<R> {
+    pub command: Box<dyn Command<R> + 'static>,
+    pub error: Box<dyn StdError + Send + Sync>,
+}
 
 impl<R> fmt::Debug for Error<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_tuple("Error")
-            .field(&self.0)
-            .field(&self.1)
+        f.debug_struct("Error")
+            .field("command", &self.command)
+            .field("error", &self.error)
             .finish()
     }
 }
@@ -223,7 +223,7 @@ impl<R> fmt::Debug for Error<R> {
 impl<R> fmt::Display for Error<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.1 as &dyn fmt::Display).fmt(f)
+        (&self.error as &dyn fmt::Display).fmt(f)
     }
 }
 
@@ -234,8 +234,8 @@ impl<R> fmt::Display for Error<R> {
         write!(
             f,
             "`{error}` caused by `{command}`",
-            error = self.1,
-            command = self.0
+            error = self.error,
+            command = self.command
         )
     }
 }
@@ -243,11 +243,11 @@ impl<R> fmt::Display for Error<R> {
 impl<R> StdError for Error<R> {
     #[inline]
     fn description(&self) -> &str {
-        self.1.description()
+        self.error.description()
     }
 
     #[inline]
     fn cause(&self) -> Option<&dyn StdError> {
-        self.1.cause()
+        self.error.cause()
     }
 }

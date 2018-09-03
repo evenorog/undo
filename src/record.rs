@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
@@ -146,7 +147,6 @@ impl<R> Record<R> {
             self.commands = self.commands.split_off(begin);
             self.limit = self.len();
             self.cursor -= begin;
-
             // Check if the saved state has been removed.
             self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
 
@@ -236,7 +236,6 @@ impl<R> Record<R> {
         self.commands.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.cursor = 0;
-
         if let Some(ref mut f) = self.signal {
             // Emit signal if the cursor has changed.
             if old != 0 {
@@ -282,8 +281,11 @@ impl<R> Record<R> {
     where
         R: 'static,
     {
-        if let Err(err) = cmd.apply(&mut self.receiver) {
-            return Err(Error(Box::new(cmd), err));
+        if let Err(error) = cmd.apply(&mut self.receiver) {
+            return Err(Error {
+                command: Box::new(cmd),
+                error,
+            });
         }
 
         let old = self.cursor;
@@ -294,12 +296,13 @@ impl<R> Record<R> {
         // Pop off all elements after cursor from record.
         let v = self.commands.split_off(self.cursor);
         debug_assert_eq!(self.cursor, self.len());
-
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= self.cursor);
-
         // Try to merge commands unless the receiver is in a saved state.
-        let merges = self.merges(&cmd);
+        let merges = match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
+            (Some(id1), Some(id2)) => id1 == id2 && !self.is_saved(),
+            _ => false,
+        };
         if merges {
             // Merge the command with the one on the top of the stack.
             let merged = Merged::new(self.commands.pop_back().unwrap(), cmd);
@@ -350,11 +353,12 @@ impl<R> Record<R> {
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
         if !self.can_undo() {
             return None;
-        }
-
-        if let Err(err) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
+        } else if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
             let cmd = self.commands.remove(self.cursor - 1).unwrap();
-            return Some(Err(Error(cmd.command, err)));
+            return Some(Err(Error {
+                command: cmd.command,
+                error,
+            }));
         }
 
         let was_saved = self.is_saved();
@@ -396,11 +400,12 @@ impl<R> Record<R> {
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         if !self.can_redo() {
             return None;
-        }
-
-        if let Err(err) = self.commands[self.cursor].redo(&mut self.receiver) {
+        } else if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
             let cmd = self.commands.remove(self.cursor).unwrap();
-            return Some(Err(Error(cmd.command, err)));
+            return Some(Err(Error {
+                command: cmd.command,
+                error,
+            }));
         }
 
         let was_saved = self.is_saved();
@@ -513,8 +518,7 @@ impl<R> Record<R> {
     pub fn jump_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
         if cursor > self.len() {
             return None;
-        }
-        if cursor == self.cursor {
+        } else if cursor == self.cursor {
             return Some(Ok(()));
         }
 
@@ -576,6 +580,14 @@ impl<R> Record<R> {
         Some(Ok(()))
     }
 
+    /// Go back or forward in time.
+    #[inline]
+    #[must_use]
+    pub fn time_travel(&mut self, to: impl Into<DateTime<Local>>) -> Option<Result<(), Error<R>>> {
+        let _ = to.into();
+        unimplemented!();
+    }
+
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -635,15 +647,6 @@ impl<R> Record<R> {
     #[inline]
     pub fn commands(&self) -> impl Iterator<Item = &impl Command<R>> {
         self.commands.iter()
-    }
-
-    /// Returns `true` if the command will be merged when applied to the record.
-    #[inline]
-    fn merges(&self, cmd: &impl Command<R>) -> bool {
-        match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
-            (Some(id1), Some(id2)) => id1 == id2 && !self.is_saved(),
-            _ => false,
-        }
     }
 }
 

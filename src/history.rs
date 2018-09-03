@@ -201,7 +201,6 @@ impl<R> History<R> {
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-
         if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch { old, new: 0 })
         }
@@ -312,7 +311,6 @@ impl<R> History<R> {
         if root == branch {
             return self.record.go_to(cursor).map(|r| r.map(|_| root));
         }
-
         // Walk the path from `start` to `dest`.
         for (new, branch) in self.create_path(branch)? {
             let old = self.root();
@@ -353,12 +351,9 @@ impl<R> History<R> {
                 }
             }
         }
-
         if let Err(err) = self.record.go_to(cursor)? {
             return Some(Err(err));
-        }
-
-        if let Some(ref mut f) = self.record.signal {
+        } else if let Some(ref mut f) = self.record.signal {
             f(Signal::Branch {
                 old: root,
                 new: self.root,
@@ -389,7 +384,6 @@ impl<R> History<R> {
         if root == branch {
             return self.record.jump_to(cursor).map(|r| r.map(|_| root));
         }
-
         // Jump the path from `start` to `dest`.
         for (new, mut branch) in self.create_path(branch)? {
             let old = self.root();
@@ -397,7 +391,6 @@ impl<R> History<R> {
             if let Err(err) = self.record.jump_to(branch.parent.cursor).unwrap() {
                 return Some(Err(err));
             }
-
             let cursor = self.cursor();
             let saved = self.record.saved.filter(|&saved| saved > cursor);
             let mut commands = self.record.commands.split_off(cursor);
