@@ -362,77 +362,6 @@ impl<R> History<R> {
         Some(Ok(root))
     }
 
-    /// Jump directly to the command in `branch` at `cursor` and executes its [`undo`] or [`redo`] method.
-    ///
-    /// This method can be used if the commands store the whole state of the receiver,
-    /// and does not require the commands in between to be called to get the same result.
-    /// Use [`go_to`] otherwise.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
-    ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
-    /// [`redo`]: trait.Command.html#method.redo
-    /// [`go_to`]: struct.History.html#method.go_to
-    #[inline]
-    #[must_use]
-    pub fn jump_to(&mut self, branch: usize, cursor: usize) -> Option<Result<usize, Error<R>>>
-    where
-        R: 'static,
-    {
-        let root = self.root();
-        if root == branch {
-            return self.record.jump_to(cursor).map(|r| r.map(|_| root));
-        }
-        // Jump the path from `start` to `dest`.
-        for (new, mut branch) in self.create_path(branch)? {
-            let old = self.root();
-            // Jump to `branch.cursor` either by undoing or redoing.
-            if let Err(err) = self.record.jump_to(branch.parent.cursor).unwrap() {
-                return Some(Err(err));
-            }
-            let cursor = self.cursor();
-            let saved = self.record.saved.filter(|&saved| saved > cursor);
-            let mut commands = self.record.commands.split_off(cursor);
-            self.record.commands.append(&mut branch.commands);
-            // Handle new branch.
-            if !commands.is_empty() {
-                self.branches.insert(
-                    self.root,
-                    Branch {
-                        parent: At {
-                            branch: new,
-                            cursor,
-                        },
-                        commands,
-                    },
-                );
-                self.record.saved = self.record.saved.or(saved);
-                self.set_root(new, cursor);
-                match (self.record.saved, saved, self.saved) {
-                    (Some(_), None, None) | (None, None, Some(_)) => {
-                        self.swap_saved(new, old, cursor);
-                    }
-                    (Some(_), Some(_), None) => self.swap_saved(old, new, cursor),
-                    (None, None, None) => (),
-                    _ => unreachable!(),
-                }
-            }
-        }
-
-        if let Err(err) = self.record.jump_to(cursor)? {
-            return Some(Err(err));
-        }
-
-        if let Some(ref mut f) = self.record.signal {
-            f(Signal::Branch {
-                old: root,
-                new: self.root,
-            });
-        }
-        Some(Ok(root))
-    }
-
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.History.html#method.undo
@@ -717,34 +646,6 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
-    struct JumpAdd(char, String);
-
-    impl From<char> for JumpAdd {
-        fn from(c: char) -> JumpAdd {
-            JumpAdd(c, Default::default())
-        }
-    }
-
-    impl Command<String> for JumpAdd {
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-            self.1 = receiver.clone();
-            receiver.push(self.0);
-            Ok(())
-        }
-
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-            *receiver = self.1.clone();
-            Ok(())
-        }
-
-        fn redo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
-            *receiver = self.1.clone();
-            receiver.push(self.0);
-            Ok(())
-        }
-    }
-
     #[test]
     fn go_to() {
         //          m
@@ -810,74 +711,6 @@ mod tests {
         assert_eq!(history.go_to(abno, 4).unwrap().unwrap(), abcfhilm);
         assert_eq!(history.as_receiver(), "abno");
         assert_eq!(history.go_to(abnpq, 5).unwrap().unwrap(), abno);
-        assert_eq!(history.as_receiver(), "abnpq");
-    }
-
-    #[test]
-    fn jump_to() {
-        //          m
-        //          |
-        //    j  k  l
-        //     \ | /
-        //       i
-        //       |
-        // e  g  h
-        // |  | /
-        // d  f  p - q *
-        // | /  /
-        // c  n - o
-        // | /
-        // b
-        // |
-        // a
-        let mut history = History::default();
-        assert!(history.apply(JumpAdd::from('a')).unwrap().is_none());
-        assert!(history.apply(JumpAdd::from('b')).unwrap().is_none());
-        assert!(history.apply(JumpAdd::from('c')).unwrap().is_none());
-        assert!(history.apply(JumpAdd::from('d')).unwrap().is_none());
-        assert!(history.apply(JumpAdd::from('e')).unwrap().is_none());
-        assert_eq!(history.as_receiver(), "abcde");
-        history.undo().unwrap().unwrap();
-        history.undo().unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abc");
-        let abcde = history.apply(JumpAdd::from('f')).unwrap().unwrap();
-        assert!(history.apply(JumpAdd::from('g')).unwrap().is_none());
-        assert_eq!(history.as_receiver(), "abcfg");
-        history.undo().unwrap().unwrap();
-        let abcfg = history.apply(JumpAdd::from('h')).unwrap().unwrap();
-        assert!(history.apply(JumpAdd::from('i')).unwrap().is_none());
-        assert!(history.apply(JumpAdd::from('j')).unwrap().is_none());
-        assert_eq!(history.as_receiver(), "abcfhij");
-        history.undo().unwrap().unwrap();
-        let abcfhij = history.apply(JumpAdd::from('k')).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcfhik");
-        history.undo().unwrap().unwrap();
-        let abcfhik = history.apply(JumpAdd::from('l')).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcfhil");
-        assert!(history.apply(JumpAdd::from('m')).unwrap().is_none());
-        assert_eq!(history.as_receiver(), "abcfhilm");
-        let abcfhilm = history.jump_to(abcde, 2).unwrap().unwrap();
-        history.apply(JumpAdd::from('n')).unwrap().unwrap();
-        assert!(history.apply(JumpAdd::from('o')).unwrap().is_none());
-        assert_eq!(history.as_receiver(), "abno");
-        history.undo().unwrap().unwrap();
-        let abno = history.apply(JumpAdd::from('p')).unwrap().unwrap();
-        assert!(history.apply(JumpAdd::from('q')).unwrap().is_none());
-        assert_eq!(history.as_receiver(), "abnpq");
-
-        let abnpq = history.jump_to(abcde, 5).unwrap().unwrap();
-        assert_eq!(history.as_receiver(), "abcde");
-        assert_eq!(history.jump_to(abcfg, 5).unwrap().unwrap(), abcde);
-        assert_eq!(history.as_receiver(), "abcfg");
-        assert_eq!(history.jump_to(abcfhij, 7).unwrap().unwrap(), abcfg);
-        assert_eq!(history.as_receiver(), "abcfhij");
-        assert_eq!(history.jump_to(abcfhik, 7).unwrap().unwrap(), abcfhij);
-        assert_eq!(history.as_receiver(), "abcfhik");
-        assert_eq!(history.jump_to(abcfhilm, 8).unwrap().unwrap(), abcfhik);
-        assert_eq!(history.as_receiver(), "abcfhilm");
-        assert_eq!(history.jump_to(abno, 4).unwrap().unwrap(), abcfhilm);
-        assert_eq!(history.as_receiver(), "abno");
-        assert_eq!(history.jump_to(abnpq, 5).unwrap().unwrap(), abno);
         assert_eq!(history.as_receiver(), "abnpq");
     }
 }

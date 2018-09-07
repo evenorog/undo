@@ -163,24 +163,6 @@ impl<R> Meta<R> {
     }
 }
 
-#[cfg(feature = "display")]
-impl<R> fmt::Display for Meta<R> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.command as &dyn fmt::Display).fmt(f)
-    }
-}
-
-impl<R> fmt::Debug for Meta<R> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Meta")
-            .field("command", &self.command)
-            .field("timestamp", &self.timestamp)
-            .finish()
-    }
-}
-
 impl<R> Command<R> for Meta<R> {
     #[inline]
     fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
@@ -203,17 +185,43 @@ impl<R> Command<R> for Meta<R> {
     }
 }
 
+impl<R> fmt::Debug for Meta<R> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Meta")
+            .field("command", &self.command)
+            .field("timestamp", &self.timestamp)
+            .finish()
+    }
+}
+
+#[cfg(feature = "display")]
+impl<R> fmt::Display for Meta<R> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (&self.command as &dyn fmt::Display).fmt(f)
+    }
+}
+
 /// An error which holds the command that caused it.
 pub struct Error<R> {
-    pub command: Box<dyn Command<R> + 'static>,
-    pub error: Box<dyn StdError + Send + Sync>,
+    meta: Meta<R>,
+    error: Box<dyn StdError + Send + Sync>,
+}
+
+impl<R> Error<R> {
+    /// Returns the command that caused the error.
+    #[inline]
+    pub fn command(&self) -> &impl Command<R> {
+        &self.meta
+    }
 }
 
 impl<R> fmt::Debug for Error<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Error")
-            .field("command", &self.command)
+            .field("meta", &self.meta)
             .field("error", &self.error)
             .finish()
     }
@@ -235,7 +243,7 @@ impl<R> fmt::Display for Error<R> {
             f,
             "`{error}` caused by `{command}`",
             error = self.error,
-            command = self.command
+            command = self.meta.command
         )
     }
 }
