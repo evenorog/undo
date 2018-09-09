@@ -134,7 +134,7 @@ impl<R> History<R> {
         let diff = len - self.len();
         let root = self.root();
         for cursor in 0..diff {
-            self.remove_children(At {
+            self.rm_child(At {
                 branch: root,
                 cursor,
             });
@@ -202,7 +202,7 @@ impl<R> History<R> {
         self.record.clear();
         self.branches.clear();
         if let Some(ref mut f) = self.record.signal {
-            f(Signal::Branch { old, new: 0 })
+            f(Signal::Branch { old, new: 0 });
         }
     }
 
@@ -221,11 +221,11 @@ impl<R> History<R> {
     {
         let cursor = self.cursor();
         let saved = self.record.saved.filter(|&saved| saved > cursor);
-        let (merged, commands) = self.record.__apply(cmd)?;
+        let (merged, commands) = self.record.__apply(Meta::new(cmd))?;
         // Check if the limit has been reached.
         if !merged && cursor == self.cursor() {
             let root = self.root();
-            self.remove_children(At {
+            self.rm_child(At {
                 branch: root,
                 cursor: 0,
             });
@@ -312,7 +312,7 @@ impl<R> History<R> {
             return self.record.go_to(cursor).map(|r| r.map(|_| root));
         }
         // Walk the path from `start` to `dest`.
-        for (new, branch) in self.create_path(branch)? {
+        for (new, branch) in self.mk_path(branch)? {
             let old = self.root();
             // Walk to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.parent.cursor).unwrap() {
@@ -458,7 +458,7 @@ impl<R> History<R> {
 
     /// Remove all children of the command at position `at`.
     #[inline]
-    fn remove_children(&mut self, at: At) {
+    fn rm_child(&mut self, at: At) {
         let mut dead = FnvHashSet::default();
         // We need to check if any of the branches had the removed node as root.
         let mut children = self
@@ -487,18 +487,17 @@ impl<R> History<R> {
     /// Create a path between the current branch and the `to` branch.
     #[inline]
     #[must_use]
-    fn create_path(&mut self, to: usize) -> Option<Vec<(usize, Branch<R>)>> {
-        let mut path = vec![];
-        let dest = self.branches.remove(&to)?;
+    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<R>)>> {
+        let mut dest = self.branches.remove(&to)?;
         let mut i = dest.parent.branch;
+        let mut path = vec![(to, dest)];
         while i != self.root() {
-            let branch = self.branches.remove(&i).unwrap();
-            let j = i;
-            i = branch.parent.branch;
-            path.push((j, branch));
+            dest = self.branches.remove(&i).unwrap();
+            to = i;
+            i = dest.parent.branch;
+            path.push((to, dest));
         }
-        path.push((to, dest));
-        Some(path)
+        Some(path.into_iter().rev())
     }
 }
 

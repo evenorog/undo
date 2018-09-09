@@ -270,22 +270,19 @@ impl<R> Record<R> {
     where
         R: 'static,
     {
-        self.__apply(cmd).map(|(_, v)| v.into_iter())
+        self.__apply(Meta::new(cmd)).map(|(_, v)| v.into_iter())
     }
 
     #[inline]
     pub(crate) fn __apply(
         &mut self,
-        mut cmd: impl Command<R> + 'static,
+        mut meta: Meta<R>,
     ) -> Result<(bool, VecDeque<Meta<R>>), Error<R>>
     where
         R: 'static,
     {
-        if let Err(error) = cmd.apply(&mut self.receiver) {
-            return Err(Error {
-                meta: Meta::new(cmd),
-                error,
-            });
+        if let Err(error) = meta.apply(&mut self.receiver) {
+            return Err(Error { meta, error });
         }
 
         let old = self.cursor;
@@ -299,13 +296,13 @@ impl<R> Record<R> {
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= self.cursor);
         // Try to merge commands unless the receiver is in a saved state.
-        let merges = match (cmd.id(), self.commands.back().and_then(|last| last.id())) {
+        let merges = match (meta.id(), self.commands.back().and_then(|last| last.id())) {
             (Some(id1), Some(id2)) => id1 == id2 && !self.is_saved(),
             _ => false,
         };
         if merges {
             // Merge the command with the one on the top of the stack.
-            let merged = Merged::new(self.commands.pop_back().unwrap(), cmd);
+            let merged = Merged::new(self.commands.pop_back().unwrap(), meta);
             self.commands.push_back(Meta::new(merged));
         } else {
             // If commands are not merged push it onto the record.
@@ -316,7 +313,7 @@ impl<R> Record<R> {
             } else {
                 self.cursor += 1;
             }
-            self.commands.push_back(Meta::new(cmd));
+            self.commands.push_back(meta);
         }
 
         debug_assert_eq!(self.cursor, self.len());
@@ -354,8 +351,10 @@ impl<R> Record<R> {
         if !self.can_undo() {
             return None;
         } else if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
-            let meta = self.commands.remove(self.cursor - 1).unwrap();
-            return Some(Err(Error { meta, error }));
+            return Some(Err(Error {
+                meta: self.commands.remove(self.cursor - 1).unwrap(),
+                error,
+            }));
         }
 
         let was_saved = self.is_saved();
@@ -398,8 +397,10 @@ impl<R> Record<R> {
         if !self.can_redo() {
             return None;
         } else if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
-            let meta = self.commands.remove(self.cursor).unwrap();
-            return Some(Err(Error { meta, error }));
+            return Some(Err(Error {
+                meta: self.commands.remove(self.cursor).unwrap(),
+                error,
+            }));
         }
 
         let was_saved = self.is_saved();

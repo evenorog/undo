@@ -210,10 +210,16 @@ pub struct Error<R> {
 }
 
 impl<R> Error<R> {
-    /// Returns the command that caused the error.
+    /// Returns a reference to the command that caused the error.
     #[inline]
     pub fn command(&self) -> &impl Command<R> {
         &self.meta
+    }
+
+    /// Returns the command that caused the error.
+    #[inline]
+    pub fn into_command(self) -> impl Command<R> {
+        self.meta
     }
 }
 
@@ -243,7 +249,7 @@ impl<R> fmt::Display for Error<R> {
             f,
             "`{error}` caused by `{command}`",
             error = self.error,
-            command = self.meta.command
+            command = self.meta
         )
     }
 }
