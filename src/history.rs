@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::VecDeque;
 #[cfg(feature = "display")]
@@ -209,6 +210,8 @@ impl<R> History<R> {
     /// Pushes the command to the top of the history and executes its [`apply`] method.
     /// The command is merged with the previous top command if they have the same [`id`].
     ///
+    /// If a new branch is created, the old branch id is returned.
+    ///
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned together with the command.
     ///
@@ -319,10 +322,10 @@ impl<R> History<R> {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
-            for cmd in branch.commands {
+            for meta in branch.commands {
                 let cursor = self.cursor();
                 let saved = self.record.saved.filter(|&saved| saved > cursor);
-                let commands = match self.record.__apply(cmd) {
+                let commands = match self.record.__apply(meta) {
                     Ok((_, commands)) => commands,
                     Err(err) => return Some(Err(err)),
                 };
@@ -360,6 +363,13 @@ impl<R> History<R> {
             });
         }
         Some(Ok(root))
+    }
+
+    /// Go back or forward in time.
+    #[inline]
+    #[must_use]
+    pub fn time_travel(&mut self, to: impl Into<DateTime<Local>>) -> Option<Result<(), Error<R>>> {
+        self.record.time_travel(to)
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
@@ -488,6 +498,7 @@ impl<R> History<R> {
     #[inline]
     #[must_use]
     fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<R>)>> {
+        debug_assert_ne!(self.root(), to);
         let mut dest = self.branches.remove(&to)?;
         let mut i = dest.parent.branch;
         let mut path = vec![(to, dest)];

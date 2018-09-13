@@ -1,4 +1,5 @@
 use chrono::{DateTime, Local};
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
@@ -501,19 +502,23 @@ impl<R> Record<R> {
     #[must_use]
     pub fn time_travel(&mut self, to: impl Into<DateTime<Local>>) -> Option<Result<(), Error<R>>> {
         let to = to.into();
-        let cursor = {
-            let (start, end) = self.commands.as_slices();
-            if end.is_empty() {
-                match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+        let cursor = match self.commands.as_slices() {
+            ([], []) => return None,
+            (start, []) => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+                Ok(cursor) | Err(cursor) => cursor,
+            },
+            ([], end) => match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+                Ok(cursor) | Err(cursor) => cursor,
+            },
+            (start, end) => match start.last().unwrap().timestamp.cmp(&to) {
+                Ordering::Less => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
                     Ok(cursor) | Err(cursor) => cursor,
-                }
-            } else if start.is_empty() {
-                match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
-                    Ok(cursor) | Err(cursor) => cursor,
-                }
-            } else {
-                unimplemented!();
-            }
+                },
+                Ordering::Equal => start.len(),
+                Ordering::Greater => match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+                    Ok(cursor) | Err(cursor) => start.len() + cursor,
+                },
+            },
         };
         self.go_to(cursor)
     }
