@@ -1,3 +1,4 @@
+#[cfg(feature = "chrono")]
 use chrono::{DateTime, Local};
 use fnv::{FnvHashMap, FnvHashSet};
 use std::collections::VecDeque;
@@ -205,7 +206,6 @@ impl<R> History<R> {
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
-    /// The command is merged with the previous top command if they have the same [`id`].
     ///
     /// If a new branch is created, the old branch id is returned.
     ///
@@ -213,7 +213,6 @@ impl<R> History<R> {
     /// If an error occur when executing [`apply`] the error is returned together with the command.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    /// [`id`]: trait.Command.html#method.id
     #[inline]
     pub fn apply(&mut self, cmd: impl Command<R> + 'static) -> Result<Option<usize>, Error<R>>
     where
@@ -362,6 +361,7 @@ impl<R> History<R> {
     /// Go back or forward in time.
     #[inline]
     #[must_use]
+    #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, to: impl Into<DateTime<Local>>) -> Option<Result<(), Error<R>>> {
         self.record.time_travel(to)
     }

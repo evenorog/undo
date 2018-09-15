@@ -1,3 +1,4 @@
+#[cfg(feature = "chrono")]
 use chrono::{DateTime, Local};
 use colored::{Color, Colorize};
 use history::At;
@@ -76,6 +77,7 @@ impl<'a, R> Display<'a, Record<R>> {
         self.view.mark(f)?;
         self.view.position(f, at, false)?;
         if self.view.contains(View::DETAILED) {
+            #[cfg(feature = "chrono")]
             self.view.timestamp(f, &meta.timestamp)?;
         }
         self.view.current(
@@ -117,6 +119,7 @@ impl<'a, R> Display<'a, History<R>> {
         self.view.mark(f)?;
         self.view.position(f, at, true)?;
         if self.view.contains(View::DETAILED) {
+            #[cfg(feature = "chrono")]
             self.view.timestamp(f, &meta.timestamp)?;
         }
         self.view.current(
@@ -350,6 +353,7 @@ impl View {
     }
 
     #[inline]
+    #[cfg(feature = "chrono")]
     fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Local>) -> fmt::Result {
         if self.contains(View::COLORED) {
             let ts = format!("[{}]", timestamp.format("%T %F"));

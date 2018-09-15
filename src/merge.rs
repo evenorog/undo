@@ -59,10 +59,6 @@ pub struct Merged<R, C1: Command<R> + 'static, C2: Command<R> + 'static> {
 
 impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Merged<R, C1, C2> {
     /// Merges `cmd1` and `cmd2` into a single command.
-    ///
-    /// The [`id`] of the command will be the `cmd1`s [`id`].
-    ///
-    /// [`id`]: trait.Command.html#method.id
     #[inline]
     pub fn new(cmd1: C1, cmd2: C2) -> Merged<R, C1, C2> {
         Merged {

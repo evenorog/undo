@@ -33,6 +33,7 @@
 #[cfg(feature = "display")]
 #[macro_use]
 extern crate bitflags;
+#[cfg(feature = "chrono")]
 extern crate chrono;
 #[cfg(feature = "display")]
 extern crate colored;
@@ -45,6 +46,7 @@ mod merge;
 mod record;
 mod signal;
 
+#[cfg(feature = "chrono")]
 use chrono::{DateTime, Local};
 use std::{error::Error as StdError, fmt};
 
@@ -79,9 +81,7 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
 
     /// Used for automatic merging of commands.
     ///
-    /// Two commands are merged together when a command is pushed, and it has
-    /// the same id as the top command already on the stack or record. When commands are merged together,
-    /// undoing and redoing them are done in one step.
+    /// When commands are merged together, undoing and redoing them are done in one step.
     ///
     /// # Examples
     /// ```
@@ -161,6 +161,7 @@ pub enum Merge {
 
 struct Meta<R> {
     command: Box<dyn Command<R> + 'static>,
+    #[cfg(feature = "chrono")]
     timestamp: DateTime<Local>,
 }
 
@@ -169,6 +170,7 @@ impl<R> Meta<R> {
     fn new(command: impl Command<R> + 'static) -> Meta<R> {
         Meta {
             command: Box::new(command),
+            #[cfg(feature = "chrono")]
             timestamp: Local::now(),
         }
     }
@@ -198,6 +200,15 @@ impl<R> Command<R> for Meta<R> {
 
 impl<R> fmt::Debug for Meta<R> {
     #[inline]
+    #[cfg(not(feature = "chrono"))]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Meta")
+            .field("command", &self.command)
+            .finish()
+    }
+
+    #[inline]
+    #[cfg(feature = "chrono")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Meta")
             .field("command", &self.command)

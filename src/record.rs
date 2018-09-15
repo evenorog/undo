@@ -1,4 +1,6 @@
+#[cfg(feature = "chrono")]
 use chrono::{DateTime, Local};
+#[cfg(feature = "chrono")]
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
@@ -254,7 +256,6 @@ impl<R> Record<R> {
     }
 
     /// Pushes the command to the top of the record and executes its [`apply`] method.
-    /// The command is merged with the previous top command if they have the same [`id`].
     ///
     /// All commands above the active one are removed and returned as an iterator.
     ///
@@ -262,7 +263,6 @@ impl<R> Record<R> {
     /// If an error occur when executing [`apply`] the error is returned together with the command.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    /// [`id`]: trait.Command.html#method.id
     #[inline]
     pub fn apply(
         &mut self,
@@ -501,6 +501,7 @@ impl<R> Record<R> {
     /// Go back or forward in time.
     #[inline]
     #[must_use]
+    #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, to: impl Into<DateTime<Local>>) -> Option<Result<(), Error<R>>> {
         let to = to.into();
         let cursor = match self.commands.as_slices() {
