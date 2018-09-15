@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::marker::PhantomData;
-use Command;
+use {Command, Merge};
 
 /// Macro for merging commands.
 ///
@@ -99,8 +99,8 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Command<R> for Merge
     }
 
     #[inline]
-    fn id(&self) -> Option<u32> {
-        self.cmd1.id()
+    fn merge(&self) -> Merge {
+        self.cmd1.merge()
     }
 }
 
@@ -123,11 +123,6 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Display for Mer
 }
 
 /// A command wrapper which always merges with itself.
-///
-/// This wrapper has an [`id`] of [`u32::max_value`].
-///
-/// [`id`]: trait.Command.html#method.id
-/// [`u32::max_value`]: https://doc.rust-lang.org/std/primitive.u32.html#method.max_value
 pub struct Merger<R, C: Command<R> + 'static> {
     cmd: C,
     _marker: PhantomData<Box<dyn Command<R> + 'static>>,
@@ -174,8 +169,8 @@ impl<R, C: Command<R> + 'static> Command<R> for Merger<R, C> {
     }
 
     #[inline]
-    fn id(&self) -> Option<u32> {
-        Some(u32::max_value())
+    fn merge(&self) -> Merge {
+        Merge::Always
     }
 }
 

@@ -135,10 +135,7 @@ impl<R> History<R> {
         let diff = len - self.len();
         let root = self.root();
         for cursor in 0..diff {
-            self.rm_child(At {
-                branch: root,
-                cursor,
-            });
+            self.rm_child(root, cursor);
         }
         for branch in self
             .branches
@@ -228,10 +225,7 @@ impl<R> History<R> {
         // Check if the limit has been reached.
         if !merged && cursor == self.cursor() {
             let root = self.root();
-            self.rm_child(At {
-                branch: root,
-                cursor: 0,
-            });
+            self.rm_child(root, 0);
             for branch in self
                 .branches
                 .values_mut()
@@ -468,13 +462,13 @@ impl<R> History<R> {
 
     /// Remove all children of the command at position `at`.
     #[inline]
-    fn rm_child(&mut self, at: At) {
+    fn rm_child(&mut self, branch: usize, cursor: usize) {
         let mut dead = FnvHashSet::default();
         // We need to check if any of the branches had the removed node as root.
         let mut children = self
             .branches
             .iter()
-            .filter(|&(&id, child)| child.parent == at && dead.insert(id))
+            .filter(|&(&id, child)| child.parent == At { branch, cursor } && dead.insert(id))
             .map(|(&id, _)| id)
             .collect::<Vec<_>>();
         // Add all the children of dead branches so they are removed too.

@@ -5,7 +5,7 @@ use std::fmt;
 use std::marker::PhantomData;
 #[cfg(feature = "display")]
 use Display;
-use {merge::Merged, Command, Error, History, Meta, Signal};
+use {Command, Error, History, Merge, Merged, Meta, Signal};
 
 /// A record of commands.
 ///
@@ -297,8 +297,9 @@ impl<R> Record<R> {
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= self.cursor);
         // Try to merge commands unless the receiver is in a saved state.
-        let merges = match (meta.id(), self.commands.back().and_then(|last| last.id())) {
-            (Some(id1), Some(id2)) => id1 == id2 && !self.is_saved(),
+        let merges = match (meta.merge(), self.commands.back().map(|last| last.merge())) {
+            (Merge::Always, Some(_)) => !self.is_saved(),
+            (Merge::If(id1), Some(Merge::If(id2))) => id1 == id2 && !self.is_saved(),
             _ => false,
         };
         if merges {

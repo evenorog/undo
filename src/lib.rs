@@ -11,14 +11,14 @@
 //! History provides a tree based undo-redo functionality where you can
 //! jump between different branches.
 //!
-//! Commands can be merged using the [`merge!`] macro or the [`id`] method.
+//! Commands can be merged using the [`merge!`] macro or the [`merge`] method.
 //! When two commands are merged, undoing and redoing them are done in a single step.
 //!
 //! [command pattern]: https://en.wikipedia.org/wiki/Command_pattern
 //! [Record]: struct.Record.html
 //! [History]: struct.History.html
 //! [`merge!`]: macro.merge.html
-//! [`id`]: trait.Command.html#method.id
+//! [`merge`]: trait.Command.html#method.merge
 
 #![deny(
     bad_style,
@@ -101,8 +101,8 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
     ///         Ok(())
     ///     }
     ///
-    ///     fn id(&self) -> Option<u32> {
-    ///         Some(1)
+    ///     fn merge(&self) -> Merge {
+    ///         Merge::If(1)
     ///     }
     /// }
     ///
@@ -126,8 +126,8 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
     /// }
     /// ```
     #[inline]
-    fn id(&self) -> Option<u32> {
-        None
+    fn merge(&self) -> Merge {
+        Merge::Never
     }
 }
 
@@ -143,9 +143,20 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
     }
 
     #[inline]
-    fn id(&self) -> Option<u32> {
-        None
+    fn merge(&self) -> Merge {
+        Merge::Never
     }
+}
+
+/// Says if the command should merge with another command.
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub enum Merge {
+    /// Always merges.
+    Always,
+    /// Merges if the two commands have the same value.
+    If(u32),
+    /// Never merges.
+    Never,
 }
 
 struct Meta<R> {
@@ -180,8 +191,8 @@ impl<R> Command<R> for Meta<R> {
     }
 
     #[inline]
-    fn id(&self) -> Option<u32> {
-        self.command.id()
+    fn merge(&self) -> Merge {
+        self.command.merge()
     }
 }
 
