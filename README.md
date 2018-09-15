@@ -17,7 +17,7 @@ The Record provides a stack based undo-redo functionality, while the
 History provides a tree based undo-redo functionality where you can
 jump between different branches.
 
-Commands can be merged using the [`merge!`] macro or the [`id`] method.
+Commands can be merged using the [`merge!`] macro or the [`merge`] method.
 When two commands are merged, undoing and redoing them are done in a single step.
 
 ## Examples
@@ -26,7 +26,7 @@ Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-undo = "0.25"
+undo = "0.26"
 ```
 
 And this to `main.rs`:
@@ -90,4 +90,4 @@ additional terms or conditions.
 [Record]: https://docs.rs/undo/latest/undo/struct.Record.html
 [History]: https://docs.rs/undo/latest/undo/struct.History.html
 [`merge!`]: https://docs.rs/undo/latest/undo/macro.merge.html
-[`id`]: https://docs.rs/undo/latest/undo/trait.Command.html#method.id
+[`merge`]: https://docs.rs/undo/latest/undo/trait.Command.html#method.merge
