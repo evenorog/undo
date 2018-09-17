@@ -1,5 +1,5 @@
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, Local};
+use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "chrono")]
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -502,8 +502,11 @@ impl<R> Record<R> {
     #[inline]
     #[must_use]
     #[cfg(feature = "chrono")]
-    pub fn time_travel(&mut self, to: impl Into<DateTime<Local>>) -> Option<Result<(), Error<R>>> {
-        let to = to.into();
+    pub fn time_travel<Tz: TimeZone>(
+        &mut self,
+        to: impl AsRef<DateTime<Tz>>,
+    ) -> Option<Result<(), Error<R>>> {
+        let to = Utc.from_utc_datetime(&to.as_ref().naive_utc());
         let cursor = match self.commands.as_slices() {
             ([], []) => return None,
             (start, []) => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {

@@ -1,5 +1,5 @@
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Local, TimeZone};
 use colored::{Color, Colorize};
 use history::At;
 use std::fmt::{self, Write};
@@ -354,12 +354,17 @@ impl View {
 
     #[inline]
     #[cfg(feature = "chrono")]
-    fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Local>) -> fmt::Result {
+    fn timestamp<Tz: TimeZone>(
+        self,
+        f: &mut fmt::Formatter,
+        timestamp: &DateTime<Tz>,
+    ) -> fmt::Result {
+        let local = Local.from_utc_datetime(&timestamp.naive_utc());
         if self.contains(View::COLORED) {
-            let ts = format!("[{}]", timestamp.format("%T %F"));
+            let ts = format!("[{}]", local.format("%T %F"));
             write!(f, " {}", ts.yellow())
         } else {
-            write!(f, " [{}]", timestamp.format("%T %F"))
+            write!(f, " [{}]", local.format("%T %F"))
         }
     }
 }

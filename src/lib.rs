@@ -47,13 +47,13 @@ mod record;
 mod signal;
 
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use std::{error::Error as StdError, fmt};
 
 #[cfg(feature = "display")]
 pub use display::Display;
 pub use history::{History, HistoryBuilder};
-pub use merge::{Merged, Merger};
+pub use merge::Merged;
 pub use record::{Record, RecordBuilder};
 pub use signal::Signal;
 
@@ -162,7 +162,7 @@ pub enum Merge {
 struct Meta<R> {
     command: Box<dyn Command<R> + 'static>,
     #[cfg(feature = "chrono")]
-    timestamp: DateTime<Local>,
+    timestamp: DateTime<Utc>,
 }
 
 impl<R> Meta<R> {
@@ -171,7 +171,7 @@ impl<R> Meta<R> {
         Meta {
             command: Box::new(command),
             #[cfg(feature = "chrono")]
-            timestamp: Local::now(),
+            timestamp: Utc::now(),
         }
     }
 }
