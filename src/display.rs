@@ -59,7 +59,7 @@ impl<'a, T: 'a> Display<'a, T> {
 }
 
 impl<'a, R> Display<'a, History<R>> {
-    /// Show the history as a graph (on by default).
+    /// Show the history as a graph (off by default).
     #[inline]
     pub fn graph(&mut self, on: bool) -> &mut Self {
         if on {
@@ -245,7 +245,7 @@ bitflags! {
 impl Default for View {
     #[inline]
     fn default() -> Self {
-        View::CURRENT | View::DETAILED | View::GRAPH | View::MARK | View::POSITION | View::SAVED
+        View::CURRENT | View::DETAILED | View::MARK | View::POSITION | View::SAVED
     }
 }
 
@@ -258,7 +258,7 @@ impl View {
             for line in lines {
                 for i in 0..level + 1 {
                     self.edge(f, i)?;
-                    f.write_str(" ")?;
+                    f.write_char(' ')?;
                 }
                 writeln!(f, "{}", line.trim())?;
             }
@@ -354,11 +354,7 @@ impl View {
 
     #[inline]
     #[cfg(feature = "chrono")]
-    fn timestamp<Tz: TimeZone>(
-        self,
-        f: &mut fmt::Formatter,
-        timestamp: &DateTime<Tz>,
-    ) -> fmt::Result {
+    fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<impl TimeZone>) -> fmt::Result {
         let local = Local.from_utc_datetime(&timestamp.naive_utc());
         if self.contains(View::COLORED) {
             let ts = format!("[{}]", local.format("%T %F"));

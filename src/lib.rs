@@ -102,7 +102,7 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
     ///     }
     ///
     ///     fn merge(&self) -> Merge {
-    ///         Merge::If(1)
+    ///         Merge::Always
     ///     }
     /// }
     ///
@@ -112,7 +112,6 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
     ///     record.apply(Add('a'))?;
     ///     record.apply(Add('b'))?;
     ///     record.apply(Add('c'))?;
-    ///     assert_eq!(record.len(), 1);
     ///     assert_eq!(record.as_receiver(), "abc");
     ///
     ///     // Calling `undo` once will undo all merged commands.
