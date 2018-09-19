@@ -7,7 +7,7 @@ use std::fmt;
 use std::marker::PhantomData;
 #[cfg(feature = "display")]
 use Display;
-use {Command, Error, History, Merge, Merged, Meta, Signal};
+use {Checkpoint, Command, Error, History, Merge, Merged, Meta, Signal};
 
 /// A record of commands.
 ///
@@ -272,12 +272,12 @@ impl<R> Record<R> {
     #[inline]
     pub fn apply(
         &mut self,
-        cmd: impl Command<R> + 'static,
+        command: impl Command<R> + 'static,
     ) -> Result<impl Iterator<Item = impl Command<R> + 'static>, Error<R>>
     where
         R: 'static,
     {
-        self.__apply(Meta::new(cmd)).map(|(_, v)| v.into_iter())
+        self.__apply(Meta::new(command)).map(|(_, v)| v.into_iter())
     }
 
     #[inline]
@@ -296,7 +296,6 @@ impl<R> Record<R> {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
-
         // Pop off all elements after cursor from record.
         let v = self.commands.split_off(self.cursor);
         debug_assert_eq!(self.cursor, self.len());
@@ -534,6 +533,12 @@ impl<R> Record<R> {
         self.go_to(cursor)
     }
 
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>> {
+        Checkpoint::from(self)
+    }
+
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -732,8 +737,8 @@ impl<R: fmt::Debug> fmt::Debug for RecordBuilder<R> {
 
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
-    use super::*;
     use std::error::Error;
+    use {Command, Record};
 
     #[derive(Debug)]
     struct Add(char);

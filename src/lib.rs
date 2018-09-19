@@ -39,6 +39,7 @@ extern crate chrono;
 extern crate colored;
 extern crate fnv;
 
+mod checkpoint;
 #[cfg(feature = "display")]
 mod display;
 mod history;
@@ -50,6 +51,7 @@ mod signal;
 use chrono::{DateTime, Utc};
 use std::{error::Error as StdError, fmt};
 
+pub use checkpoint::Checkpoint;
 #[cfg(feature = "display")]
 pub use display::Display;
 pub use history::{History, HistoryBuilder};
@@ -156,6 +158,13 @@ pub enum Merge {
     If(u32),
     /// Never merges.
     Never,
+}
+
+/// A position in a history tree.
+#[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
+struct At {
+    branch: usize,
+    cursor: usize,
 }
 
 struct Meta<R> {

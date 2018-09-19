@@ -1,9 +1,8 @@
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Local, TimeZone};
 use colored::{Color, Colorize};
-use history::At;
 use std::fmt::{self, Write};
-use {History, Meta, Record};
+use {At, History, Meta, Record};
 
 /// Configurable display formatting of structures.
 #[derive(Copy, Clone, Debug)]

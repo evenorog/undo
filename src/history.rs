@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 use std::fmt;
 #[cfg(feature = "display")]
 use Display;
-use {Command, Error, Meta, Record, RecordBuilder, Signal};
+use {At, Checkpoint, Command, Error, Meta, Record, RecordBuilder, Signal};
 
 /// A history of commands.
 ///
@@ -42,7 +42,8 @@ use {Command, Error, Meta, Record, RecordBuilder, Signal};
 ///     history.go_to(root, 1).unwrap()?;
 ///     assert_eq!(history.as_receiver(), "a");
 ///
-///     let abc = history.apply(Add('f'))?.unwrap();
+///     let abc = history.root();
+///     history.apply(Add('f'))?;
 ///     history.apply(Add('g'))?;
 ///     assert_eq!(history.as_receiver(), "afg");
 ///
@@ -181,12 +182,12 @@ impl<R> History<R> {
 
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result<usize, Error<R>>>
+    pub fn revert(&mut self) -> Option<Result<(), Error<R>>>
     where
         R: 'static,
     {
         if self.is_saved() {
-            self.record.revert().map(|r| r.map(|_| self.root()))
+            self.record.revert()
         } else {
             self.saved
                 .and_then(|saved| self.go_to(saved.branch, saved.cursor))
@@ -228,13 +229,21 @@ impl<R> History<R> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, cmd: impl Command<R> + 'static) -> Result<Option<usize>, Error<R>>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<(), Error<R>>
+    where
+        R: 'static,
+    {
+        self.__apply(Meta::new(command)).map(|_| ())
+    }
+
+    #[inline]
+    pub(crate) fn __apply(&mut self, meta: Meta<R>) -> Result<bool, Error<R>>
     where
         R: 'static,
     {
         let cursor = self.cursor();
         let saved = self.record.saved.filter(|&saved| saved > cursor);
-        let (merged, commands) = self.record.__apply(Meta::new(cmd))?;
+        let (merged, commands) = self.record.__apply(meta)?;
         // Check if the limit has been reached.
         if !merged && cursor == self.cursor() {
             let root = self.root();
@@ -273,10 +282,8 @@ impl<R> History<R> {
             if let Some(ref mut f) = self.record.signal {
                 f(Signal::Branch { old, new })
             }
-            Ok(Some(old))
-        } else {
-            Ok(None)
         }
+        Ok(merged)
     }
 
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
@@ -313,13 +320,13 @@ impl<R> History<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<usize, Error<R>>>
+    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
     where
         R: 'static,
     {
         let root = self.root();
         if root == branch {
-            return self.record.go_to(cursor).map(|r| r.map(|_| root));
+            return self.record.go_to(cursor);
         }
         // Walk the path from `start` to `dest`.
         for (new, branch) in self.mk_path(branch)? {
@@ -369,7 +376,7 @@ impl<R> History<R> {
                 new: self.root,
             });
         }
-        Some(Ok(root))
+        Some(Ok(()))
     }
 
     /// Go back or forward in time.
@@ -381,6 +388,12 @@ impl<R> History<R> {
         to: impl AsRef<DateTime<Tz>>,
     ) -> Option<Result<(), Error<R>>> {
         self.record.time_travel(to)
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R>> {
+        Checkpoint::from(self)
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
@@ -579,13 +592,6 @@ pub(crate) struct Branch<R> {
     pub(crate) commands: VecDeque<Meta<R>>,
 }
 
-/// The position in the tree.
-#[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub(crate) struct At {
-    pub(crate) branch: usize,
-    pub(crate) cursor: usize,
-}
-
 /// Builder for a History.
 #[derive(Debug)]
 pub struct HistoryBuilder<R> {
@@ -649,8 +655,8 @@ impl<R: Default> HistoryBuilder<R> {
 
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
-    use super::*;
     use std::error::Error;
+    use {Command, History};
 
     #[derive(Debug)]
     struct Add(char);
@@ -685,53 +691,60 @@ mod tests {
         // |
         // a
         let mut history = History::default();
-        assert!(history.apply(Add('a')).unwrap().is_none());
-        assert!(history.apply(Add('b')).unwrap().is_none());
-        assert!(history.apply(Add('c')).unwrap().is_none());
-        assert!(history.apply(Add('d')).unwrap().is_none());
-        assert!(history.apply(Add('e')).unwrap().is_none());
+        history.apply(Add('a')).unwrap();
+        history.apply(Add('b')).unwrap();
+        history.apply(Add('c')).unwrap();
+        history.apply(Add('d')).unwrap();
+        history.apply(Add('e')).unwrap();
         assert_eq!(history.as_receiver(), "abcde");
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abc");
-        let abcde = history.apply(Add('f')).unwrap().unwrap();
-        assert!(history.apply(Add('g')).unwrap().is_none());
+        let abcde = history.root();
+        history.apply(Add('f')).unwrap();
+        history.apply(Add('g')).unwrap();
         assert_eq!(history.as_receiver(), "abcfg");
         history.undo().unwrap().unwrap();
-        let abcfg = history.apply(Add('h')).unwrap().unwrap();
-        assert!(history.apply(Add('i')).unwrap().is_none());
-        assert!(history.apply(Add('j')).unwrap().is_none());
+        let abcfg = history.root();
+        history.apply(Add('h')).unwrap();
+        history.apply(Add('i')).unwrap();
+        history.apply(Add('j')).unwrap();
         assert_eq!(history.as_receiver(), "abcfhij");
         history.undo().unwrap().unwrap();
-        let abcfhij = history.apply(Add('k')).unwrap().unwrap();
+        let abcfhij = history.root();
+        history.apply(Add('k')).unwrap();
         assert_eq!(history.as_receiver(), "abcfhik");
         history.undo().unwrap().unwrap();
-        let abcfhik = history.apply(Add('l')).unwrap().unwrap();
+        let abcfhik = history.root();
+        history.apply(Add('l')).unwrap();
         assert_eq!(history.as_receiver(), "abcfhil");
-        assert!(history.apply(Add('m')).unwrap().is_none());
+        history.apply(Add('m')).unwrap();
         assert_eq!(history.as_receiver(), "abcfhilm");
-        let abcfhilm = history.go_to(abcde, 2).unwrap().unwrap();
-        history.apply(Add('n')).unwrap().unwrap();
-        assert!(history.apply(Add('o')).unwrap().is_none());
+        let abcfhilm = history.root();
+        history.go_to(abcde, 2).unwrap().unwrap();
+        history.apply(Add('n')).unwrap();
+        history.apply(Add('o')).unwrap();
         assert_eq!(history.as_receiver(), "abno");
         history.undo().unwrap().unwrap();
-        let abno = history.apply(Add('p')).unwrap().unwrap();
-        assert!(history.apply(Add('q')).unwrap().is_none());
+        let abno = history.root();
+        history.apply(Add('p')).unwrap();
+        history.apply(Add('q')).unwrap();
         assert_eq!(history.as_receiver(), "abnpq");
 
-        let abnpq = history.go_to(abcde, 5).unwrap().unwrap();
+        let abnpq = history.root();
+        history.go_to(abcde, 5).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcde");
-        assert_eq!(history.go_to(abcfg, 5).unwrap().unwrap(), abcde);
+        history.go_to(abcfg, 5).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfg");
-        assert_eq!(history.go_to(abcfhij, 7).unwrap().unwrap(), abcfg);
+        history.go_to(abcfhij, 7).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfhij");
-        assert_eq!(history.go_to(abcfhik, 7).unwrap().unwrap(), abcfhij);
+        history.go_to(abcfhik, 7).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfhik");
-        assert_eq!(history.go_to(abcfhilm, 8).unwrap().unwrap(), abcfhik);
+        history.go_to(abcfhilm, 8).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abcfhilm");
-        assert_eq!(history.go_to(abno, 4).unwrap().unwrap(), abcfhilm);
+        history.go_to(abno, 4).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abno");
-        assert_eq!(history.go_to(abnpq, 5).unwrap().unwrap(), abno);
+        history.go_to(abnpq, 5).unwrap().unwrap();
         assert_eq!(history.as_receiver(), "abnpq");
     }
 }
