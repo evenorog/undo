@@ -179,6 +179,20 @@ impl<R> History<R> {
         self.record.is_saved()
     }
 
+    /// Revert the changes done to the receiver since the saved state.
+    #[inline]
+    pub fn revert(&mut self) -> Option<Result<usize, Error<R>>>
+    where
+        R: 'static,
+    {
+        if self.is_saved() {
+            self.record.revert().map(|r| r.map(|_| self.root()))
+        } else {
+            self.saved
+                .and_then(|saved| self.go_to(saved.branch, saved.cursor))
+        }
+    }
+
     /// Returns the current branch.
     #[inline]
     pub fn root(&self) -> usize {

@@ -223,6 +223,12 @@ impl<R> Record<R> {
         self.saved.map_or(false, |saved| saved == self.cursor)
     }
 
+    /// Revert the changes done to the receiver since the saved state.
+    #[inline]
+    pub fn revert(&mut self) -> Option<Result<(), Error<R>>> {
+        self.saved.and_then(|saved| self.go_to(saved))
+    }
+
     /// Returns the position of the current command.
     #[inline]
     pub fn cursor(&self) -> usize {
