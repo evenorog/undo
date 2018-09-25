@@ -44,6 +44,7 @@ mod checkpoint;
 mod display;
 mod history;
 mod merge;
+mod queue;
 mod record;
 mod signal;
 
@@ -56,6 +57,7 @@ pub use checkpoint::Checkpoint;
 pub use display::Display;
 pub use history::{History, HistoryBuilder};
 pub use merge::Merged;
+pub use queue::Queue;
 pub use record::{Record, RecordBuilder};
 pub use signal::Signal;
 
@@ -178,6 +180,17 @@ impl<R> Meta<R> {
     fn new(command: impl Command<R> + 'static) -> Meta<R> {
         Meta {
             command: Box::new(command),
+            #[cfg(feature = "chrono")]
+            timestamp: Utc::now(),
+        }
+    }
+}
+
+impl<R> From<Box<dyn Command<R> + 'static>> for Meta<R> {
+    #[inline]
+    fn from(command: Box<dyn Command<R> + 'static>) -> Self {
+        Meta {
+            command,
             #[cfg(feature = "chrono")]
             timestamp: Utc::now(),
         }

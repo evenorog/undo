@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 use std::fmt;
 #[cfg(feature = "display")]
 use Display;
-use {At, Checkpoint, Command, Error, Meta, Record, RecordBuilder, Signal};
+use {At, Checkpoint, Command, Error, Meta, Queue, Record, RecordBuilder, Signal};
 
 /// A history of commands.
 ///
@@ -393,6 +393,12 @@ impl<R> History<R> {
     #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<History<R>> {
         Checkpoint::from(self)
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<History<R>, R> {
+        Queue::from(self)
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].

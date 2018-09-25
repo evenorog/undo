@@ -7,7 +7,7 @@ use std::fmt;
 use std::marker::PhantomData;
 #[cfg(feature = "display")]
 use Display;
-use {Checkpoint, Command, Error, History, Merge, Merged, Meta, Signal};
+use {Checkpoint, Command, Error, History, Merge, Merged, Meta, Queue, Signal};
 
 /// A record of commands.
 ///
@@ -537,6 +537,12 @@ impl<R> Record<R> {
     #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<Record<R>> {
         Checkpoint::from(self)
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<Record<R>, R> {
+        Queue::from(self)
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
