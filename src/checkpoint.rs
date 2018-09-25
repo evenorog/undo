@@ -21,6 +21,9 @@ impl<'a, R> From<&'a mut Record<R>> for Checkpoint<'a, Record<R>> {
 }
 
 impl<'a, R> Checkpoint<'a, Record<R>> {
+    /// Calls the [`apply`] method.
+    ///
+    /// [`apply`]: struct.Record.html#method.apply
     #[inline]
     pub fn apply(
         &mut self,
@@ -42,38 +45,51 @@ impl<'a, R> Checkpoint<'a, Record<R>> {
         Ok(v.into_iter())
     }
 
+    /// Calls the [`undo`] method.
+    ///
+    /// [`undo`]: struct.Record.html#method.undo
     #[inline]
     #[must_use]
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
         self.inner.undo()
     }
 
+    /// Calls the [`redo`] method.
+    ///
+    /// [`redo`]: struct.Record.html#method.redo
     #[inline]
     #[must_use]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         self.inner.redo()
     }
 
+    /// Calls the [`go_to`] method.
+    ///
+    /// [`go_to`]: struct.Record.html#method.go_to
     #[inline]
     #[must_use]
     pub fn go_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
         self.inner.go_to(cursor)
     }
 
+    /// Commits the changes and consumes the checkpoint.
     #[inline]
     pub fn commit(self) {}
 
+    /// Cancels the changes and consumes the checkpoint.
     #[inline]
     pub fn cancel(self) -> Option<Result<(), Error<R>>> {
         let at = self.at?;
         self.inner.go_to(at.cursor)
     }
 
+    /// Returns a checkpoint.
     #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<Record<R>> {
         self.inner.checkpoint()
     }
 
+    /// Returns a reference to the `receiver`.
     #[inline]
     pub fn as_receiver(&self) -> &R {
         self.inner.as_receiver()
@@ -100,6 +116,9 @@ impl<'a, R> From<&'a mut History<R>> for Checkpoint<'a, History<R>> {
 }
 
 impl<'a, R> Checkpoint<'a, History<R>> {
+    /// Calls the [`apply`] method.
+    ///
+    /// [`apply`]: struct.History.html#method.apply
     #[inline]
     pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<(), Error<R>>
     where
@@ -125,18 +144,27 @@ impl<'a, R> Checkpoint<'a, History<R>> {
         Ok(())
     }
 
+    /// Calls the [`undo`] method.
+    ///
+    /// [`undo`]: struct.History.html#method.undo
     #[inline]
     #[must_use]
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
         self.inner.undo()
     }
 
+    /// Calls the [`redo`] method.
+    ///
+    /// [`redo`]: struct.History.html#method.redo
     #[inline]
     #[must_use]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
         self.inner.redo()
     }
 
+    /// Calls the [`go_to`] method.
+    ///
+    /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
     #[must_use]
     pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
@@ -158,9 +186,11 @@ impl<'a, R> Checkpoint<'a, History<R>> {
         ok
     }
 
+    /// Commits the changes and consumes the checkpoint.
     #[inline]
     pub fn commit(self) {}
 
+    /// Cancels the changes and consumes the checkpoint.
     #[inline]
     pub fn cancel(self) -> Option<Result<(), Error<R>>>
     where
@@ -170,11 +200,13 @@ impl<'a, R> Checkpoint<'a, History<R>> {
         self.inner.go_to(at.branch, at.cursor)
     }
 
+    /// Returns a checkpoint.
     #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<History<R>> {
         self.inner.checkpoint()
     }
 
+    /// Returns a reference to the `receiver`.
     #[inline]
     pub fn as_receiver(&self) -> &R {
         self.inner.as_receiver()
