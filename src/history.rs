@@ -328,10 +328,9 @@ impl<R> History<R> {
         if root == branch {
             return self.record.go_to(cursor);
         }
-        // Walk the path from `start` to `dest`.
+        // Walk the path from `root` to `branch`.
         for (new, branch) in self.mk_path(branch)? {
             let old = self.root();
-            // Walk to `branch.cursor` either by undoing or redoing.
             if let Err(err) = self.record.go_to(branch.parent.cursor).unwrap() {
                 return Some(Err(err));
             }

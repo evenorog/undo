@@ -144,11 +144,12 @@ impl<'a, R> Checkpoint<'a, History<R>> {
         R: 'static,
     {
         let root = self.inner.root();
-        let cursor = self.inner.cursor();
+        let old = self.inner.cursor();
         let ok = self.inner.go_to(branch, cursor);
+        // TODO: Test case when branch is not equal to root, but is part of the path to branch.
         self.at = match self.at {
-            Some(at) if at.branch == root && at.cursor > cursor => Some(at),
-            Some(at) if at.branch == root && at.cursor <= cursor => Some(At {
+            Some(at) if at.branch == root && at.cursor > old => Some(at),
+            Some(at) if at.branch == root && at.cursor <= old => Some(At {
                 branch: self.inner.root(),
                 cursor: at.cursor,
             }),
