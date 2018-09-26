@@ -1,5 +1,5 @@
 use std::mem;
-use {Checkpoint, Command, History, Meta, Record};
+use {Checkpoint, Command, Error, History, Meta, Record};
 
 /// An action that can be applied to a Record or History.
 #[derive(Debug)]
@@ -61,34 +61,64 @@ impl<'a, R> Queue<'a, Record<R>, R> {
 
     /// Applies the actions that is queued.
     ///
-    /// If an error occurs, it tries to rewind the receiver back to the original state.
+    /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(mut self)
+    pub fn commit(self) -> Result<(), Error<R>>
     where
         R: 'static,
     {
-        let mut error_at_index = None;
-        for (i, action) in self.queue.iter_mut().enumerate() {
+        for action in self.queue {
+            match action {
+                Action::Apply(command) => {
+                    let _ = self.inner.__apply(Meta::from(command))?;
+                }
+                Action::Undo => if let Some(Err(error)) = self.inner.undo() {
+                    return Err(error);
+                },
+                Action::Redo => if let Some(Err(error)) = self.inner.redo() {
+                    return Err(error);
+                },
+                Action::GoTo(_, cursor) => if let Some(Err(error)) = self.inner.go_to(cursor) {
+                    return Err(error);
+                },
+                Action::None => unreachable!(),
+            }
+        }
+        Ok(())
+    }
+
+    /// Applies the actions that is queued.
+    ///
+    /// # Errors
+    /// If an error occurs, it tries to rewind the receiver back to the original state and returns the error.
+    /// If the rewind fails, the error will hold the rewind error in its `fault` method.
+    #[inline]
+    pub fn commit_with_rewind(mut self) -> Result<(), Error<R>>
+    where
+        R: 'static,
+    {
+        let mut error_and_index = None;
+        for (index, action) in self.queue.iter_mut().enumerate() {
             *action = match mem::replace(action, Action::None) {
                 Action::Apply(command) => match self.inner.__apply(Meta::from(command)) {
                     Ok(_) => Action::Undo,
-                    Err(_) => {
-                        error_at_index = Some(i);
+                    Err(error) => {
+                        error_and_index = Some((error, index));
                         break;
                     }
                 },
                 Action::Undo => match self.inner.undo() {
                     Some(Ok(_)) => Action::Redo,
-                    Some(Err(_)) => {
-                        error_at_index = Some(i);
+                    Some(Err(error)) => {
+                        error_and_index = Some((error, index));
                         break;
                     }
                     None => Action::None,
                 },
                 Action::Redo => match self.inner.redo() {
                     Some(Ok(_)) => Action::Undo,
-                    Some(Err(_)) => {
-                        error_at_index = Some(i);
+                    Some(Err(error)) => {
+                        error_and_index = Some((error, index));
                         break;
                     }
                     None => Action::None,
@@ -97,8 +127,8 @@ impl<'a, R> Queue<'a, Record<R>, R> {
                     let old = self.inner.cursor();
                     match self.inner.go_to(cursor) {
                         Some(Ok(_)) => Action::GoTo(0, old),
-                        Some(Err(_)) => {
-                            error_at_index = Some(i);
+                        Some(Err(error)) => {
+                            error_and_index = Some((error, index));
                             break;
                         }
                         None => Action::None,
@@ -107,23 +137,32 @@ impl<'a, R> Queue<'a, Record<R>, R> {
                 Action::None => unreachable!(),
             };
         }
-        if let Some(i) = error_at_index {
-            let len = self.queue.len();
-            for action in self.queue.into_iter().rev().skip(len - i) {
-                match action {
-                    Action::Apply(_) => unreachable!(),
-                    Action::Undo => {
-                        let _ = self.inner.undo();
+        match error_and_index {
+            Some((mut error, index)) => {
+                let len = self.queue.len();
+                for action in self.queue.into_iter().rev().skip(len - index) {
+                    match action {
+                        Action::Apply(_) => unreachable!(),
+                        Action::Undo => if let Some(Err(fault)) = self.inner.undo() {
+                            error.fault = Some(Box::new(fault));
+                            break;
+                        },
+                        Action::Redo => if let Some(Err(fault)) = self.inner.redo() {
+                            error.fault = Some(Box::new(fault));
+                            break;
+                        },
+                        Action::GoTo(_, cursor) => {
+                            if let Some(Err(fault)) = self.inner.go_to(cursor) {
+                                error.fault = Some(Box::new(fault));
+                                break;
+                            }
+                        }
+                        Action::None => (),
                     }
-                    Action::Redo => {
-                        let _ = self.inner.redo();
-                    }
-                    Action::GoTo(_, cursor) => {
-                        let _ = self.inner.go_to(cursor);
-                    }
-                    Action::None => (),
                 }
+                Err(error)
             }
+            None => Ok(()),
         }
     }
 
@@ -162,34 +201,67 @@ impl<'a, R> Queue<'a, History<R>, R> {
 
     /// Applies the actions that is queued.
     ///
-    /// If an error occurs, it tries to rewind the receiver back to the original state.
+    /// # Errors
+    /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(mut self)
+    pub fn commit(self) -> Result<(), Error<R>>
     where
         R: 'static,
     {
-        let mut error_at_index = None;
-        for (i, action) in self.queue.iter_mut().enumerate() {
+        for action in self.queue {
+            match action {
+                Action::Apply(command) => {
+                    let _ = self.inner.__apply(Meta::from(command))?;
+                }
+                Action::Undo => if let Some(Err(error)) = self.inner.undo() {
+                    return Err(error);
+                },
+                Action::Redo => if let Some(Err(error)) = self.inner.redo() {
+                    return Err(error);
+                },
+                Action::GoTo(branch, cursor) => {
+                    if let Some(Err(error)) = self.inner.go_to(branch, cursor) {
+                        return Err(error);
+                    }
+                }
+                Action::None => unreachable!(),
+            }
+        }
+        Ok(())
+    }
+
+    /// Applies the actions that is queued.
+    ///
+    /// # Errors
+    /// If an error occurs, it tries to rewind the receiver back to the original state and returns the error.
+    /// If the rewind fails, the error will hold the rewind error in its `fault` method.
+    #[inline]
+    pub fn commit_with_rewind(mut self) -> Result<(), Error<R>>
+    where
+        R: 'static,
+    {
+        let mut error_and_index = None;
+        for (index, action) in self.queue.iter_mut().enumerate() {
             *action = match mem::replace(action, Action::None) {
                 Action::Apply(command) => match self.inner.__apply(Meta::from(command)) {
                     Ok(_) => Action::Undo,
-                    Err(_) => {
-                        error_at_index = Some(i);
+                    Err(error) => {
+                        error_and_index = Some((error, index));
                         break;
                     }
                 },
                 Action::Undo => match self.inner.undo() {
                     Some(Ok(_)) => Action::Redo,
-                    Some(Err(_)) => {
-                        error_at_index = Some(i);
+                    Some(Err(error)) => {
+                        error_and_index = Some((error, index));
                         break;
                     }
                     None => Action::None,
                 },
                 Action::Redo => match self.inner.redo() {
                     Some(Ok(_)) => Action::Undo,
-                    Some(Err(_)) => {
-                        error_at_index = Some(i);
+                    Some(Err(error)) => {
+                        error_and_index = Some((error, index));
                         break;
                     }
                     None => Action::None,
@@ -199,8 +271,8 @@ impl<'a, R> Queue<'a, History<R>, R> {
                     let old = self.inner.cursor();
                     match self.inner.go_to(branch, cursor) {
                         Some(Ok(_)) => Action::GoTo(root, old),
-                        Some(Err(_)) => {
-                            error_at_index = Some(i);
+                        Some(Err(error)) => {
+                            error_and_index = Some((error, index));
                             break;
                         }
                         None => Action::None,
@@ -209,23 +281,32 @@ impl<'a, R> Queue<'a, History<R>, R> {
                 Action::None => unreachable!(),
             };
         }
-        if let Some(i) = error_at_index {
-            let len = self.queue.len();
-            for action in self.queue.into_iter().rev().skip(len - i) {
-                match action {
-                    Action::Apply(_) => unreachable!(),
-                    Action::Undo => {
-                        let _ = self.inner.undo();
+        match error_and_index {
+            Some((mut error, index)) => {
+                let len = self.queue.len();
+                for action in self.queue.into_iter().rev().skip(len - index) {
+                    match action {
+                        Action::Apply(_) => unreachable!(),
+                        Action::Undo => if let Some(Err(fault)) = self.inner.undo() {
+                            error.fault = Some(Box::new(fault));
+                            break;
+                        },
+                        Action::Redo => if let Some(Err(fault)) = self.inner.redo() {
+                            error.fault = Some(Box::new(fault));
+                            break;
+                        },
+                        Action::GoTo(branch, cursor) => {
+                            if let Some(Err(fault)) = self.inner.go_to(branch, cursor) {
+                                error.fault = Some(Box::new(fault));
+                                break;
+                            }
+                        }
+                        Action::None => (),
                     }
-                    Action::Redo => {
-                        let _ = self.inner.redo();
-                    }
-                    Action::GoTo(branch, cursor) => {
-                        let _ = self.inner.go_to(branch, cursor);
-                    }
-                    Action::None => (),
                 }
+                Err(error)
             }
+            None => Ok(()),
         }
     }
 
@@ -294,13 +375,13 @@ mod tests {
                     queue.apply(Add('b'));
                     queue.apply(Add('c'));
                     assert_eq!(queue.as_receiver(), "");
-                    queue.commit();
+                    queue.commit().unwrap();
                 }
                 assert_eq!(queue.as_receiver(), "abc");
-                queue.commit();
+                queue.commit().unwrap();
             }
             assert_eq!(queue.as_receiver(), "");
-            queue.commit();
+            queue.commit().unwrap();
         }
         assert_eq!(record.as_receiver(), "abc");
     }

@@ -77,6 +77,9 @@ impl<'a, R> Checkpoint<'a, Record<R>> {
     pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
+    ///
+    /// # Errors
+    /// If an error occur when canceling the changes, the error is returned together with the command.
     #[inline]
     pub fn cancel(self) -> Option<Result<(), Error<R>>> {
         let at = self.at?;
@@ -197,6 +200,9 @@ impl<'a, R> Checkpoint<'a, History<R>> {
     pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
+    ///
+    /// # Errors
+    /// If an error occur when canceling the changes, the error is returned together with the command.
     #[inline]
     pub fn cancel(self) -> Option<Result<(), Error<R>>>
     where

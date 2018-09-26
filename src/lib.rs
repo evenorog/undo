@@ -250,9 +250,28 @@ impl<R> fmt::Display for Meta<R> {
 pub struct Error<R> {
     meta: Meta<R>,
     error: Box<dyn StdError + Send + Sync>,
+    fault: Option<Box<Error<R>>>,
 }
 
 impl<R> Error<R> {
+    /// Returns a new error.
+    #[inline]
+    fn new(meta: Meta<R>, error: Box<dyn StdError + Send + Sync>) -> Error<R> {
+        Error {
+            meta,
+            error,
+            fault: None,
+        }
+    }
+}
+
+impl<R> Error<R> {
+    /// Returns an error that this error is the fault of.
+    #[inline]
+    pub fn fault(&self) -> Option<&Error<R>> {
+        self.fault.as_ref().map(|fault| fault.as_ref())
+    }
+
     /// Returns a reference to the command that caused the error.
     #[inline]
     pub fn command(&self) -> &impl Command<R> {
@@ -272,6 +291,7 @@ impl<R> fmt::Debug for Error<R> {
         f.debug_struct("Error")
             .field("meta", &self.meta)
             .field("error", &self.error)
+            .field("fault", &self.fault)
             .finish()
     }
 }

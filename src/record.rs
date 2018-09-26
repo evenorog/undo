@@ -289,7 +289,7 @@ impl<R> Record<R> {
         R: 'static,
     {
         if let Err(error) = meta.apply(&mut self.receiver) {
-            return Err(Error { meta, error });
+            return Err(Error::new(meta, error));
         }
 
         let old = self.cursor;
@@ -358,10 +358,8 @@ impl<R> Record<R> {
         if !self.can_undo() {
             return None;
         } else if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
-            return Some(Err(Error {
-                meta: self.commands.remove(self.cursor - 1).unwrap(),
-                error,
-            }));
+            let meta = self.commands.remove(self.cursor - 1).unwrap();
+            return Some(Err(Error::new(meta, error)));
         }
 
         let was_saved = self.is_saved();
@@ -404,10 +402,8 @@ impl<R> Record<R> {
         if !self.can_redo() {
             return None;
         } else if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
-            return Some(Err(Error {
-                meta: self.commands.remove(self.cursor).unwrap(),
-                error,
-            }));
+            let meta = self.commands.remove(self.cursor).unwrap();
+            return Some(Err(Error::new(meta, error)));
         }
 
         let was_saved = self.is_saved();
