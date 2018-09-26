@@ -1,5 +1,5 @@
 use std::mem;
-use {Command, History, Meta, Record};
+use {Checkpoint, Command, History, Meta, Record};
 
 /// An action that can be applied to a Record or History.
 #[derive(Debug)]
@@ -67,20 +67,20 @@ impl<'a, R> Queue<'a, Record<R>, R> {
     where
         R: 'static,
     {
-        let mut j = None;
+        let mut error_at_index = None;
         for (i, action) in self.queue.iter_mut().enumerate() {
             *action = match mem::replace(action, Action::None) {
                 Action::Apply(command) => match self.inner.__apply(Meta::from(command)) {
                     Ok(_) => Action::Undo,
                     Err(_) => {
-                        j = i.checked_sub(1);
+                        error_at_index = Some(i);
                         break;
                     }
                 },
                 Action::Undo => match self.inner.undo() {
                     Some(Ok(_)) => Action::Redo,
                     Some(Err(_)) => {
-                        j = i.checked_sub(1);
+                        error_at_index = Some(i);
                         break;
                     }
                     None => Action::None,
@@ -88,7 +88,7 @@ impl<'a, R> Queue<'a, Record<R>, R> {
                 Action::Redo => match self.inner.redo() {
                     Some(Ok(_)) => Action::Undo,
                     Some(Err(_)) => {
-                        j = i.checked_sub(1);
+                        error_at_index = Some(i);
                         break;
                     }
                     None => Action::None,
@@ -98,7 +98,7 @@ impl<'a, R> Queue<'a, Record<R>, R> {
                     match self.inner.go_to(cursor) {
                         Some(Ok(_)) => Action::GoTo(0, old),
                         Some(Err(_)) => {
-                            j = i.checked_sub(1);
+                            error_at_index = Some(i);
                             break;
                         }
                         None => Action::None,
@@ -107,8 +107,9 @@ impl<'a, R> Queue<'a, Record<R>, R> {
                 Action::None => unreachable!(),
             };
         }
-        if let Some(j) = j {
-            for action in self.queue.into_iter().skip(j).rev() {
+        if let Some(i) = error_at_index {
+            let len = self.queue.len();
+            for action in self.queue.into_iter().rev().skip(len - i) {
                 match action {
                     Action::Apply(_) => unreachable!(),
                     Action::Undo => {
@@ -124,6 +125,12 @@ impl<'a, R> Queue<'a, Record<R>, R> {
                 }
             }
         }
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a queue.
@@ -161,20 +168,20 @@ impl<'a, R> Queue<'a, History<R>, R> {
     where
         R: 'static,
     {
-        let mut j = None;
+        let mut error_at_index = None;
         for (i, action) in self.queue.iter_mut().enumerate() {
             *action = match mem::replace(action, Action::None) {
                 Action::Apply(command) => match self.inner.__apply(Meta::from(command)) {
                     Ok(_) => Action::Undo,
                     Err(_) => {
-                        j = i.checked_sub(1);
+                        error_at_index = Some(i);
                         break;
                     }
                 },
                 Action::Undo => match self.inner.undo() {
                     Some(Ok(_)) => Action::Redo,
                     Some(Err(_)) => {
-                        j = i.checked_sub(1);
+                        error_at_index = Some(i);
                         break;
                     }
                     None => Action::None,
@@ -182,7 +189,7 @@ impl<'a, R> Queue<'a, History<R>, R> {
                 Action::Redo => match self.inner.redo() {
                     Some(Ok(_)) => Action::Undo,
                     Some(Err(_)) => {
-                        j = i.checked_sub(1);
+                        error_at_index = Some(i);
                         break;
                     }
                     None => Action::None,
@@ -193,7 +200,7 @@ impl<'a, R> Queue<'a, History<R>, R> {
                     match self.inner.go_to(branch, cursor) {
                         Some(Ok(_)) => Action::GoTo(root, old),
                         Some(Err(_)) => {
-                            j = i.checked_sub(1);
+                            error_at_index = Some(i);
                             break;
                         }
                         None => Action::None,
@@ -202,8 +209,9 @@ impl<'a, R> Queue<'a, History<R>, R> {
                 Action::None => unreachable!(),
             };
         }
-        if let Some(j) = j {
-            for action in self.queue.into_iter().skip(j).rev() {
+        if let Some(i) = error_at_index {
+            let len = self.queue.len();
+            for action in self.queue.into_iter().rev().skip(len - i) {
                 match action {
                     Action::Apply(_) => unreachable!(),
                     Action::Undo => {
@@ -219,6 +227,12 @@ impl<'a, R> Queue<'a, History<R>, R> {
                 }
             }
         }
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a queue.

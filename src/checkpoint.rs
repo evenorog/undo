@@ -1,4 +1,4 @@
-use {At, Command, Error, History, Meta, Record};
+use {At, Command, Error, History, Meta, Queue, Record};
 
 /// A checkpoint wrapper.
 ///
@@ -87,6 +87,12 @@ impl<'a, R> Checkpoint<'a, Record<R>> {
     #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<Record<R>> {
         self.inner.checkpoint()
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<Record<R>, R> {
+        self.inner.queue()
     }
 
     /// Returns a reference to the `receiver`.
@@ -204,6 +210,12 @@ impl<'a, R> Checkpoint<'a, History<R>> {
     #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<History<R>> {
         self.inner.checkpoint()
+    }
+
+    /// Returns a queue.
+    #[inline]
+    pub fn queue(&mut self) -> Queue<History<R>, R> {
+        self.inner.queue()
     }
 
     /// Returns a reference to the `receiver`.
