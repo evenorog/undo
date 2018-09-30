@@ -271,11 +271,13 @@ impl<R> History<R> {
                     commands,
                 },
             );
-            self.record.saved = self.record.saved.or(saved);
             self.set_root(new, cursor);
             match (self.record.saved, saved, self.saved) {
                 (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(new, old, cursor),
-                (Some(_), Some(_), None) => self.swap_saved(old, new, cursor),
+                (None, Some(_), None) => {
+                    self.record.saved = saved;
+                    self.swap_saved(old, new, cursor);
+                }
                 (None, None, None) => (),
                 _ => unreachable!(),
             }
@@ -354,13 +356,15 @@ impl<R> History<R> {
                             commands,
                         },
                     );
-                    self.record.saved = self.record.saved.or(saved);
                     self.set_root(new, cursor);
                     match (self.record.saved, saved, self.saved) {
                         (Some(_), None, None) | (None, None, Some(_)) => {
                             self.swap_saved(new, old, cursor);
                         }
-                        (Some(_), Some(_), None) => self.swap_saved(old, new, cursor),
+                        (None, Some(_), None) => {
+                            self.record.saved = saved;
+                            self.swap_saved(old, new, cursor);
+                        }
                         (None, None, None) => (),
                         _ => unreachable!(),
                     }
