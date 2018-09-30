@@ -1,6 +1,6 @@
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
-use fnv::{FnvHashMap, FnvHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::VecDeque;
 #[cfg(feature = "display")]
 use std::fmt;
@@ -61,7 +61,7 @@ pub struct History<R> {
     next: usize,
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<R>,
-    pub(crate) branches: FnvHashMap<usize, Branch<R>>,
+    pub(crate) branches: FxHashMap<usize, Branch<R>>,
 }
 
 impl<R> History<R> {
@@ -73,7 +73,7 @@ impl<R> History<R> {
             next: 1,
             saved: None,
             record: Record::new(receiver),
-            branches: FnvHashMap::default(),
+            branches: FxHashMap::default(),
         }
     }
 
@@ -502,7 +502,7 @@ impl<R> History<R> {
     /// Remove all children of the command at position `at`.
     #[inline]
     fn rm_child(&mut self, branch: usize, cursor: usize) {
-        let mut dead = FnvHashSet::default();
+        let mut dead = FxHashSet::default();
         // We need to check if any of the branches had the removed node as root.
         let mut children = self
             .branches
@@ -581,7 +581,7 @@ impl<R> From<Record<R>> for History<R> {
             next: 1,
             saved: None,
             record,
-            branches: FnvHashMap::default(),
+            branches: FxHashMap::default(),
         }
     }
 }
@@ -649,7 +649,7 @@ impl<R> HistoryBuilder<R> {
             next: 1,
             saved: None,
             record: self.inner.build(receiver),
-            branches: FnvHashMap::default(),
+            branches: FxHashMap::default(),
         }
     }
 }

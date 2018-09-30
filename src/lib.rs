@@ -37,7 +37,7 @@ extern crate bitflags;
 extern crate chrono;
 #[cfg(feature = "display")]
 extern crate colored;
-extern crate fnv;
+extern crate rustc_hash;
 
 mod checkpoint;
 #[cfg(feature = "display")]
