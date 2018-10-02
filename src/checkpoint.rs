@@ -13,6 +13,40 @@ enum Action<R> {
 /// A checkpoint wrapper.
 ///
 /// Wraps a Record or History and gives it checkpoint functionality.
+///
+/// # Examples
+/// ```
+/// # use std::error::Error;
+/// # use undo::*;
+/// #[derive(Debug)]
+/// struct Add(char);
+///
+/// impl Command<String> for Add {
+///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///         s.push(self.0);
+///         Ok(())
+///     }
+///
+///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///         self.0 = s.pop().ok_or("`s` is empty")?;
+///         Ok(())
+///     }
+/// }
+///
+/// fn main() -> Result<(), Box<dyn Error>> {
+///     let mut record = Record::default();
+///     {
+///         let mut cp = record.checkpoint();
+///         cp.apply(Add('a'))?;
+///         cp.apply(Add('b'))?;
+///         cp.apply(Add('c'))?;
+///         assert_eq!(cp.as_receiver(), "abc");
+///         cp.cancel()?;
+///     }
+///     assert_eq!(record.as_receiver(), "");
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug)]
 pub struct Checkpoint<'a, T: 'a, R> {
     inner: &'a mut T,

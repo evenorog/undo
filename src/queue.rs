@@ -9,7 +9,43 @@ enum Action<R> {
     GoTo(usize, usize),
 }
 
-/// A command queue.
+/// A command queue wrapper.
+///
+/// Wraps a Record or History and gives it batch queue functionality.
+///
+/// # Examples
+/// ```
+/// # use std::error::Error;
+/// # use undo::*;
+/// #[derive(Debug)]
+/// struct Add(char);
+///
+/// impl Command<String> for Add {
+///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///         s.push(self.0);
+///         Ok(())
+///     }
+///
+///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///         self.0 = s.pop().ok_or("`s` is empty")?;
+///         Ok(())
+///     }
+/// }
+///
+/// fn main() -> Result<(), Box<dyn Error>> {
+///     let mut record = Record::default();
+///     {
+///         let mut queue = record.queue();
+///         queue.apply(Add('a'));
+///         queue.apply(Add('b'));
+///         queue.apply(Add('c'));
+///         assert_eq!(queue.as_receiver(), "");
+///         queue.commit()?;
+///     }
+///     assert_eq!(record.as_receiver(), "abc");
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug)]
 pub struct Queue<'a, T: 'a, R> {
     inner: &'a mut T,
