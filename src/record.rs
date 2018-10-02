@@ -531,7 +531,7 @@ impl<R> Record<R> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>, R> {
         Checkpoint::from(self)
     }
 

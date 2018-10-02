@@ -1,4 +1,3 @@
-use std::mem;
 use {Checkpoint, Command, Error, History, Meta, Record};
 
 /// An action that can be applied to a Record or History.
@@ -8,7 +7,6 @@ enum Action<R> {
     Undo,
     Redo,
     GoTo(usize, usize),
-    None,
 }
 
 /// A command queue.
@@ -61,6 +59,7 @@ impl<'a, R> Queue<'a, Record<R>, R> {
 
     /// Applies the actions that is queued.
     ///
+    /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
     pub fn commit(self) -> Result<(), Error<R>>
@@ -81,94 +80,14 @@ impl<'a, R> Queue<'a, Record<R>, R> {
                 Action::GoTo(_, cursor) => if let Some(Err(error)) = self.inner.go_to(cursor) {
                     return Err(error);
                 },
-                Action::None => unreachable!(),
             }
         }
         Ok(())
     }
 
-    /// Applies the actions that is queued.
-    ///
-    /// # Errors
-    /// If an error occurs, it tries to rewind the receiver back to the original state and returns the error.
-    /// If the rewind fails, the error will hold the rewind error in its `fault` method.
-    #[inline]
-    pub fn commit_with_rewind(mut self) -> Result<(), Error<R>>
-    where
-        R: 'static,
-    {
-        let mut error_and_index = None;
-        for (index, action) in self.queue.iter_mut().enumerate() {
-            *action = match mem::replace(action, Action::None) {
-                Action::Apply(command) => match self.inner.__apply(Meta::from(command)) {
-                    Ok(_) => Action::Undo,
-                    Err(error) => {
-                        error_and_index = Some((error, index));
-                        break;
-                    }
-                },
-                Action::Undo => match self.inner.undo() {
-                    Some(Ok(_)) => Action::Redo,
-                    Some(Err(error)) => {
-                        error_and_index = Some((error, index));
-                        break;
-                    }
-                    None => Action::None,
-                },
-                Action::Redo => match self.inner.redo() {
-                    Some(Ok(_)) => Action::Undo,
-                    Some(Err(error)) => {
-                        error_and_index = Some((error, index));
-                        break;
-                    }
-                    None => Action::None,
-                },
-                Action::GoTo(_, cursor) => {
-                    let old = self.inner.cursor();
-                    match self.inner.go_to(cursor) {
-                        Some(Ok(_)) => Action::GoTo(0, old),
-                        Some(Err(error)) => {
-                            error_and_index = Some((error, index));
-                            break;
-                        }
-                        None => Action::None,
-                    }
-                }
-                Action::None => unreachable!(),
-            };
-        }
-        match error_and_index {
-            Some((mut error, index)) => {
-                let len = self.queue.len();
-                for action in self.queue.into_iter().rev().skip(len - index) {
-                    match action {
-                        Action::Apply(_) => unreachable!(),
-                        Action::Undo => if let Some(Err(fault)) = self.inner.undo() {
-                            error.fault = Some(Box::new(fault));
-                            break;
-                        },
-                        Action::Redo => if let Some(Err(fault)) = self.inner.redo() {
-                            error.fault = Some(Box::new(fault));
-                            break;
-                        },
-                        Action::GoTo(_, cursor) => {
-                            if let Some(Err(fault)) = self.inner.go_to(cursor) {
-                                error.fault = Some(Box::new(fault));
-                                break;
-                            }
-                        }
-                        Action::None => (),
-                    }
-                }
-                Err(error)
-            }
-            None => Ok(()),
-        }
-    }
-
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>, R> {
         self.inner.checkpoint()
     }
 
@@ -224,95 +143,14 @@ impl<'a, R> Queue<'a, History<R>, R> {
                         return Err(error);
                     }
                 }
-                Action::None => unreachable!(),
             }
         }
         Ok(())
     }
 
-    /// Applies the actions that is queued.
-    ///
-    /// # Errors
-    /// If an error occurs, it tries to rewind the receiver back to the original state and returns the error.
-    /// If the rewind fails, the error will hold the rewind error in its `fault` method.
-    #[inline]
-    pub fn commit_with_rewind(mut self) -> Result<(), Error<R>>
-    where
-        R: 'static,
-    {
-        let mut error_and_index = None;
-        for (index, action) in self.queue.iter_mut().enumerate() {
-            *action = match mem::replace(action, Action::None) {
-                Action::Apply(command) => match self.inner.__apply(Meta::from(command)) {
-                    Ok(_) => Action::Undo,
-                    Err(error) => {
-                        error_and_index = Some((error, index));
-                        break;
-                    }
-                },
-                Action::Undo => match self.inner.undo() {
-                    Some(Ok(_)) => Action::Redo,
-                    Some(Err(error)) => {
-                        error_and_index = Some((error, index));
-                        break;
-                    }
-                    None => Action::None,
-                },
-                Action::Redo => match self.inner.redo() {
-                    Some(Ok(_)) => Action::Undo,
-                    Some(Err(error)) => {
-                        error_and_index = Some((error, index));
-                        break;
-                    }
-                    None => Action::None,
-                },
-                Action::GoTo(branch, cursor) => {
-                    let root = self.inner.root();
-                    let old = self.inner.cursor();
-                    match self.inner.go_to(branch, cursor) {
-                        Some(Ok(_)) => Action::GoTo(root, old),
-                        Some(Err(error)) => {
-                            error_and_index = Some((error, index));
-                            break;
-                        }
-                        None => Action::None,
-                    }
-                }
-                Action::None => unreachable!(),
-            };
-        }
-        match error_and_index {
-            Some((mut error, index)) => {
-                let len = self.queue.len();
-                for action in self.queue.into_iter().rev().skip(len - index) {
-                    match action {
-                        Action::Apply(_) => unreachable!(),
-                        Action::Undo => if let Some(Err(fault)) = self.inner.undo() {
-                            error.fault = Some(Box::new(fault));
-                            break;
-                        },
-                        Action::Redo => if let Some(Err(fault)) = self.inner.redo() {
-                            error.fault = Some(Box::new(fault));
-                            break;
-                        },
-                        Action::GoTo(branch, cursor) => {
-                            if let Some(Err(fault)) = self.inner.go_to(branch, cursor) {
-                                error.fault = Some(Box::new(fault));
-                                break;
-                            }
-                        }
-                        Action::None => (),
-                    }
-                }
-                Err(error)
-            }
-            None => Ok(()),
-        }
-    }
-
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R>> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R>, R> {
         self.inner.checkpoint()
     }
 

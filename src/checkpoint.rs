@@ -1,48 +1,46 @@
-use {At, Command, Error, History, Meta, Queue, Record};
+use std::collections::VecDeque;
+use {Command, Error, History, Meta, Queue, Record};
+
+/// An action that can be applied to a Record or History.
+#[derive(Debug)]
+enum Action<R> {
+    Apply(VecDeque<Meta<R>>),
+    Undo,
+    Redo,
+    GoTo(usize, usize),
+}
 
 /// A checkpoint wrapper.
 ///
 /// Wraps a Record or History and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, T: 'a> {
+pub struct Checkpoint<'a, T: 'a, R> {
     inner: &'a mut T,
-    at: Option<At>,
+    stack: Vec<Action<R>>,
 }
 
-impl<'a, R> From<&'a mut Record<R>> for Checkpoint<'a, Record<R>> {
+impl<'a, R> From<&'a mut Record<R>> for Checkpoint<'a, Record<R>, R> {
     #[inline]
     fn from(record: &'a mut Record<R>) -> Self {
-        let cursor = record.cursor();
         Checkpoint {
             inner: record,
-            at: Some(At { branch: 0, cursor }),
+            stack: Vec::new(),
         }
     }
 }
 
-impl<'a, R> Checkpoint<'a, Record<R>> {
+impl<'a, R> Checkpoint<'a, Record<R>, R> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
     #[inline]
-    pub fn apply(
-        &mut self,
-        command: impl Command<R> + 'static,
-    ) -> Result<impl Iterator<Item = impl Command<R> + 'static>, Error<R>>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<(), Error<R>>
     where
         R: 'static,
     {
-        let cursor = self.inner.cursor();
-        self.at = self.at.filter(|at| at.cursor <= cursor);
-        let (merged, v) = self.inner.__apply(Meta::new(command))?;
-        if !merged && cursor == self.inner.cursor() {
-            self.at = self.at.and_then(|at| {
-                at.cursor
-                    .checked_sub(1)
-                    .map(|cursor| At { branch: 0, cursor })
-            });
-        }
-        Ok(v.into_iter())
+        let (_, v) = self.inner.__apply(Meta::new(command))?;
+        self.stack.push(Action::Apply(v));
+        Ok(())
     }
 
     /// Calls the [`undo`] method.
@@ -51,7 +49,13 @@ impl<'a, R> Checkpoint<'a, Record<R>> {
     #[inline]
     #[must_use]
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
-        self.inner.undo()
+        match self.inner.undo() {
+            Some(Ok(_)) => {
+                self.stack.push(Action::Undo);
+                Some(Ok(()))
+            }
+            undo => undo,
+        }
     }
 
     /// Calls the [`redo`] method.
@@ -60,7 +64,13 @@ impl<'a, R> Checkpoint<'a, Record<R>> {
     #[inline]
     #[must_use]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
-        self.inner.redo()
+        match self.inner.redo() {
+            Some(Ok(_)) => {
+                self.stack.push(Action::Redo);
+                Some(Ok(()))
+            }
+            redo => redo,
+        }
     }
 
     /// Calls the [`go_to`] method.
@@ -69,7 +79,14 @@ impl<'a, R> Checkpoint<'a, Record<R>> {
     #[inline]
     #[must_use]
     pub fn go_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
-        self.inner.go_to(cursor)
+        let old = self.inner.cursor();
+        match self.inner.go_to(cursor) {
+            Some(Ok(_)) => {
+                self.stack.push(Action::GoTo(0, old));
+                Some(Ok(()))
+            }
+            go_to => go_to,
+        }
     }
 
     /// Commits the changes and consumes the checkpoint.
@@ -81,14 +98,32 @@ impl<'a, R> Checkpoint<'a, Record<R>> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned together with the command.
     #[inline]
-    pub fn cancel(self) -> Option<Result<(), Error<R>>> {
-        let at = self.at?;
-        self.inner.go_to(at.cursor)
+    pub fn cancel(self) -> Result<(), Error<R>> {
+        for action in self.stack.into_iter().rev() {
+            match action {
+                Action::Apply(mut v) => {
+                    if let Some(Err(error)) = self.inner.undo() {
+                        return Err(error);
+                    }
+                    self.inner.commands.append(&mut v);
+                }
+                Action::Undo => if let Some(Err(error)) = self.inner.redo() {
+                    return Err(error);
+                },
+                Action::Redo => if let Some(Err(error)) = self.inner.undo() {
+                    return Err(error);
+                },
+                Action::GoTo(_, cursor) => if let Some(Err(error)) = self.inner.go_to(cursor) {
+                    return Err(error);
+                },
+            }
+        }
+        Ok(())
     }
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>, R> {
         self.inner.checkpoint()
     }
 
@@ -105,26 +140,24 @@ impl<'a, R> Checkpoint<'a, Record<R>> {
     }
 }
 
-impl<'a, R> AsRef<R> for Checkpoint<'a, Record<R>> {
+impl<'a, R> AsRef<R> for Checkpoint<'a, Record<R>, R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<'a, R> From<&'a mut History<R>> for Checkpoint<'a, History<R>> {
+impl<'a, R> From<&'a mut History<R>> for Checkpoint<'a, History<R>, R> {
     #[inline]
     fn from(history: &'a mut History<R>) -> Self {
-        let branch = history.root();
-        let cursor = history.cursor();
         Checkpoint {
             inner: history,
-            at: Some(At { branch, cursor }),
+            stack: Vec::new(),
         }
     }
 }
 
-impl<'a, R> Checkpoint<'a, History<R>> {
+impl<'a, R> Checkpoint<'a, History<R>, R> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
@@ -134,22 +167,9 @@ impl<'a, R> Checkpoint<'a, History<R>> {
         R: 'static,
     {
         let root = self.inner.root();
-        let cursor = self.inner.cursor();
-        let merged = self.inner.__apply(Meta::new(command))?;
-        if !merged && cursor == self.inner.cursor() {
-            self.at = self.at.and_then(|at| {
-                let branch = at.branch;
-                at.cursor.checked_sub(1).map(|cursor| At { branch, cursor })
-            });
-        }
-        self.at = match self.at {
-            Some(at) if at.branch == root && at.cursor > cursor => Some(at),
-            Some(at) if at.branch == root && at.cursor <= cursor => Some(At {
-                branch: self.inner.root(),
-                cursor: at.cursor,
-            }),
-            at => at,
-        };
+        let old = self.inner.cursor();
+        self.inner.__apply(Meta::new(command))?;
+        self.stack.push(Action::GoTo(root, old));
         Ok(())
     }
 
@@ -159,7 +179,13 @@ impl<'a, R> Checkpoint<'a, History<R>> {
     #[inline]
     #[must_use]
     pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
-        self.inner.undo()
+        match self.inner.undo() {
+            Some(Ok(_)) => {
+                self.stack.push(Action::Undo);
+                Some(Ok(()))
+            }
+            undo => undo,
+        }
     }
 
     /// Calls the [`redo`] method.
@@ -168,7 +194,13 @@ impl<'a, R> Checkpoint<'a, History<R>> {
     #[inline]
     #[must_use]
     pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
-        self.inner.redo()
+        match self.inner.redo() {
+            Some(Ok(_)) => {
+                self.stack.push(Action::Redo);
+                Some(Ok(()))
+            }
+            redo => redo,
+        }
     }
 
     /// Calls the [`go_to`] method.
@@ -182,17 +214,13 @@ impl<'a, R> Checkpoint<'a, History<R>> {
     {
         let root = self.inner.root();
         let old = self.inner.cursor();
-        let ok = self.inner.go_to(branch, cursor);
-        // TODO: Test case when branch is not equal to root, but is part of the path to branch.
-        self.at = match self.at {
-            Some(at) if at.branch == root && at.cursor > old => Some(at),
-            Some(at) if at.branch == root && at.cursor <= old => Some(At {
-                branch: self.inner.root(),
-                cursor: at.cursor,
-            }),
-            at => at,
-        };
-        ok
+        match self.inner.go_to(branch, cursor) {
+            Some(Ok(_)) => {
+                self.stack.push(Action::GoTo(root, old));
+                Some(Ok(()))
+            }
+            go_to => go_to,
+        }
     }
 
     /// Commits the changes and consumes the checkpoint.
@@ -204,17 +232,32 @@ impl<'a, R> Checkpoint<'a, History<R>> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned together with the command.
     #[inline]
-    pub fn cancel(self) -> Option<Result<(), Error<R>>>
+    pub fn cancel(self) -> Result<(), Error<R>>
     where
         R: 'static,
     {
-        let at = self.at?;
-        self.inner.go_to(at.branch, at.cursor)
+        for action in self.stack.into_iter().rev() {
+            match action {
+                Action::Apply(_) => unreachable!(),
+                Action::Undo => if let Some(Err(error)) = self.inner.redo() {
+                    return Err(error);
+                },
+                Action::Redo => if let Some(Err(error)) = self.inner.undo() {
+                    return Err(error);
+                },
+                Action::GoTo(branch, cursor) => {
+                    if let Some(Err(error)) = self.inner.go_to(branch, cursor) {
+                        return Err(error);
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R>> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R>, R> {
         self.inner.checkpoint()
     }
 
@@ -231,7 +274,7 @@ impl<'a, R> Checkpoint<'a, History<R>> {
     }
 }
 
-impl<'a, R> AsRef<R> for Checkpoint<'a, History<R>> {
+impl<'a, R> AsRef<R> for Checkpoint<'a, History<R>, R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
@@ -307,13 +350,13 @@ mod tests {
                     cp.apply(Add('h')).unwrap();
                     cp.apply(Add('i')).unwrap();
                     assert_eq!(cp.as_receiver(), "abcdefghi");
-                    cp.cancel().unwrap().unwrap();
+                    cp.cancel().unwrap();
                 }
                 assert_eq!(cp.as_receiver(), "abcdef");
-                cp.cancel().unwrap().unwrap();
+                cp.cancel().unwrap();
             }
             assert_eq!(cp.as_receiver(), "abc");
-            cp.cancel().unwrap().unwrap();
+            cp.cancel().unwrap();
         }
         assert_eq!(record.as_receiver(), "");
     }

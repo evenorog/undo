@@ -395,7 +395,7 @@ impl<R> History<R> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R>> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<R>, R> {
         Checkpoint::from(self)
     }
 
