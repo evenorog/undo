@@ -20,10 +20,12 @@
 //! [`merge!`]: macro.merge.html
 //! [`merge`]: trait.Command.html#method.merge
 
+#![doc(html_root_url = "https://docs.rs/undo/0.28.0")]
 #![deny(
     bad_style,
     bare_trait_objects,
     missing_debug_implementations,
+    missing_docs,
     unused_import_braces,
     unused_qualifications,
     unsafe_code,
@@ -134,17 +136,73 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
     }
 }
 
+/// Base functionality for all commands.
 #[cfg(feature = "display")]
 pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
+    /// Applies the command on the receiver and returns `Ok` if everything went fine,
+    /// and `Err` if something went wrong.
     fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
+    /// Restores the state of the receiver as it was before the command was applied
+    /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>>;
 
+    /// Reapplies the command on the receiver and return `Ok` if everything went fine,
+    /// and `Err` if something went wrong.
+    ///
+    /// The default implementation uses the [`apply`] implementation.
+    ///
+    /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
     fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn StdError + Send + Sync>> {
         self.apply(receiver)
     }
 
+    /// Used for automatic merging of commands.
+    ///
+    /// When commands are merged together, undoing and redoing them are done in one step.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::error::Error;
+    /// # use undo::*;
+    /// #[derive(Debug)]
+    /// struct Add(char);
+    ///
+    /// impl Command<String> for Add {
+    ///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ///         s.push(self.0);
+    ///         Ok(())
+    ///     }
+    ///
+    ///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ///         self.0 = s.pop().ok_or("`s` is empty")?;
+    ///         Ok(())
+    ///     }
+    ///
+    ///     fn merge(&self) -> Merge {
+    ///         Merge::Always
+    ///     }
+    /// }
+    ///
+    /// fn main() -> Result<(), Box<dyn Error>> {
+    ///     let mut record = Record::default();
+    ///     // The `a`, `b`, and `c` commands are merged.
+    ///     record.apply(Add('a'))?;
+    ///     record.apply(Add('b'))?;
+    ///     record.apply(Add('c'))?;
+    ///     assert_eq!(record.as_receiver(), "abc");
+    ///
+    ///     // Calling `undo` once will undo all merged commands.
+    ///     record.undo().unwrap()?;
+    ///     assert_eq!(record.as_receiver(), "");
+    ///
+    ///     // Calling `redo` once will redo all merged commands.
+    ///     record.redo().unwrap()?;
+    ///     assert_eq!(record.as_receiver(), "abc");
+    ///     Ok(())
+    /// }
+    /// ```
     #[inline]
     fn merge(&self) -> Merge {
         Merge::Never
