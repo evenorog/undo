@@ -27,13 +27,13 @@ pub enum Signal {
         /// The new cursor.
         new: usize,
     },
-    /// Says if the current branch has changed.
+    /// Says if the current branch, or root, has changed.
     ///
     /// This is only emitted from `History`.
-    Branch {
-        /// The old branch.
+    Root {
+        /// The old root.
         old: usize,
-        /// The new branch.
+        /// The new root.
         new: usize,
     },
 }

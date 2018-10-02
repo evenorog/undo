@@ -216,7 +216,7 @@ impl<R> History<R> {
         self.record.clear();
         self.branches.clear();
         if let Some(ref mut f) = self.record.signal {
-            f(Signal::Branch { old, new: 0 });
+            f(Signal::Root { old, new: 0 });
         }
     }
 
@@ -282,7 +282,7 @@ impl<R> History<R> {
                 _ => unreachable!(),
             }
             if let Some(ref mut f) = self.record.signal {
-                f(Signal::Branch { old, new })
+                f(Signal::Root { old, new })
             }
         }
         Ok(merged)
@@ -374,7 +374,7 @@ impl<R> History<R> {
         if let Err(err) = self.record.go_to(cursor)? {
             return Some(Err(err));
         } else if let Some(ref mut f) = self.record.signal {
-            f(Signal::Branch {
+            f(Signal::Root {
                 old: root,
                 new: self.root,
             });
