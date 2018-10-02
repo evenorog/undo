@@ -263,21 +263,16 @@ impl<R> Record<R> {
 
     /// Pushes the command to the top of the record and executes its [`apply`] method.
     ///
-    /// All commands above the active one are removed and returned as an iterator.
-    ///
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned together with the command.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(
-        &mut self,
-        command: impl Command<R> + 'static,
-    ) -> Result<impl Iterator<Item = impl Command<R> + 'static>, Error<R>>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<(), Error<R>>
     where
         R: 'static,
     {
-        self.__apply(Meta::new(command)).map(|(_, v)| v.into_iter())
+        self.__apply(Meta::new(command)).map(|(_, _)| ())
     }
 
     #[inline]
