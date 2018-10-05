@@ -53,11 +53,11 @@ pub struct Checkpoint<'a, T: 'a, R> {
     stack: Vec<Action<R>>,
 }
 
-impl<'a, R> From<&'a mut Record<R>> for Checkpoint<'a, Record<R>, R> {
+impl<'a, T: 'a, R> From<&'a mut T> for Checkpoint<'a, T, R> {
     #[inline]
-    fn from(record: &'a mut Record<R>) -> Self {
+    fn from(inner: &'a mut T) -> Self {
         Checkpoint {
-            inner: record,
+            inner,
             stack: Vec::new(),
         }
     }
@@ -139,17 +139,25 @@ impl<'a, R> Checkpoint<'a, Record<R>, R> {
                     if let Some(Err(error)) = self.inner.undo() {
                         return Err(error);
                     }
+                    let cursor = self.inner.cursor();
+                    self.inner.commands.truncate(cursor);
                     self.inner.commands.append(&mut v);
                 }
-                Action::Undo => if let Some(Err(error)) = self.inner.redo() {
-                    return Err(error);
-                },
-                Action::Redo => if let Some(Err(error)) = self.inner.undo() {
-                    return Err(error);
-                },
-                Action::GoTo(_, cursor) => if let Some(Err(error)) = self.inner.go_to(cursor) {
-                    return Err(error);
-                },
+                Action::Undo => {
+                    if let Some(Err(error)) = self.inner.redo() {
+                        return Err(error);
+                    }
+                }
+                Action::Redo => {
+                    if let Some(Err(error)) = self.inner.undo() {
+                        return Err(error);
+                    }
+                }
+                Action::GoTo(_, cursor) => {
+                    if let Some(Err(error)) = self.inner.go_to(cursor) {
+                        return Err(error);
+                    }
+                }
             }
         }
         Ok(())
@@ -178,16 +186,6 @@ impl<'a, R> AsRef<R> for Checkpoint<'a, Record<R>, R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
-    }
-}
-
-impl<'a, R> From<&'a mut History<R>> for Checkpoint<'a, History<R>, R> {
-    #[inline]
-    fn from(history: &'a mut History<R>) -> Self {
-        Checkpoint {
-            inner: history,
-            stack: Vec::new(),
-        }
     }
 }
 
@@ -273,12 +271,16 @@ impl<'a, R> Checkpoint<'a, History<R>, R> {
         for action in self.stack.into_iter().rev() {
             match action {
                 Action::Apply(_) => unreachable!(),
-                Action::Undo => if let Some(Err(error)) = self.inner.redo() {
-                    return Err(error);
-                },
-                Action::Redo => if let Some(Err(error)) = self.inner.undo() {
-                    return Err(error);
-                },
+                Action::Undo => {
+                    if let Some(Err(error)) = self.inner.redo() {
+                        return Err(error);
+                    }
+                }
+                Action::Redo => {
+                    if let Some(Err(error)) = self.inner.undo() {
+                        return Err(error);
+                    }
+                }
                 Action::GoTo(branch, cursor) => {
                     if let Some(Err(error)) = self.inner.go_to(branch, cursor) {
                         return Err(error);

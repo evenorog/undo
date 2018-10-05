@@ -138,7 +138,8 @@ impl<'a, R> Display<'a, History<R>> {
                 .map(|saved| At {
                     branch: self.data.root(),
                     cursor: saved,
-                }).or(self.data.saved),
+                })
+                .or(self.data.saved),
         )?;
         if self.view.contains(View::DETAILED) {
             writeln!(f)?;

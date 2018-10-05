@@ -157,15 +157,12 @@ impl<R> Record<R> {
             let can_undo = self.can_undo();
             let is_saved = self.is_saved();
             if let Some(ref mut f) = self.signal {
-                // Emit signal if the cursor has changed.
                 if old != new {
                     f(Signal::Cursor { old, new });
                 }
-                // Check if the records ability to undo changed.
                 if could_undo != can_undo {
                     f(Signal::Undo(can_undo));
                 }
-                // Check if the receiver went from saved to unsaved.
                 if was_saved != is_saved {
                     f(Signal::Saved(is_saved));
                 }
@@ -246,15 +243,12 @@ impl<R> Record<R> {
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.cursor = 0;
         if let Some(ref mut f) = self.signal {
-            // Emit signal if the cursor has changed.
             if old != 0 {
                 f(Signal::Cursor { old, new: 0 });
             }
-            // Record can never undo after being cleared, check if you could undo before.
             if could_undo {
                 f(Signal::Undo(false));
             }
-            // Record can never redo after being cleared, check if you could redo before.
             if could_redo {
                 f(Signal::Redo(false));
             }
@@ -325,15 +319,12 @@ impl<R> Record<R> {
                 old,
                 new: self.cursor,
             });
-            // Record can never redo after executing a command, check if you could redo before.
             if could_redo {
                 f(Signal::Redo(false));
             }
-            // Record can always undo after executing a command, check if you could not undo before.
             if !could_undo {
                 f(Signal::Undo(true));
             }
-            // Check if the receiver went from saved to unsaved.
             if was_saved {
                 f(Signal::Saved(false));
             }
@@ -363,20 +354,16 @@ impl<R> Record<R> {
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signal {
-            // Cursor has always changed at this point.
             f(Signal::Cursor {
                 old,
                 new: self.cursor,
             });
-            // Check if the records ability to redo changed.
             if old == len {
                 f(Signal::Redo(true));
             }
-            // Check if the records ability to undo changed.
             if old == 1 {
                 f(Signal::Undo(false));
             }
-            // Check if the receiver went from saved to unsaved, or unsaved to saved.
             if was_saved != is_saved {
                 f(Signal::Saved(is_saved));
             }
@@ -400,27 +387,22 @@ impl<R> Record<R> {
             let meta = self.commands.remove(self.cursor).unwrap();
             return Some(Err(Error::new(meta, error)));
         }
-
         let was_saved = self.is_saved();
         let old = self.cursor;
         self.cursor += 1;
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signal {
-            // Cursor has always changed at this point.
             f(Signal::Cursor {
                 old,
                 new: self.cursor,
             });
-            // Check if the records ability to redo changed.
             if old == len - 1 {
                 f(Signal::Redo(false));
             }
-            // Check if the records ability to undo changed.
             if old == 0 {
                 f(Signal::Undo(true));
             }
-            // Check if the receiver went from saved to unsaved, or unsaved to saved.
             if was_saved != is_saved {
                 f(Signal::Saved(is_saved));
             }
@@ -441,7 +423,6 @@ impl<R> Record<R> {
         if cursor > self.len() {
             return None;
         }
-
         let was_saved = self.is_saved();
         let old = self.cursor;
         let len = self.len();
@@ -460,32 +441,26 @@ impl<R> Record<R> {
         self.signal = signal;
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signal {
-            // Emit signal if the cursor has changed.
             if old != self.cursor {
                 f(Signal::Cursor {
                     old,
                     new: self.cursor,
                 });
             }
-            // Check if the receiver went from saved to unsaved, or unsaved to saved.
             if was_saved != is_saved {
                 f(Signal::Saved(is_saved));
             }
             if redo {
-                // Check if the records ability to redo changed.
                 if old == len - 1 {
                     f(Signal::Redo(false));
                 }
-                // Check if the records ability to undo changed.
                 if old == 0 {
                     f(Signal::Undo(true));
                 }
             } else {
-                // Check if the records ability to redo changed.
                 if old == len {
                     f(Signal::Redo(true));
                 }
-                // Check if the records ability to undo changed.
                 if old == 1 {
                     f(Signal::Undo(false));
                 }

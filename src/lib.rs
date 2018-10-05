@@ -29,7 +29,7 @@
     unused_import_braces,
     unused_qualifications,
     unsafe_code,
-    unstable_features,
+    unstable_features
 )]
 
 #[cfg(feature = "display")]

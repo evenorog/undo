@@ -107,15 +107,21 @@ impl<'a, R> Queue<'a, Record<R>, R> {
                 Action::Apply(command) => {
                     let _ = self.inner.__apply(Meta::from(command))?;
                 }
-                Action::Undo => if let Some(Err(error)) = self.inner.undo() {
-                    return Err(error);
-                },
-                Action::Redo => if let Some(Err(error)) = self.inner.redo() {
-                    return Err(error);
-                },
-                Action::GoTo(_, cursor) => if let Some(Err(error)) = self.inner.go_to(cursor) {
-                    return Err(error);
-                },
+                Action::Undo => {
+                    if let Some(Err(error)) = self.inner.undo() {
+                        return Err(error);
+                    }
+                }
+                Action::Redo => {
+                    if let Some(Err(error)) = self.inner.redo() {
+                        return Err(error);
+                    }
+                }
+                Action::GoTo(_, cursor) => {
+                    if let Some(Err(error)) = self.inner.go_to(cursor) {
+                        return Err(error);
+                    }
+                }
             }
         }
         Ok(())
@@ -168,12 +174,16 @@ impl<'a, R> Queue<'a, History<R>, R> {
                 Action::Apply(command) => {
                     let _ = self.inner.__apply(Meta::from(command))?;
                 }
-                Action::Undo => if let Some(Err(error)) = self.inner.undo() {
-                    return Err(error);
-                },
-                Action::Redo => if let Some(Err(error)) = self.inner.redo() {
-                    return Err(error);
-                },
+                Action::Undo => {
+                    if let Some(Err(error)) = self.inner.undo() {
+                        return Err(error);
+                    }
+                }
+                Action::Redo => {
+                    if let Some(Err(error)) = self.inner.redo() {
+                        return Err(error);
+                    }
+                }
                 Action::GoTo(branch, cursor) => {
                     if let Some(Err(error)) = self.inner.go_to(branch, cursor) {
                         return Err(error);
