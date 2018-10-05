@@ -17,5 +17,5 @@ colored = { version = "1", optional = true }
 rustc-hash = "1"
 
 [features]
-default = ["chrono"]
+default = []
 display = ["bitflags", "colored"]

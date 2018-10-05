@@ -198,7 +198,6 @@ impl<R> Record<R> {
         if saved {
             self.saved = Some(self.cursor);
             if let Some(ref mut f) = self.signal {
-                // Check if the receiver went from unsaved to saved.
                 if !was_saved {
                     f(Signal::Saved(true));
                 }
@@ -206,7 +205,6 @@ impl<R> Record<R> {
         } else {
             self.saved = None;
             if let Some(ref mut f) = self.signal {
-                // Check if the receiver went from saved to unsaved.
                 if was_saved {
                     f(Signal::Saved(false));
                 }
@@ -280,7 +278,6 @@ impl<R> Record<R> {
         if let Err(error) = meta.apply(&mut self.receiver) {
             return Err(Error::new(meta, error));
         }
-
         let old = self.cursor;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -311,7 +308,6 @@ impl<R> Record<R> {
             }
             self.commands.push_back(meta);
         }
-
         debug_assert_eq!(self.cursor, self.len());
         if let Some(ref mut f) = self.signal {
             // We emit this signal even if the commands might have been merged.
@@ -347,7 +343,6 @@ impl<R> Record<R> {
             let meta = self.commands.remove(self.cursor - 1).unwrap();
             return Some(Err(Error::new(meta, error)));
         }
-
         let was_saved = self.is_saved();
         let old = self.cursor;
         self.cursor -= 1;

@@ -1,6 +1,6 @@
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 #[cfg(feature = "display")]
 use std::fmt;
@@ -221,8 +221,6 @@ impl<R> History<R> {
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
-    ///
-    /// If a new branch is created, the old branch id is returned.
     ///
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned together with the command.
@@ -499,31 +497,27 @@ impl<R> History<R> {
         }
     }
 
-    /// Remove all children of the command at position `at`.
+    /// Remove all children of the command at the given position.
     #[inline]
     fn rm_child(&mut self, branch: usize, cursor: usize) {
-        let mut dead = FxHashSet::default();
         // We need to check if any of the branches had the removed node as root.
-        let mut children = self
+        let mut dead: Vec<_> = self
             .branches
             .iter()
-            .filter(|&(&id, child)| child.parent == At { branch, cursor } && dead.insert(id))
+            .filter(|&(_, child)| child.parent == At { branch, cursor })
             .map(|(&id, _)| id)
-            .collect::<Vec<_>>();
-        // Add all the children of dead branches so they are removed too.
-        while let Some(parent) = children.pop() {
-            for (&id, _) in self
-                .branches
-                .iter()
-                .filter(|&(&id, child)| child.parent.branch == parent && dead.insert(id))
-            {
-                children.push(id);
-            }
-        }
-        // Remove all dead branches.
-        for id in dead {
-            self.branches.remove(&id);
-            self.saved = self.saved.filter(|saved| saved.branch != id);
+            .collect();
+        while let Some(parent) = dead.pop() {
+            // Remove the dead branch.
+            self.branches.remove(&parent).unwrap();
+            self.saved = self.saved.filter(|saved| saved.branch != parent);
+            // Add the children of the dead branch so they are removed too.
+            dead.extend(
+                self.branches
+                    .iter()
+                    .filter(|&(_, child)| child.parent.branch == parent)
+                    .map(|(&id, _)| id),
+            )
         }
     }
 
