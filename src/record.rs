@@ -5,9 +5,13 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
+use std::num::NonZeroUsize;
 #[cfg(feature = "display")]
 use Display;
 use {Checkpoint, Command, Error, History, Merge, Merged, Meta, Queue, Signal};
+
+#[allow(unsafe_code)]
+const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_value()) };
 
 /// A record of commands.
 ///
@@ -62,7 +66,7 @@ pub struct Record<R> {
     pub(crate) commands: VecDeque<Meta<R>>,
     receiver: R,
     cursor: usize,
-    limit: usize,
+    limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
     pub(crate) signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
 }
@@ -75,7 +79,7 @@ impl<R> Record<R> {
             commands: VecDeque::new(),
             receiver: receiver.into(),
             cursor: 0,
-            limit: usize::max_value(),
+            limit: MAX_LIMIT,
             saved: Some(0),
             signal: None,
         }
@@ -87,7 +91,7 @@ impl<R> Record<R> {
         RecordBuilder {
             receiver: PhantomData,
             capacity: 0,
-            limit: usize::max_value(),
+            limit: MAX_LIMIT,
             saved: true,
             signal: None,
         }
@@ -123,7 +127,7 @@ impl<R> Record<R> {
     /// Returns the limit of the record.
     #[inline]
     pub fn limit(&self) -> usize {
-        self.limit
+        self.limit.get()
     }
 
     /// Sets the limit of the record and returns the new limit.
@@ -140,7 +144,7 @@ impl<R> Record<R> {
     /// Panics if `limit` is `0`.
     #[inline]
     pub fn set_limit(&mut self, limit: usize) -> usize {
-        assert_ne!(limit, 0);
+        self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         if limit < self.len() {
             let old = self.cursor;
             let could_undo = self.can_undo();
@@ -148,7 +152,7 @@ impl<R> Record<R> {
 
             let begin = usize::min(self.cursor, self.len() - limit);
             self.commands = self.commands.split_off(begin);
-            self.limit = self.len();
+            self.limit = NonZeroUsize::new(self.len()).unwrap();
             self.cursor -= begin;
             // Check if the saved state has been removed.
             self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
@@ -167,10 +171,8 @@ impl<R> Record<R> {
                     f(Signal::Saved(is_saved));
                 }
             }
-        } else {
-            self.limit = limit;
         }
-        self.limit
+        self.limit.get()
     }
 
     /// Sets how the signal should be handled when the state changes.
@@ -299,7 +301,7 @@ impl<R> Record<R> {
             self.commands.push_back(Meta::new(merged));
         } else {
             // If commands are not merged push it onto the record.
-            if self.limit == self.cursor {
+            if self.limit.get() == self.cursor {
                 // If limit is reached, pop off the first command.
                 self.commands.pop_front();
                 self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
@@ -628,7 +630,7 @@ impl<R> fmt::Display for Record<R> {
 pub struct RecordBuilder<R> {
     receiver: PhantomData<R>,
     capacity: usize,
-    limit: usize,
+    limit: NonZeroUsize,
     saved: bool,
     signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
 }
@@ -647,8 +649,7 @@ impl<R> RecordBuilder<R> {
     /// Panics if `limit` is `0`.
     #[inline]
     pub fn limit(mut self, limit: usize) -> RecordBuilder<R> {
-        assert_ne!(limit, 0);
-        self.limit = limit;
+        self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
 
