@@ -19,3 +19,7 @@ rustc-hash = "1"
 [features]
 default = []
 display = ["bitflags", "colored"]
+
+[badges]
+travis-ci = { repository = "evenorog/undo" }
+maintenance = { status = "actively-developed" }
