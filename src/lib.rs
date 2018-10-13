@@ -1,22 +1,18 @@
-//! An undo-redo library with dynamic dispatch and automatic command merging.
+//! Provides undo-redo functionality with dynamic dispatch and automatic command merging.
 //!
-//! It uses the [command pattern] where the user modifies the receiver by
-//! applying commands on it. Since each command knows how to undo and redo
-//! the changes it applies to the receiver, the state of the receiver can
-//! be rolled forwards or backwards by calling undo or redo in the correct order.
+//! * [Record] provides a stack based undo-redo functionality.
+//! * [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
+//! * [Queue] wraps a [Record] or [History] and provides batch queue functionality.
+//! * [Checkpoint] wraps a [Record] or [History] and provides checkpoint functionality.
+//! * Commands can be merged using the [`merge!`] macro or the [`merge`] method.
+//!   When two commands are merged, undoing and redoing them are done in a single step.
+//! * Configurable display formatting is provided when the `display` feature is enabled.
+//! * Time stamps and time travel is provided when the `chrono` feature is enabled.
 //!
-//! The [Record] and [History] provides functionality to store and keep track
-//! of the applied commands, and makes it easy to undo and redo changes.
-//! The Record provides a stack based undo-redo functionality, while the
-//! History provides a tree based undo-redo functionality where you can
-//! jump between different branches.
-//!
-//! Commands can be merged using the [`merge!`] macro or the [`merge`] method.
-//! When two commands are merged, undoing and redoing them are done in a single step.
-//!
-//! [command pattern]: https://en.wikipedia.org/wiki/Command_pattern
 //! [Record]: struct.Record.html
 //! [History]: struct.History.html
+//! [Queue]: struct.Queue.html
+//! [Checkpoint]: struct.Checkpoint.html
 //! [`merge!`]: macro.merge.html
 //! [`merge`]: trait.Command.html#method.merge
 
