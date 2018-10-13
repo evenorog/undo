@@ -146,18 +146,18 @@ impl<R> Record<R> {
     pub fn set_limit(&mut self, limit: usize) -> usize {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         if limit < self.len() {
-            let old = self.cursor;
+            let old = self.cursor();
             let could_undo = self.can_undo();
             let was_saved = self.is_saved();
 
-            let begin = usize::min(self.cursor, self.len() - limit);
+            let begin = usize::min(old, self.len() - limit);
             self.commands = self.commands.split_off(begin);
             self.limit = NonZeroUsize::new(self.len()).unwrap();
             self.cursor -= begin;
             // Check if the saved state has been removed.
             self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
 
-            let new = self.cursor;
+            let new = self.cursor();
             let can_undo = self.can_undo();
             let is_saved = self.is_saved();
             if let Some(ref mut f) = self.signal {
@@ -184,13 +184,13 @@ impl<R> Record<R> {
     /// Returns `true` if the record can undo.
     #[inline]
     pub fn can_undo(&self) -> bool {
-        self.cursor > 0
+        self.cursor() > 0
     }
 
     /// Returns `true` if the record can redo.
     #[inline]
     pub fn can_redo(&self) -> bool {
-        self.cursor < self.len()
+        self.cursor() < self.len()
     }
 
     /// Marks the receiver as currently being in a saved or unsaved state.
@@ -198,7 +198,7 @@ impl<R> Record<R> {
     pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
         if saved {
-            self.saved = Some(self.cursor);
+            self.saved = Some(self.cursor());
             if let Some(ref mut f) = self.signal {
                 if !was_saved {
                     f(Signal::Saved(true));
@@ -217,7 +217,7 @@ impl<R> Record<R> {
     /// Returns `true` if the receiver is in a saved state, `false` otherwise.
     #[inline]
     pub fn is_saved(&self) -> bool {
-        self.saved.map_or(false, |saved| saved == self.cursor)
+        self.saved.map_or(false, |saved| saved == self.cursor())
     }
 
     /// Revert the changes done to the receiver since the saved state.
@@ -235,7 +235,7 @@ impl<R> Record<R> {
     /// Removes all commands from the record without undoing them.
     #[inline]
     pub fn clear(&mut self) {
-        let old = self.cursor;
+        let old = self.cursor();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
 
@@ -280,15 +280,15 @@ impl<R> Record<R> {
         if let Err(error) = meta.apply(&mut self.receiver) {
             return Err(Error::new(meta, error));
         }
-        let old = self.cursor;
+        let cursor = self.cursor();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Pop off all elements after cursor from record.
-        let v = self.commands.split_off(self.cursor);
-        debug_assert_eq!(self.cursor, self.len());
+        let v = self.commands.split_off(cursor);
+        debug_assert_eq!(cursor, self.len());
         // Check if the saved state was popped off.
-        self.saved = self.saved.filter(|&saved| saved <= self.cursor);
+        self.saved = self.saved.filter(|&saved| saved <= cursor);
         // Try to merge commands unless the receiver is in a saved state.
         let merges = match (meta.merge(), self.commands.back().map(|last| last.merge())) {
             (Merge::Always, Some(_)) => !self.is_saved(),
@@ -310,11 +310,11 @@ impl<R> Record<R> {
             }
             self.commands.push_back(meta);
         }
-        debug_assert_eq!(self.cursor, self.len());
+        debug_assert_eq!(self.cursor(), self.len());
         if let Some(ref mut f) = self.signal {
             // We emit this signal even if the commands might have been merged.
             f(Signal::Cursor {
-                old,
+                old: cursor,
                 new: self.cursor,
             });
             if could_redo {
@@ -346,7 +346,7 @@ impl<R> Record<R> {
             return Some(Err(Error::new(meta, error)));
         }
         let was_saved = self.is_saved();
-        let old = self.cursor;
+        let old = self.cursor();
         self.cursor -= 1;
         let len = self.len();
         let is_saved = self.is_saved();
@@ -385,7 +385,7 @@ impl<R> Record<R> {
             return Some(Err(Error::new(meta, error)));
         }
         let was_saved = self.is_saved();
-        let old = self.cursor;
+        let old = self.cursor();
         self.cursor += 1;
         let len = self.len();
         let is_saved = self.is_saved();
@@ -421,14 +421,14 @@ impl<R> Record<R> {
             return None;
         }
         let was_saved = self.is_saved();
-        let old = self.cursor;
+        let old = self.cursor();
         let len = self.len();
         // Temporarily remove signal so they are not called each iteration.
         let signal = self.signal.take();
         // Decide if we need to undo or redo to reach cursor.
-        let redo = cursor > self.cursor;
+        let redo = cursor > self.cursor();
         let f = if redo { Record::redo } else { Record::undo };
-        while self.cursor != cursor {
+        while self.cursor() != cursor {
             if let Err(error) = f(self).unwrap() {
                 self.signal = signal;
                 return Some(Err(error));
