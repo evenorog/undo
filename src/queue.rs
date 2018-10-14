@@ -144,12 +144,27 @@ impl<'a, R> Queue<'a, Record<R>, R> {
     pub fn as_receiver(&self) -> &R {
         self.inner.as_receiver()
     }
+
+    /// Returns a mutable reference to the `receiver`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_receiver(&mut self) -> &mut R {
+        self.inner.as_mut_receiver()
+    }
 }
 
 impl<'a, R> AsRef<R> for Queue<'a, Record<R>, R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
+    }
+}
+
+impl<'a, R> AsMut<R> for Queue<'a, Record<R>, R> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut R {
+        self.inner.as_mut()
     }
 }
 
@@ -211,12 +226,27 @@ impl<'a, R> Queue<'a, History<R>, R> {
     pub fn as_receiver(&self) -> &R {
         self.inner.as_receiver()
     }
+
+    /// Returns a mutable reference to the `receiver`.
+    ///
+    /// This method should **only** be used when doing changes that should not be able to be undone.
+    #[inline]
+    pub fn as_mut_receiver(&mut self) -> &mut R {
+        self.inner.as_mut_receiver()
+    }
 }
 
 impl<'a, R> AsRef<R> for Queue<'a, History<R>, R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
+    }
+}
+
+impl<'a, R> AsMut<R> for Queue<'a, History<R>, R> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut R {
+        self.inner.as_mut()
     }
 }
 
