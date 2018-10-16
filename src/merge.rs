@@ -54,6 +54,8 @@ macro_rules! merge {
 pub struct Merged<R, C1: Command<R> + 'static, C2: Command<R> + 'static> {
     cmd1: C1,
     cmd2: C2,
+    #[cfg(feature = "display")]
+    summary: Option<String>,
     _marker: PhantomData<Box<dyn Command<R> + 'static>>,
 }
 
@@ -64,8 +66,17 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Merged<R, C1, C2> {
         Merged {
             cmd1,
             cmd2,
+            #[cfg(feature = "display")]
+            summary: None,
             _marker: PhantomData,
         }
+    }
+
+    /// Sets a summary for the two merged commands. This overrides the default display text.
+    #[inline]
+    #[cfg(feature = "display")]
+    pub fn set_summary(&mut self, summary: impl Into<String>) {
+        self.summary = Some(summary.into());
     }
 
     /// Returns the two merged commands.
@@ -102,10 +113,21 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Command<R> for Merge
 
 impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Debug for Merged<R, C1, C2> {
     #[inline]
+    #[cfg(not(feature = "display"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Merged")
             .field("cmd1", &self.cmd1)
             .field("cmd2", &self.cmd2)
+            .finish()
+    }
+
+    #[inline]
+    #[cfg(feature = "display")]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Merged")
+            .field("cmd1", &self.cmd1)
+            .field("cmd2", &self.cmd2)
+            .field("summary", &self.summary)
             .finish()
     }
 }
@@ -114,6 +136,9 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Debug for Merge
 impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Display for Merged<R, C1, C2> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{cmd1} + {cmd2}", cmd1 = self.cmd1, cmd2 = self.cmd2)
+        match &self.summary {
+            Some(summary) => f.write_str(summary),
+            None => write!(f, "{cmd1} + {cmd2}", cmd1 = self.cmd1, cmd2 = self.cmd2),
+        }
     }
 }
