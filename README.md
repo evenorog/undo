@@ -51,12 +51,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     record.apply(Add('b'))?;
     record.apply(Add('c'))?;
     assert_eq!(record.as_receiver(), "abc");
-
     record.undo().unwrap()?;
     record.undo().unwrap()?;
     record.undo().unwrap()?;
     assert_eq!(record.as_receiver(), "");
-
     record.redo().unwrap()?;
     record.redo().unwrap()?;
     record.redo().unwrap()?;

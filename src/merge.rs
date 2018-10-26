@@ -29,10 +29,8 @@ use {Command, Merge};
 ///     let cmd = merge![Add('a'), Add('b'), Add('c')];
 ///     record.apply(cmd)?;
 ///     assert_eq!(record.as_receiver(), "abc");
-///
 ///     record.undo().unwrap()?;
 ///     assert_eq!(record.as_receiver(), "");
-///
 ///     record.redo().unwrap()?;
 ///     assert_eq!(record.as_receiver(), "abc");
 ///     Ok(())

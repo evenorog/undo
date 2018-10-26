@@ -37,16 +37,13 @@ use {At, Checkpoint, Command, Error, Meta, Queue, Record, RecordBuilder, Signal}
 ///     history.apply(Add('b'))?;
 ///     history.apply(Add('c'))?;
 ///     assert_eq!(history.as_receiver(), "abc");
-///
 ///     let root = history.root();
 ///     history.go_to(root, 1).unwrap()?;
 ///     assert_eq!(history.as_receiver(), "a");
-///
 ///     let abc = history.root();
 ///     history.apply(Add('f'))?;
 ///     history.apply(Add('g'))?;
 ///     assert_eq!(history.as_receiver(), "afg");
-///
 ///     history.go_to(abc, 3).unwrap()?;
 ///     assert_eq!(history.as_receiver(), "abc");
 ///     Ok(())

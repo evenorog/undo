@@ -16,7 +16,7 @@
 //! [`merge!`]: macro.merge.html
 //! [`merge`]: trait.Command.html#method.merge
 
-#![doc(html_root_url = "https://docs.rs/undo/0.28.2")]
+#![doc(html_root_url = "https://docs.rs/undo/0.28.3")]
 #![deny(
     bad_style,
     bare_trait_objects,
@@ -112,11 +112,9 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
     ///     record.apply(Add('b'))?;
     ///     record.apply(Add('c'))?;
     ///     assert_eq!(record.as_receiver(), "abc");
-    ///
     ///     // Calling `undo` once will undo all merged commands.
     ///     record.undo().unwrap()?;
     ///     assert_eq!(record.as_receiver(), "");
-    ///
     ///     // Calling `redo` once will redo all merged commands.
     ///     record.redo().unwrap()?;
     ///     assert_eq!(record.as_receiver(), "abc");
@@ -192,11 +190,9 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
     ///     record.apply(Add('b'))?;
     ///     record.apply(Add('c'))?;
     ///     assert_eq!(record.as_receiver(), "abc");
-    ///
     ///     // Calling `undo` once will undo all merged commands.
     ///     record.undo().unwrap()?;
     ///     assert_eq!(record.as_receiver(), "");
-    ///
     ///     // Calling `redo` once will redo all merged commands.
     ///     record.redo().unwrap()?;
     ///     assert_eq!(record.as_receiver(), "abc");
