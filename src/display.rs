@@ -257,7 +257,7 @@ impl View {
         let lines = msg.lines();
         if self.contains(View::DETAILED) {
             for line in lines {
-                for i in 0..level + 1 {
+                for i in 0..=level {
                     self.edge(f, i)?;
                     f.write_char(' ')?;
                 }
