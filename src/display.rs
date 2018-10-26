@@ -1,3 +1,4 @@
+use bitflags::bitflags;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Local, TimeZone};
 use colored::{Color, Colorize};
