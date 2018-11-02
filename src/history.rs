@@ -148,8 +148,8 @@ impl<R> History<R> {
 
     /// Sets how the signal should be handled when the state changes.
     #[inline]
-    pub fn set_signal(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
-        self.record.set_signal(f);
+    pub fn connect(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
+        self.record.connect(f);
     }
 
     /// Returns `true` if the history can undo.
@@ -633,8 +633,8 @@ impl<R> HistoryBuilder<R> {
     /// Decides how the signal should be handled when the state changes.
     /// By default the history does not handle any signals.
     #[inline]
-    pub fn signal(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> HistoryBuilder<R> {
-        self.inner = self.inner.signal(f);
+    pub fn connect(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> HistoryBuilder<R> {
+        self.inner = self.inner.connect(f);
         self
     }
 

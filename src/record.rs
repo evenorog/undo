@@ -173,7 +173,7 @@ impl<R> Record<R> {
 
     /// Sets how the signal should be handled when the state changes.
     #[inline]
-    pub fn set_signal(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
+    pub fn connect(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
         self.signal = Some(Box::new(f));
     }
 
@@ -659,7 +659,7 @@ impl<R> RecordBuilder<R> {
     /// Decides how the signal should be handled when the state changes.
     /// By default the record does not handle any signals.
     #[inline]
-    pub fn signal(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> RecordBuilder<R> {
+    pub fn connect(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> RecordBuilder<R> {
         self.signal = Some(Box::new(f));
         self
     }
