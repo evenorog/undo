@@ -16,44 +16,28 @@ impl<'a, T: 'a> Display<'a, T> {
     /// Show colored output (off by default).
     #[inline]
     pub fn colored(&mut self, on: bool) -> &mut Self {
-        if on {
-            self.view.insert(View::COLORED);
-        } else {
-            self.view.remove(View::COLORED);
-        }
+        self.view.set(View::COLORED, on);
         self
     }
 
     /// Show detailed output (on by default).
     #[inline]
     pub fn detailed(&mut self, on: bool) -> &mut Self {
-        if on {
-            self.view.insert(View::DETAILED);
-        } else {
-            self.view.remove(View::DETAILED);
-        }
+        self.view.set(View::DETAILED, on);
         self
     }
 
     /// Show the position of the command (on by default).
     #[inline]
     pub fn position(&mut self, on: bool) -> &mut Self {
-        if on {
-            self.view.insert(View::POSITION);
-        } else {
-            self.view.remove(View::POSITION);
-        }
+        self.view.set(View::POSITION, on);
         self
     }
 
     /// Show the saved command (on by default).
     #[inline]
     pub fn saved(&mut self, on: bool) -> &mut Self {
-        if on {
-            self.view.insert(View::SAVED);
-        } else {
-            self.view.remove(View::SAVED);
-        }
+        self.view.set(View::SAVED, on);
         self
     }
 }
@@ -62,11 +46,7 @@ impl<'a, R> Display<'a, History<R>> {
     /// Show the history as a graph (off by default).
     #[inline]
     pub fn graph(&mut self, on: bool) -> &mut Self {
-        if on {
-            self.view.insert(View::GRAPH);
-        } else {
-            self.view.remove(View::GRAPH);
-        }
+        self.view.set(View::GRAPH, on);
         self
     }
 }
