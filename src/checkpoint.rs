@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use {Command, Error, History, Meta, Queue, Record};
+use {Command, History, Meta, Queue, Record, Result};
 
 /// An action that can be applied to a Record or History.
 #[derive(Debug)]
@@ -17,7 +17,7 @@ enum Action<R> {
 /// # Examples
 /// ```
 /// # use std::error::Error;
-/// # use undo::*;
+/// # use undo::{Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
@@ -33,7 +33,7 @@ enum Action<R> {
 ///     }
 /// }
 ///
-/// fn main() -> Result<(), Box<dyn Error>> {
+/// fn main() -> undo::Result<String> {
 ///     let mut record = Record::default();
 ///     {
 ///         let mut cp = record.checkpoint();
@@ -68,7 +68,7 @@ impl<'a, R> Checkpoint<'a, Record<R>, R> {
     ///
     /// [`apply`]: struct.Record.html#method.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<(), Error<R>>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<R>
     where
         R: 'static,
     {
@@ -82,7 +82,7 @@ impl<'a, R> Checkpoint<'a, Record<R>, R> {
     /// [`undo`]: struct.Record.html#method.undo
     #[inline]
     #[must_use]
-    pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn undo(&mut self) -> Option<Result<R>> {
         match self.inner.undo() {
             Some(Ok(_)) => {
                 self.stack.push(Action::Undo);
@@ -97,7 +97,7 @@ impl<'a, R> Checkpoint<'a, Record<R>, R> {
     /// [`redo`]: struct.Record.html#method.redo
     #[inline]
     #[must_use]
-    pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn redo(&mut self) -> Option<Result<R>> {
         match self.inner.redo() {
             Some(Ok(_)) => {
                 self.stack.push(Action::Redo);
@@ -112,7 +112,7 @@ impl<'a, R> Checkpoint<'a, Record<R>, R> {
     /// [`go_to`]: struct.Record.html#method.go_to
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
+    pub fn go_to(&mut self, cursor: usize) -> Option<Result<R>> {
         let old = self.inner.cursor();
         match self.inner.go_to(cursor) {
             Some(Ok(_)) => {
@@ -132,7 +132,7 @@ impl<'a, R> Checkpoint<'a, Record<R>, R> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned together with the command.
     #[inline]
-    pub fn cancel(self) -> Result<(), Error<R>> {
+    pub fn cancel(self) -> Result<R> {
         for action in self.stack.into_iter().rev() {
             match action {
                 Action::Apply(mut v) => {
@@ -209,7 +209,7 @@ impl<'a, R> Checkpoint<'a, History<R>, R> {
     ///
     /// [`apply`]: struct.History.html#method.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<(), Error<R>>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<R>
     where
         R: 'static,
     {
@@ -225,7 +225,7 @@ impl<'a, R> Checkpoint<'a, History<R>, R> {
     /// [`undo`]: struct.History.html#method.undo
     #[inline]
     #[must_use]
-    pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn undo(&mut self) -> Option<Result<R>> {
         match self.inner.undo() {
             Some(Ok(_)) => {
                 self.stack.push(Action::Undo);
@@ -240,7 +240,7 @@ impl<'a, R> Checkpoint<'a, History<R>, R> {
     /// [`redo`]: struct.History.html#method.redo
     #[inline]
     #[must_use]
-    pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn redo(&mut self) -> Option<Result<R>> {
         match self.inner.redo() {
             Some(Ok(_)) => {
                 self.stack.push(Action::Redo);
@@ -255,7 +255,7 @@ impl<'a, R> Checkpoint<'a, History<R>, R> {
     /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
+    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<R>>
     where
         R: 'static,
     {
@@ -279,7 +279,7 @@ impl<'a, R> Checkpoint<'a, History<R>, R> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned together with the command.
     #[inline]
-    pub fn cancel(self) -> Result<(), Error<R>>
+    pub fn cancel(self) -> Result<R>
     where
         R: 'static,
     {

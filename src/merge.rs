@@ -8,7 +8,7 @@ use {Command, Merge};
 /// # Examples
 /// ```
 /// # use std::error::Error;
-/// # use undo::*;
+/// # use undo::{merge, Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
@@ -24,7 +24,7 @@ use {Command, Merge};
 ///     }
 /// }
 ///
-/// fn main() -> Result<(), Box<dyn Error>> {
+/// fn main() -> undo::Result<String> {
 ///     let mut record = Record::default();
 ///     let cmd = merge![Add('a'), Add('b'), Add('c')];
 ///     record.apply(cmd)?;

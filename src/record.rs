@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 #[cfg(feature = "display")]
 use Display;
-use {Checkpoint, Command, Error, History, Merge, Merged, Meta, Queue, Signal};
+use {Checkpoint, Command, Error, History, Merge, Merged, Meta, Queue, Result, Signal};
 
 #[allow(unsafe_code)]
 const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_value()) };
@@ -24,7 +24,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// # Examples
 /// ```
 /// # use std::error::Error;
-/// # use undo::*;
+/// # use undo::{Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
@@ -40,7 +40,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 ///     }
 /// }
 ///
-/// fn main() -> Result<(), Box<dyn Error>> {
+/// fn main() -> undo::Result<String> {
 ///     let mut record = Record::default();
 ///     record.apply(Add('a'))?;
 ///     record.apply(Add('b'))?;
@@ -218,7 +218,7 @@ impl<R> Record<R> {
 
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn revert(&mut self) -> Option<Result<R>> {
         self.saved.and_then(|saved| self.go_to(saved))
     }
 
@@ -257,7 +257,7 @@ impl<R> Record<R> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<(), Error<R>>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<R>
     where
         R: 'static,
     {
@@ -268,7 +268,7 @@ impl<R> Record<R> {
     pub(crate) fn __apply(
         &mut self,
         mut meta: Meta<R>,
-    ) -> Result<(bool, VecDeque<Meta<R>>), Error<R>>
+    ) -> std::result::Result<(bool, VecDeque<Meta<R>>), Error<R>>
     where
         R: 'static,
     {
@@ -333,7 +333,7 @@ impl<R> Record<R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     #[must_use]
-    pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn undo(&mut self) -> Option<Result<R>> {
         if !self.can_undo() {
             return None;
         } else if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
@@ -372,7 +372,7 @@ impl<R> Record<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn redo(&mut self) -> Option<Result<R>> {
         if !self.can_redo() {
             return None;
         } else if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
@@ -411,7 +411,7 @@ impl<R> Record<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, cursor: usize) -> Option<Result<(), Error<R>>> {
+    pub fn go_to(&mut self, cursor: usize) -> Option<Result<R>> {
         if cursor > self.len() {
             return None;
         }
@@ -465,10 +465,7 @@ impl<R> Record<R> {
     #[inline]
     #[must_use]
     #[cfg(feature = "chrono")]
-    pub fn time_travel<Tz: TimeZone>(
-        &mut self,
-        to: impl AsRef<DateTime<Tz>>,
-    ) -> Option<Result<(), Error<R>>> {
+    pub fn time_travel<Tz: TimeZone>(&mut self, to: impl AsRef<DateTime<Tz>>) -> Option<Result<R>> {
         let to = Utc.from_utc_datetime(&to.as_ref().naive_utc());
         let cursor = match self.commands.as_slices() {
             ([], []) => return None,

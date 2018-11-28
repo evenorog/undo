@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 use std::fmt;
 #[cfg(feature = "display")]
 use Display;
-use {At, Checkpoint, Command, Error, Meta, Queue, Record, RecordBuilder, Signal};
+use {At, Checkpoint, Command, Error, Meta, Queue, Record, RecordBuilder, Result, Signal};
 
 /// A history of commands.
 ///
@@ -15,7 +15,7 @@ use {At, Checkpoint, Command, Error, Meta, Queue, Record, RecordBuilder, Signal}
 /// # Examples
 /// ```
 /// # use std::error::Error;
-/// # use undo::*;
+/// # use undo::{Command, History};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
@@ -31,7 +31,7 @@ use {At, Checkpoint, Command, Error, Meta, Queue, Record, RecordBuilder, Signal}
 ///     }
 /// }
 ///
-/// fn main() -> Result<(), Box<dyn Error>> {
+/// fn main() -> undo::Result<String> {
 ///     let mut history = History::default();
 ///     history.apply(Add('a'))?;
 ///     history.apply(Add('b'))?;
@@ -179,7 +179,7 @@ impl<R> History<R> {
 
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result<(), Error<R>>>
+    pub fn revert(&mut self) -> Option<Result<R>>
     where
         R: 'static,
     {
@@ -224,7 +224,7 @@ impl<R> History<R> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<(), Error<R>>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<R>
     where
         R: 'static,
     {
@@ -232,7 +232,7 @@ impl<R> History<R> {
     }
 
     #[inline]
-    pub(crate) fn __apply(&mut self, meta: Meta<R>) -> Result<bool, Error<R>>
+    pub(crate) fn __apply(&mut self, meta: Meta<R>) -> std::result::Result<bool, Error<R>>
     where
         R: 'static,
     {
@@ -291,7 +291,7 @@ impl<R> History<R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     #[must_use]
-    pub fn undo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn undo(&mut self) -> Option<Result<R>> {
         self.record.undo()
     }
 
@@ -304,7 +304,7 @@ impl<R> History<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn redo(&mut self) -> Option<Result<(), Error<R>>> {
+    pub fn redo(&mut self) -> Option<Result<R>> {
         self.record.redo()
     }
 
@@ -317,7 +317,7 @@ impl<R> History<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<(), Error<R>>>
+    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<R>>
     where
         R: 'static,
     {
@@ -381,10 +381,7 @@ impl<R> History<R> {
     #[inline]
     #[must_use]
     #[cfg(feature = "chrono")]
-    pub fn time_travel<Tz: TimeZone>(
-        &mut self,
-        to: impl AsRef<DateTime<Tz>>,
-    ) -> Option<Result<(), Error<R>>> {
+    pub fn time_travel<Tz: TimeZone>(&mut self, to: impl AsRef<DateTime<Tz>>) -> Option<Result<R>> {
         self.record.time_travel(to)
     }
 

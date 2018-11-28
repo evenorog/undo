@@ -1,4 +1,4 @@
-use {Checkpoint, Command, Error, History, Meta, Record};
+use {Checkpoint, Command, History, Meta, Record, Result};
 
 /// An action that can be applied to a Record or History.
 #[derive(Debug)]
@@ -16,7 +16,7 @@ enum Action<R> {
 /// # Examples
 /// ```
 /// # use std::error::Error;
-/// # use undo::*;
+/// # use undo::{Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
@@ -32,7 +32,7 @@ enum Action<R> {
 ///     }
 /// }
 ///
-/// fn main() -> Result<(), Box<dyn Error>> {
+/// fn main() -> undo::Result<String> {
 ///     let mut record = Record::default();
 ///     {
 ///         let mut queue = record.queue();
@@ -98,7 +98,7 @@ impl<'a, R> Queue<'a, Record<R>, R> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result<(), Error<R>>
+    pub fn commit(self) -> Result<R>
     where
         R: 'static,
     {
@@ -180,7 +180,7 @@ impl<'a, R> Queue<'a, History<R>, R> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result<(), Error<R>>
+    pub fn commit(self) -> Result<R>
     where
         R: 'static,
     {
