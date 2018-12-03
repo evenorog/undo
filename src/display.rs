@@ -243,7 +243,7 @@ impl View {
                 }
                 writeln!(f, "{}", line.trim())?;
             }
-        } else if let Some(line) = lines.map(|s| s.trim()).find(|s| !s.is_empty()) {
+        } else if let Some(line) = lines.map(str::trim).find(|s| !s.is_empty()) {
             f.write_str(&line)?;
         }
         Ok(())
