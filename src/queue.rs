@@ -1,4 +1,4 @@
-use {Checkpoint, Command, History, Meta, Record, Result};
+use crate::{Checkpoint, Command, History, Meta, Record, Result};
 
 /// An action that can be applied to a Record or History.
 #[derive(Debug)]
@@ -34,25 +34,23 @@ enum Action<R> {
 ///
 /// fn main() -> undo::Result<String> {
 ///     let mut record = Record::default();
-///     {
-///         let mut queue = record.queue();
-///         queue.apply(Add('a'));
-///         queue.apply(Add('b'));
-///         queue.apply(Add('c'));
-///         assert_eq!(queue.as_receiver(), "");
-///         queue.commit()?;
-///     }
+///     let mut queue = record.queue();
+///     queue.apply(Add('a'));
+///     queue.apply(Add('b'));
+///     queue.apply(Add('c'));
+///     assert_eq!(queue.as_receiver(), "");
+///     queue.commit()?;
 ///     assert_eq!(record.as_receiver(), "abc");
 ///     Ok(())
 /// }
 /// ```
 #[derive(Debug)]
-pub struct Queue<'a, T: 'a, R> {
+pub struct Queue<'a, T, R> {
     inner: &'a mut T,
     queue: Vec<Action<R>>,
 }
 
-impl<'a, T: 'a, R> From<&'a mut T> for Queue<'a, T, R> {
+impl<'a, T, R> From<&'a mut T> for Queue<'a, T, R> {
     #[inline]
     fn from(inner: &'a mut T) -> Self {
         Queue {
@@ -62,7 +60,7 @@ impl<'a, T: 'a, R> From<&'a mut T> for Queue<'a, T, R> {
     }
 }
 
-impl<'a, T: 'a, R> Queue<'a, T, R> {
+impl<T, R> Queue<'_, T, R> {
     /// Queues an `apply` action.
     #[inline]
     pub fn apply(&mut self, command: impl Command<R> + 'static) {
@@ -86,7 +84,7 @@ impl<'a, T: 'a, R> Queue<'a, T, R> {
     pub fn cancel(self) {}
 }
 
-impl<'a, R> Queue<'a, Record<R>, R> {
+impl<R> Queue<'_, Record<R>, R> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, cursor: usize) {
@@ -154,21 +152,21 @@ impl<'a, R> Queue<'a, Record<R>, R> {
     }
 }
 
-impl<'a, R> AsRef<R> for Queue<'a, Record<R>, R> {
+impl<R> AsRef<R> for Queue<'_, Record<R>, R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<'a, R> AsMut<R> for Queue<'a, Record<R>, R> {
+impl<R> AsMut<R> for Queue<'_, Record<R>, R> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
     }
 }
 
-impl<'a, R> Queue<'a, History<R>, R> {
+impl<R> Queue<'_, History<R>, R> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, branch: usize, cursor: usize) {
@@ -236,24 +234,24 @@ impl<'a, R> Queue<'a, History<R>, R> {
     }
 }
 
-impl<'a, R> AsRef<R> for Queue<'a, History<R>, R> {
+impl<R> AsRef<R> for Queue<'_, History<R>, R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<'a, R> AsMut<R> for Queue<'a, History<R>, R> {
+impl<R> AsMut<R> for Queue<'_, History<R>, R> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "display")))]
 mod tests {
+    use crate::{Command, Record};
     use std::error::Error;
-    use {Command, Record};
 
     #[derive(Debug)]
     struct Add(char);
@@ -273,30 +271,24 @@ mod tests {
     #[test]
     fn commit() {
         let mut record = Record::default();
-        {
-            let mut queue = record.queue();
-            queue.redo();
-            queue.redo();
-            queue.redo();
-            {
-                let mut queue = queue.queue();
-                queue.undo();
-                queue.undo();
-                queue.undo();
-                {
-                    let mut queue = queue.queue();
-                    queue.apply(Add('a'));
-                    queue.apply(Add('b'));
-                    queue.apply(Add('c'));
-                    assert_eq!(queue.as_receiver(), "");
-                    queue.commit().unwrap();
-                }
-                assert_eq!(queue.as_receiver(), "abc");
-                queue.commit().unwrap();
-            }
-            assert_eq!(queue.as_receiver(), "");
-            queue.commit().unwrap();
-        }
+        let mut q1 = record.queue();
+        q1.redo();
+        q1.redo();
+        q1.redo();
+        let mut q2 = q1.queue();
+        q2.undo();
+        q2.undo();
+        q2.undo();
+        let mut q3 = q2.queue();
+        q3.apply(Add('a'));
+        q3.apply(Add('b'));
+        q3.apply(Add('c'));
+        assert_eq!(q3.as_receiver(), "");
+        q3.commit().unwrap();
+        assert_eq!(q2.as_receiver(), "abc");
+        q2.commit().unwrap();
+        assert_eq!(q1.as_receiver(), "");
+        q1.commit().unwrap();
         assert_eq!(record.as_receiver(), "abc");
     }
 }

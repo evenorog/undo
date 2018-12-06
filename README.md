@@ -26,8 +26,6 @@ undo = "0.29"
 And this to `main.rs`:
 
  ```rust
-extern crate undo;
-
 use undo::{Command, Record};
 
 #[derive(Debug)]

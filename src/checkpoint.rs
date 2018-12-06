@@ -1,5 +1,5 @@
+use crate::{Command, History, Meta, Queue, Record, Result};
 use std::collections::VecDeque;
-use {Command, History, Meta, Queue, Record, Result};
 
 /// An action that can be applied to a Record or History.
 #[derive(Debug)]
@@ -35,25 +35,23 @@ enum Action<R> {
 ///
 /// fn main() -> undo::Result<String> {
 ///     let mut record = Record::default();
-///     {
-///         let mut cp = record.checkpoint();
-///         cp.apply(Add('a'))?;
-///         cp.apply(Add('b'))?;
-///         cp.apply(Add('c'))?;
-///         assert_eq!(cp.as_receiver(), "abc");
-///         cp.cancel()?;
-///     }
+///     let mut cp = record.checkpoint();
+///     cp.apply(Add('a'))?;
+///     cp.apply(Add('b'))?;
+///     cp.apply(Add('c'))?;
+///     assert_eq!(cp.as_receiver(), "abc");
+///     cp.cancel()?;
 ///     assert_eq!(record.as_receiver(), "");
 ///     Ok(())
 /// }
 /// ```
 #[derive(Debug)]
-pub struct Checkpoint<'a, T: 'a, R> {
+pub struct Checkpoint<'a, T, R> {
     inner: &'a mut T,
     stack: Vec<Action<R>>,
 }
 
-impl<'a, T: 'a, R> From<&'a mut T> for Checkpoint<'a, T, R> {
+impl<'a, T, R> From<&'a mut T> for Checkpoint<'a, T, R> {
     #[inline]
     fn from(inner: &'a mut T) -> Self {
         Checkpoint {
@@ -63,7 +61,7 @@ impl<'a, T: 'a, R> From<&'a mut T> for Checkpoint<'a, T, R> {
     }
 }
 
-impl<'a, R> Checkpoint<'a, Record<R>, R> {
+impl<R> Checkpoint<'_, Record<R>, R> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
@@ -190,21 +188,21 @@ impl<'a, R> Checkpoint<'a, Record<R>, R> {
     }
 }
 
-impl<'a, R> AsRef<R> for Checkpoint<'a, Record<R>, R> {
+impl<R> AsRef<R> for Checkpoint<'_, Record<R>, R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<'a, R> AsMut<R> for Checkpoint<'a, Record<R>, R> {
+impl<R> AsMut<R> for Checkpoint<'_, Record<R>, R> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
     }
 }
 
-impl<'a, R> Checkpoint<'a, History<R>, R> {
+impl<R> Checkpoint<'_, History<R>, R> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
@@ -333,24 +331,24 @@ impl<'a, R> Checkpoint<'a, History<R>, R> {
     }
 }
 
-impl<'a, R> AsRef<R> for Checkpoint<'a, History<R>, R> {
+impl<R> AsRef<R> for Checkpoint<'_, History<R>, R> {
     #[inline]
     fn as_ref(&self) -> &R {
         self.inner.as_ref()
     }
 }
 
-impl<'a, R> AsMut<R> for Checkpoint<'a, History<R>, R> {
+impl<R> AsMut<R> for Checkpoint<'_, History<R>, R> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "display")))]
 mod tests {
+    use crate::{Command, Record};
     use std::error::Error;
-    use {Command, Record};
 
     #[derive(Debug)]
     struct Add(char);
@@ -370,60 +368,48 @@ mod tests {
     #[test]
     fn commit() {
         let mut record = Record::default();
-        {
-            let mut cp = record.checkpoint();
-            cp.apply(Add('a')).unwrap();
-            cp.apply(Add('b')).unwrap();
-            cp.apply(Add('c')).unwrap();
-            assert_eq!(cp.as_receiver(), "abc");
-            {
-                let mut cp = cp.checkpoint();
-                cp.apply(Add('d')).unwrap();
-                cp.apply(Add('e')).unwrap();
-                cp.apply(Add('f')).unwrap();
-                assert_eq!(cp.as_receiver(), "abcdef");
-                {
-                    let mut cp = cp.checkpoint();
-                    cp.apply(Add('g')).unwrap();
-                    cp.apply(Add('h')).unwrap();
-                    cp.apply(Add('i')).unwrap();
-                    assert_eq!(cp.as_receiver(), "abcdefghi");
-                    cp.commit();
-                }
-                cp.commit();
-            }
-            cp.commit();
-        }
+        let mut cp1 = record.checkpoint();
+        cp1.apply(Add('a')).unwrap();
+        cp1.apply(Add('b')).unwrap();
+        cp1.apply(Add('c')).unwrap();
+        assert_eq!(cp1.as_receiver(), "abc");
+        let mut cp2 = cp1.checkpoint();
+        cp2.apply(Add('d')).unwrap();
+        cp2.apply(Add('e')).unwrap();
+        cp2.apply(Add('f')).unwrap();
+        assert_eq!(cp2.as_receiver(), "abcdef");
+        let mut cp3 = cp2.checkpoint();
+        cp3.apply(Add('g')).unwrap();
+        cp3.apply(Add('h')).unwrap();
+        cp3.apply(Add('i')).unwrap();
+        assert_eq!(cp3.as_receiver(), "abcdefghi");
+        cp3.commit();
+        cp2.commit();
+        cp1.commit();
         assert_eq!(record.as_receiver(), "abcdefghi");
     }
 
     #[test]
     fn cancel() {
         let mut record = Record::default();
-        {
-            let mut cp = record.checkpoint();
-            cp.apply(Add('a')).unwrap();
-            cp.apply(Add('b')).unwrap();
-            cp.apply(Add('c')).unwrap();
-            {
-                let mut cp = cp.checkpoint();
-                cp.apply(Add('d')).unwrap();
-                cp.apply(Add('e')).unwrap();
-                cp.apply(Add('f')).unwrap();
-                {
-                    let mut cp = cp.checkpoint();
-                    cp.apply(Add('g')).unwrap();
-                    cp.apply(Add('h')).unwrap();
-                    cp.apply(Add('i')).unwrap();
-                    assert_eq!(cp.as_receiver(), "abcdefghi");
-                    cp.cancel().unwrap();
-                }
-                assert_eq!(cp.as_receiver(), "abcdef");
-                cp.cancel().unwrap();
-            }
-            assert_eq!(cp.as_receiver(), "abc");
-            cp.cancel().unwrap();
-        }
+        let mut cp1 = record.checkpoint();
+        cp1.apply(Add('a')).unwrap();
+        cp1.apply(Add('b')).unwrap();
+        cp1.apply(Add('c')).unwrap();
+        let mut cp2 = cp1.checkpoint();
+        cp2.apply(Add('d')).unwrap();
+        cp2.apply(Add('e')).unwrap();
+        cp2.apply(Add('f')).unwrap();
+        let mut cp3 = cp2.checkpoint();
+        cp3.apply(Add('g')).unwrap();
+        cp3.apply(Add('h')).unwrap();
+        cp3.apply(Add('i')).unwrap();
+        assert_eq!(cp3.as_receiver(), "abcdefghi");
+        cp3.cancel().unwrap();
+        assert_eq!(cp2.as_receiver(), "abcdef");
+        cp2.cancel().unwrap();
+        assert_eq!(cp1.as_receiver(), "abc");
+        cp1.cancel().unwrap();
         assert_eq!(record.as_receiver(), "");
     }
 }

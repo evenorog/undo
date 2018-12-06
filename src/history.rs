@@ -1,12 +1,12 @@
+#[cfg(feature = "display")]
+use crate::Display;
+use crate::{At, Checkpoint, Command, Error, Meta, Queue, Record, RecordBuilder, Result, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 #[cfg(feature = "display")]
 use std::fmt;
-#[cfg(feature = "display")]
-use Display;
-use {At, Checkpoint, Command, Error, Meta, Queue, Record, RecordBuilder, Result, Signal};
 
 /// A history of commands.
 ///
@@ -658,8 +658,8 @@ impl<R: Default> HistoryBuilder<R> {
 
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
+    use crate::{Command, History};
     use std::error::Error;
-    use {Command, History};
 
     #[derive(Debug)]
     struct Add(char);

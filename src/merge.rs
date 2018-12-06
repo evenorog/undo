@@ -1,7 +1,7 @@
+use crate::{Command, Merge};
 use std::error::Error;
 use std::fmt;
 use std::marker::PhantomData;
-use {Command, Merge};
 
 /// Macro for merging commands.
 ///

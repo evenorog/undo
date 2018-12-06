@@ -1,18 +1,18 @@
+use crate::{At, History, Meta, Record};
 use bitflags::bitflags;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Local, TimeZone};
 use colored::{Color, Colorize};
 use std::fmt::{self, Write};
-use {At, History, Meta, Record};
 
 /// Configurable display formatting of structures.
 #[derive(Copy, Clone, Debug)]
-pub struct Display<'a, T: 'a> {
+pub struct Display<'a, T> {
     data: &'a T,
     view: View,
 }
 
-impl<'a, T: 'a> Display<'a, T> {
+impl<T> Display<'_, T> {
     /// Show colored output (off by default).
     #[inline]
     pub fn colored(&mut self, on: bool) -> &mut Self {
@@ -42,7 +42,7 @@ impl<'a, T: 'a> Display<'a, T> {
     }
 }
 
-impl<'a, R> Display<'a, History<R>> {
+impl<R> Display<'_, History<R>> {
     /// Show the history as a graph (off by default).
     #[inline]
     pub fn graph(&mut self, on: bool) -> &mut Self {
@@ -51,7 +51,7 @@ impl<'a, R> Display<'a, History<R>> {
     }
 }
 
-impl<'a, R> Display<'a, Record<R>> {
+impl<R> Display<'_, Record<R>> {
     #[inline]
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, meta: &Meta<R>) -> fmt::Result {
         self.view.mark(f)?;
@@ -87,7 +87,7 @@ impl<'a, R> Display<'a, Record<R>> {
     }
 }
 
-impl<'a, R> Display<'a, History<R>> {
+impl<R> Display<'_, History<R>> {
     #[inline]
     fn fmt_list(
         &self,
@@ -168,7 +168,7 @@ impl<'a, R> Display<'a, History<R>> {
     }
 }
 
-impl<'a, T: 'a> From<&'a T> for Display<'a, T> {
+impl<'a, T> From<&'a T> for Display<'a, T> {
     #[inline]
     fn from(data: &'a T) -> Self {
         Display {
@@ -178,7 +178,7 @@ impl<'a, T: 'a> From<&'a T> for Display<'a, T> {
     }
 }
 
-impl<'a, R> fmt::Display for Display<'a, Record<R>> {
+impl<R> fmt::Display for Display<'_, Record<R>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.commands.iter().enumerate().rev() {
@@ -192,7 +192,7 @@ impl<'a, R> fmt::Display for Display<'a, Record<R>> {
     }
 }
 
-impl<'a, R> fmt::Display for Display<'a, History<R>> {
+impl<R> fmt::Display for Display<'_, History<R>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {

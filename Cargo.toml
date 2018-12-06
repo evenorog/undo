@@ -10,6 +10,7 @@ license = "MIT/Apache-2.0"
 keywords = ["undo", "redo"]
 categories = ["data-structures", "rust-patterns"]
 exclude = ["/.travis.yml"]
+edition = "2018"
 
 [dependencies]
 bitflags = { version = "1", optional = true }

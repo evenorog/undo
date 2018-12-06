@@ -28,14 +28,6 @@
     unstable_features
 )]
 
-#[cfg(feature = "display")]
-extern crate bitflags;
-#[cfg(feature = "chrono")]
-extern crate chrono;
-#[cfg(feature = "display")]
-extern crate colored;
-extern crate rustc_hash;
-
 mod checkpoint;
 #[cfg(feature = "display")]
 mod display;
@@ -48,13 +40,13 @@ mod record;
 use chrono::{DateTime, Utc};
 use std::fmt;
 
-pub use checkpoint::Checkpoint;
+pub use self::checkpoint::Checkpoint;
 #[cfg(feature = "display")]
-pub use display::Display;
-pub use history::{History, HistoryBuilder};
-pub use merge::Merged;
-pub use queue::Queue;
-pub use record::{Record, RecordBuilder};
+pub use self::display::Display;
+pub use self::history::{History, HistoryBuilder};
+pub use self::merge::Merged;
+pub use self::queue::Queue;
+pub use self::record::{Record, RecordBuilder};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result<R> = std::result::Result<(), Error<R>>;
