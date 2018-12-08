@@ -61,7 +61,7 @@ fn main() -> undo::Result<String> {
 }
  ```
 
-## License
+### License
 
 Licensed under either of
 
