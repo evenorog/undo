@@ -61,6 +61,53 @@ impl<'a, T, R> From<&'a mut T> for Checkpoint<'a, T, R> {
     }
 }
 
+impl<'a, T, R> Checkpoint<'a, T, R> {
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn new(inner: &'a mut T) -> Checkpoint<'a, T, R> {
+        Checkpoint {
+            inner,
+            stack: Vec::new(),
+        }
+    }
+
+    /// Returns a checkpoint with the given capacity.
+    #[inline]
+    pub fn with_capacity(inner: &'a mut T, capacity: usize) -> Checkpoint<'a, T, R> {
+        Checkpoint {
+            inner,
+            stack: Vec::with_capacity(capacity),
+        }
+    }
+
+    /// Reserves capacity for at least `additional` more commands in the checkpoint.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.stack.reserve(additional);
+    }
+
+    /// Returns the capacity of the checkpoint.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.stack.capacity()
+    }
+
+    /// Returns the number of commands in the checkpoint.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.stack.len()
+    }
+
+    /// Returns `true` if the checkpoint is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+}
+
 impl<R> Checkpoint<'_, Record<R>, R> {
     /// Calls the [`apply`] method.
     ///
