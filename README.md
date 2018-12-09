@@ -26,6 +26,7 @@ undo = "0.29"
 And this to `main.rs`:
 
  ```rust
+use std::error::Error;
 use undo::{Command, Record};
 
 #[derive(Debug)]

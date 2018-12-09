@@ -169,7 +169,6 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use std::fmt;
     /// # use undo::*;
     /// #[derive(Debug)]
     /// struct Add(char);
@@ -187,12 +186,6 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
     ///
     ///     fn merge(&self) -> Merge {
     ///         Merge::Always
-    ///     }
-    /// }
-    ///
-    /// impl fmt::Display for Add {
-    ///     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    ///         write!(f, "Add `{}` to string", self.0)
     ///     }
     /// }
     ///
