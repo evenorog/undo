@@ -27,6 +27,15 @@ impl<T> Display<'_, T> {
         self
     }
 
+    /// Use ligature (unicode) in the output (off by default).
+    ///
+    /// The ligatures only works as expected with monospaced fonts.
+    #[inline]
+    pub fn ligatures(&mut self, on: bool) -> &mut Self {
+        self.view.set(View::LIGATURES, on);
+        self
+    }
+
     /// Show the position of the command (on by default).
     #[inline]
     pub fn position(&mut self, on: bool) -> &mut Self {
@@ -54,7 +63,7 @@ impl<R> Display<'_, History<R>> {
 impl<R> Display<'_, Record<R>> {
     #[inline]
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, meta: &Meta<R>) -> fmt::Result {
-        self.view.mark(f)?;
+        self.view.mark(f, 0)?;
         self.view.position(f, at, false)?;
         if self.view.contains(View::DETAILED) {
             #[cfg(feature = "chrono")]
@@ -96,7 +105,7 @@ impl<R> Display<'_, History<R>> {
         meta: &Meta<R>,
         level: usize,
     ) -> fmt::Result {
-        self.view.mark(f)?;
+        self.view.mark(f, level)?;
         self.view.position(f, at, true)?;
         if self.view.contains(View::DETAILED) {
             #[cfg(feature = "chrono")]
@@ -217,16 +226,15 @@ bitflags! {
         const DETAILED  = 0b_0000_0100;
         const GRAPH     = 0b_0000_1000;
         const LIGATURES = 0b_0001_0000;
-        const MARK      = 0b_0010_0000;
-        const POSITION  = 0b_0100_0000;
-        const SAVED     = 0b_1000_0000;
+        const POSITION  = 0b_0010_0000;
+        const SAVED     = 0b_0100_0000;
     }
 }
 
 impl Default for View {
     #[inline]
     fn default() -> Self {
-        View::CURRENT | View::DETAILED | View::MARK | View::POSITION | View::SAVED
+        View::CURRENT | View::DETAILED | View::LIGATURES | View::POSITION | View::SAVED
     }
 }
 
@@ -250,34 +258,43 @@ impl View {
     }
 
     #[inline]
-    fn mark(self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.contains(View::MARK) {
-            f.write_str("*")
-        } else {
-            Ok(())
+    fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
+        match (self.contains(View::COLORED), self.contains(View::LIGATURES)) {
+            (true, true) => write!(f, "{}", "\u{25CF}".color(color(level))),
+            (true, false) => write!(f, "{}", "*".color(color(level))),
+            (false, true) => f.write_char('\u{25CF}'),
+            (false, false) => f.write_char('*'),
         }
     }
 
     #[inline]
     fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        if self.contains(View::COLORED) {
-            write!(f, "{}", "|".color(color(level)))
-        } else {
-            f.write_str("|")
+        match (self.contains(View::COLORED), self.contains(View::LIGATURES)) {
+            (true, true) => write!(f, "{}", "\u{2502}".color(color(level))),
+            (true, false) => write!(f, "{}", "|".color(color(level))),
+            (false, true) => f.write_char('\u{2502}'),
+            (false, false) => f.write_char('|'),
         }
     }
 
     #[inline]
     fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        if self.contains(View::COLORED) {
-            write!(
+        match (self.contains(View::COLORED), self.contains(View::LIGATURES)) {
+            (true, true) => write!(
+                f,
+                "{}{}{}",
+                "\u{251C}".color(color(level)),
+                "\u{2500}".color(color(level + 1)),
+                "\u{256F}".color(color(level + 1))
+            ),
+            (true, false) => write!(
                 f,
                 "{}{}",
                 "|".color(color(level)),
                 "/".color(color(level + 1))
-            )
-        } else {
-            f.write_str("|/")
+            ),
+            (false, true) => f.write_str("\u{251C}\u{2500}\u{256F}"),
+            (false, false) => f.write_str("|/"),
         }
     }
 
@@ -338,10 +355,15 @@ impl View {
     fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<impl TimeZone>) -> fmt::Result {
         let local = Local.from_utc_datetime(&timestamp.naive_utc());
         if self.contains(View::COLORED) {
-            let ts = format!("[{}]", local.format("%T %F"));
-            write!(f, " {}", ts.yellow())
+            write!(
+                f,
+                " {}{}{}",
+                "[".yellow(),
+                local.to_rfc2822().yellow(),
+                "]".yellow()
+            )
         } else {
-            write!(f, " [{}]", local.format("%T %F"))
+            write!(f, " [{}]", local.to_rfc2822())
         }
     }
 }
@@ -349,12 +371,12 @@ impl View {
 #[inline]
 fn color(i: usize) -> Color {
     match i % 6 {
-        0 => Color::Red,
-        1 => Color::Blue,
+        0 => Color::Cyan,
+        1 => Color::Red,
         2 => Color::Magenta,
         3 => Color::Yellow,
         4 => Color::Green,
-        5 => Color::Cyan,
+        5 => Color::Blue,
         _ => unreachable!(),
     }
 }
