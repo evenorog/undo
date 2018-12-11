@@ -234,7 +234,7 @@ bitflags! {
 impl Default for View {
     #[inline]
     fn default() -> Self {
-        View::CURRENT | View::DETAILED | View::LIGATURES | View::POSITION | View::SAVED
+        View::CURRENT | View::DETAILED | View::POSITION | View::SAVED
     }
 }
 
