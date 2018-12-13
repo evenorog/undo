@@ -20,6 +20,13 @@ impl<T> Display<'_, T> {
         self
     }
 
+    /// Show the current position in the output (on by default).
+    #[inline]
+    pub fn current(&mut self, on: bool) -> &mut Self {
+        self.view.set(View::CURRENT, on);
+        self
+    }
+
     /// Show detailed output (on by default).
     #[inline]
     pub fn detailed(&mut self, on: bool) -> &mut Self {
