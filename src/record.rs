@@ -619,6 +619,19 @@ impl<R> fmt::Display for Record<R> {
 }
 
 /// Builder for a record.
+///
+/// # Examples
+/// ```
+/// # use undo::Record;
+/// # fn foo() -> Record<String> {
+/// let record = Record::builder()
+///     .capacity(100)
+///     .limit(100)
+///     .saved(false)
+///     .default();
+/// # record
+/// # }
+/// ```
 pub struct RecordBuilder<R> {
     receiver: PhantomData<R>,
     capacity: usize,

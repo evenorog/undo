@@ -596,6 +596,19 @@ pub(crate) struct Branch<R> {
 }
 
 /// Builder for a History.
+///
+/// # Examples
+/// ```
+/// # use undo::History;
+/// # fn foo() -> History<String> {
+/// let history = History::builder()
+///     .capacity(100)
+///     .limit(100)
+///     .saved(false)
+///     .default();
+/// # history
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct HistoryBuilder<R> {
     inner: RecordBuilder<R>,
