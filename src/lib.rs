@@ -16,7 +16,7 @@
 //! [`merge!`]: macro.merge.html
 //! [`merge`]: trait.Command.html#method.merge
 
-#![doc(html_root_url = "https://docs.rs/undo/0.29.5")]
+#![doc(html_root_url = "https://docs.rs/undo/0.29.6")]
 #![deny(
     bad_style,
     bare_trait_objects,
