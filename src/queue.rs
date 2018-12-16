@@ -96,9 +96,7 @@ impl<'a, T, R> Queue<'a, T, R> {
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
     }
-}
 
-impl<T, R> Queue<'_, T, R> {
     /// Queues an `apply` action.
     #[inline]
     pub fn apply(&mut self, command: impl Command<R> + 'static) {

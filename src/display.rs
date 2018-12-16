@@ -6,6 +6,19 @@ use colored::{Color, Colorize};
 use std::fmt::{self, Write};
 
 /// Configurable display formatting of structures.
+///
+/// # Examples
+/// ```
+/// # use undo::{Command, History};
+/// # fn foo() -> History<String> {
+/// let history = History::default();
+/// println!(
+///     "{}",
+///     history.display().graph(true).colored(true).ligatures(true)
+/// );
+/// # history
+/// # }
+/// ```
 #[derive(Copy, Clone, Debug)]
 pub struct Display<'a, T> {
     data: &'a T,

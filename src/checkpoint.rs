@@ -97,6 +97,10 @@ impl<'a, T, R> Checkpoint<'a, T, R> {
     pub fn is_empty(&self) -> bool {
         self.stack.is_empty()
     }
+
+    /// Commits the changes and consumes the checkpoint.
+    #[inline]
+    pub fn commit(self) {}
 }
 
 impl<R> Checkpoint<'_, Record<R>, R> {
@@ -158,10 +162,6 @@ impl<R> Checkpoint<'_, Record<R>, R> {
             go_to => go_to,
         }
     }
-
-    /// Commits the changes and consumes the checkpoint.
-    #[inline]
-    pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
     ///
@@ -305,10 +305,6 @@ impl<R> Checkpoint<'_, History<R>, R> {
             go_to => go_to,
         }
     }
-
-    /// Commits the changes and consumes the checkpoint.
-    #[inline]
-    pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
     ///
