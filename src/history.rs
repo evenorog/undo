@@ -10,7 +10,9 @@ use std::fmt;
 
 /// A history of commands.
 ///
-/// A history works like the [Record] but also provides branching, like [vim]'s undo-tree.
+/// Unlike [Record] which maintains a linear undo history, History maintains an undo tree
+/// containing every edit made to the receiver. By switching between different branches in the
+/// tree, the user can get to any previous state of the receiver.
 ///
 /// # Examples
 /// ```
@@ -51,7 +53,6 @@ use std::fmt;
 /// ```
 ///
 /// [Record]: struct.Record.html
-/// [Vim]: https://www.vim.org/
 #[derive(Debug)]
 pub struct History<R> {
     root: usize,
