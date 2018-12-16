@@ -149,7 +149,10 @@ impl<R> History<R> {
 
     /// Sets how the signal should be handled when the state changes.
     #[inline]
-    pub fn connect(&mut self, f: impl FnMut(Signal) + Send + Sync + 'static) {
+    pub fn connect<F>(&mut self, f: impl Into<Option<F>>)
+    where
+        F: FnMut(Signal) + Send + Sync + 'static,
+    {
         self.record.connect(f);
     }
 
@@ -644,7 +647,10 @@ impl<R> HistoryBuilder<R> {
     /// Decides how the signal should be handled when the state changes.
     /// By default the history does not handle any signals.
     #[inline]
-    pub fn connect(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> HistoryBuilder<R> {
+    pub fn connect<F>(mut self, f: impl Into<Option<F>>) -> HistoryBuilder<R>
+    where
+        F: FnMut(Signal) + Send + Sync + 'static,
+    {
         self.inner = self.inner.connect(f);
         self
     }
