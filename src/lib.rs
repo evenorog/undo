@@ -216,6 +216,23 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
 /// When one of these states changes, they will send a corresponding signal to the user.
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
 /// signal to tell the user.
+///
+/// # Examples
+/// ```
+/// # use undo::{Record, Signal};
+/// # fn foo() -> Record<String> {
+/// let record = Record::builder()
+///     .connect(|signal| match signal {
+///         Signal::Undo(on) => println!("undo: {}", on),
+///         Signal::Redo(on) => println!("redo: {}", on),
+///         Signal::Saved(on) => println!("saved: {}", on),
+///         Signal::Cursor { old, new } => println!("cursor: {} -> {}", old, new),
+///         Signal::Root { old, new } => println!("root: {} -> {}", old, new),
+///     })
+///     .default();
+/// # record
+/// # }
+/// ```
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the record can undo.
