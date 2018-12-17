@@ -163,6 +163,23 @@ impl<R> Checkpoint<'_, Record<R>, R> {
         }
     }
 
+    /// Calls the [`extend`] method.
+    ///
+    /// [`extend`]: struct.Record.html#method.extend
+    #[inline]
+    pub fn extend<C: Command<R> + 'static>(
+        &mut self,
+        commands: impl IntoIterator<Item = C>,
+    ) -> Result<R>
+    where
+        R: 'static,
+    {
+        for command in commands {
+            self.apply(command)?;
+        }
+        Ok(())
+    }
+
     /// Cancels the changes and consumes the checkpoint.
     ///
     /// # Errors
@@ -304,6 +321,23 @@ impl<R> Checkpoint<'_, History<R>, R> {
             }
             go_to => go_to,
         }
+    }
+
+    /// Calls the [`extend`] method.
+    ///
+    /// [`extend`]: struct.History.html#method.extend
+    #[inline]
+    pub fn extend<C: Command<R> + 'static>(
+        &mut self,
+        commands: impl IntoIterator<Item = C>,
+    ) -> Result<R>
+    where
+        R: 'static,
+    {
+        for command in commands {
+            self.apply(command)?;
+        }
+        Ok(())
     }
 
     /// Cancels the changes and consumes the checkpoint.

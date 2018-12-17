@@ -49,7 +49,7 @@ macro_rules! merge {
 /// The result of merging two commands.
 ///
 /// The [`merge!`](macro.merge.html) macro can be used for convenience when merging commands.
-pub struct Merged<R, C1: Command<R> + 'static, C2: Command<R> + 'static> {
+pub struct Merged<R, C1, C2> {
     cmd1: C1,
     cmd2: C2,
     #[cfg(feature = "display")]
@@ -57,7 +57,7 @@ pub struct Merged<R, C1: Command<R> + 'static, C2: Command<R> + 'static> {
     _marker: PhantomData<Box<dyn Command<R> + 'static>>,
 }
 
-impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Merged<R, C1, C2> {
+impl<R, C1, C2> Merged<R, C1, C2> {
     /// Merges `cmd1` and `cmd2` into a single command.
     #[inline]
     pub fn new(cmd1: C1, cmd2: C2) -> Merged<R, C1, C2> {
