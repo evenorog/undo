@@ -1,7 +1,7 @@
 use crate::{Command, Merge};
 use std::error::Error;
 use std::fmt;
-use std::marker::PhantomData;
+use std::iter::FromIterator;
 
 /// Macro for merging commands.
 ///
@@ -26,8 +26,7 @@ use std::marker::PhantomData;
 ///
 /// fn main() -> undo::Result<String> {
 ///     let mut record = Record::default();
-///     let cmd = merge![Add('a'), Add('b'), Add('c')];
-///     record.apply(cmd)?;
+///     record.apply(merge![Add('a'), Add('b'), Add('c')])?;
 ///     assert_eq!(record.as_receiver(), "abc");
 ///     record.undo().unwrap()?;
 ///     assert_eq!(record.as_receiver(), "");
@@ -38,36 +37,44 @@ use std::marker::PhantomData;
 /// ```
 #[macro_export]
 macro_rules! merge {
-    ($cmd1:expr, $cmd2:expr) => (
-        $crate::Merged::new($cmd1, $cmd2)
-    );
-    ($cmd1:expr, $cmd2:expr, $($tail:expr),+) => (
-        merge![$crate::Merged::new($cmd1, $cmd2), $($tail),*]
-    );
+    ($cmd1:expr, $cmd2:expr, $($commands:expr),*) => {{
+        let mut merged = $crate::Merged::new($cmd1, $cmd2);
+        $(merged.push($commands);)*
+        merged
+    }};
 }
 
-/// The result of merging two commands.
+/// The result of merging commands.
 ///
 /// The [`merge!`](macro.merge.html) macro can be used for convenience when merging commands.
-pub struct Merged<R, C1, C2> {
-    cmd1: C1,
-    cmd2: C2,
+pub struct Merged<R> {
+    commands: Vec<Box<dyn Command<R> + 'static>>,
     #[cfg(feature = "display")]
     summary: Option<String>,
-    _marker: PhantomData<Box<dyn Command<R> + 'static>>,
 }
 
-impl<R, C1, C2> Merged<R, C1, C2> {
+impl<R> Merged<R> {
     /// Merges `cmd1` and `cmd2` into a single command.
     #[inline]
-    pub fn new(cmd1: C1, cmd2: C2) -> Merged<R, C1, C2> {
+    pub fn new(cmd1: impl Command<R> + 'static, cmd2: impl Command<R> + 'static) -> Merged<R> {
         Merged {
-            cmd1,
-            cmd2,
+            commands: vec![Box::new(cmd1), Box::new(cmd2)],
             #[cfg(feature = "display")]
             summary: None,
-            _marker: PhantomData,
         }
+    }
+
+    /// Merges `self` with `command`.
+    #[inline]
+    pub fn push(&mut self, command: impl Command<R> + 'static) {
+        self.commands.push(Box::new(command));
+    }
+
+    /// Merges `self` with `command` and returns the merged command.
+    #[inline]
+    pub fn join(mut self, command: impl Command<R> + 'static) -> Merged<R> {
+        self.push(command);
+        self
     }
 
     /// Sets a summary for the two merged commands. This overrides the default display text.
@@ -76,46 +83,74 @@ impl<R, C1, C2> Merged<R, C1, C2> {
     pub fn set_summary(&mut self, summary: impl Into<String>) {
         self.summary = Some(summary.into());
     }
-
-    /// Returns the two merged commands.
-    #[inline]
-    pub fn into_commands(self) -> (C1, C2) {
-        (self.cmd1, self.cmd2)
-    }
 }
 
-impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> Command<R> for Merged<R, C1, C2> {
+impl<R> Command<R> for Merged<R> {
     #[inline]
     fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
-        self.cmd1.apply(receiver)?;
-        self.cmd2.apply(receiver)
+        for command in &mut self.commands {
+            command.apply(receiver)?;
+        }
+        Ok(())
     }
 
     #[inline]
     fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
-        self.cmd2.undo(receiver)?;
-        self.cmd1.undo(receiver)
+        for command in self.commands.iter_mut().rev() {
+            command.undo(receiver)?;
+        }
+        Ok(())
     }
 
     #[inline]
     fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
-        self.cmd1.redo(receiver)?;
-        self.cmd2.redo(receiver)
+        for command in &mut self.commands {
+            command.redo(receiver)?;
+        }
+        Ok(())
     }
 
     #[inline]
     fn merge(&self) -> Merge {
-        self.cmd1.merge()
+        self.commands.first().map_or(Merge::Never, |c| c.merge())
     }
 }
 
-impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Debug for Merged<R, C1, C2> {
+impl<R> Default for Merged<R> {
+    #[inline]
+    fn default() -> Self {
+        Merged {
+            commands: Vec::default(),
+            #[cfg(feature = "display")]
+            summary: None,
+        }
+    }
+}
+
+impl<R, C: Command<R> + 'static> FromIterator<C> for Merged<R> {
+    #[inline]
+    fn from_iter<T: IntoIterator<Item = C>>(commands: T) -> Self {
+        Merged {
+            commands: commands.into_iter().map(|c| Box::new(c) as _).collect(),
+            ..Default::default()
+        }
+    }
+}
+
+impl<R, C: Command<R> + 'static> Extend<C> for Merged<R> {
+    #[inline]
+    fn extend<T: IntoIterator<Item = C>>(&mut self, iter: T) {
+        self.commands
+            .extend(iter.into_iter().map(|c| Box::new(c) as _));
+    }
+}
+
+impl<R> fmt::Debug for Merged<R> {
     #[inline]
     #[cfg(not(feature = "display"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Merged")
-            .field("cmd1", &self.cmd1)
-            .field("cmd2", &self.cmd2)
+            .field("commands", &self.commands)
             .finish()
     }
 
@@ -123,20 +158,27 @@ impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Debug for Merge
     #[cfg(feature = "display")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Merged")
-            .field("cmd1", &self.cmd1)
-            .field("cmd2", &self.cmd2)
+            .field("commands", &self.commands)
             .field("summary", &self.summary)
             .finish()
     }
 }
 
 #[cfg(feature = "display")]
-impl<R, C1: Command<R> + 'static, C2: Command<R> + 'static> fmt::Display for Merged<R, C1, C2> {
+impl<R> fmt::Display for Merged<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.summary {
             Some(summary) => f.write_str(summary),
-            None => write!(f, "{cmd1} + {cmd2}", cmd1 = self.cmd1, cmd2 = self.cmd2),
+            None => {
+                if let Some((first, commands)) = self.commands.split_first() {
+                    (first as &dyn fmt::Display).fmt(f)?;
+                    for command in commands {
+                        write!(f, "\n\n{}", command)?;
+                    }
+                }
+                Ok(())
+            }
         }
     }
 }
