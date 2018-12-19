@@ -219,9 +219,9 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Record, Signal};
-/// # fn foo() -> Record<String> {
-/// let record = Record::builder()
+/// # use undo::{History, Signal};
+/// # fn foo() -> History<String> {
+/// let history = History::builder()
 ///     .connect(|signal| match signal {
 ///         Signal::Undo(on) => println!("undo: {}", on),
 ///         Signal::Redo(on) => println!("redo: {}", on),
@@ -230,7 +230,7 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
 ///         Signal::Root { old, new } => println!("root: {} -> {}", old, new),
 ///     })
 ///     .default();
-/// # record
+/// # history
 /// # }
 /// ```
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
