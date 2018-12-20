@@ -1,7 +1,8 @@
 use crate::{Command, Merge};
 use std::error::Error;
 use std::fmt;
-use std::iter::FromIterator;
+use std::iter::{FromIterator, IntoIterator};
+use std::vec::IntoIter;
 
 /// Macro for merging commands.
 ///
@@ -112,7 +113,7 @@ impl<R> Command<R> for Merged<R> {
 
     #[inline]
     fn merge(&self) -> Merge {
-        self.commands.first().map_or(Merge::Never, |c| c.merge())
+        self.commands.first().map_or(Merge::Always, |c| c.merge())
     }
 }
 
@@ -134,6 +135,16 @@ impl<R, C: Command<R> + 'static> FromIterator<C> for Merged<R> {
             commands: commands.into_iter().map(|c| Box::new(c) as _).collect(),
             ..Default::default()
         }
+    }
+}
+
+impl<R> IntoIterator for Merged<R> {
+    type Item = Box<dyn Command<R> + 'static>;
+    type IntoIter = IntoIter<Self::Item>;
+
+    #[inline]
+    fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
+        self.commands.into_iter()
     }
 }
 
