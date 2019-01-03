@@ -1,5 +1,4 @@
 use crate::{Command, Merge};
-use std::error::Error;
 use std::fmt;
 use std::iter::{FromIterator, IntoIterator};
 use std::vec::IntoIter;
@@ -8,24 +7,23 @@ use std::vec::IntoIter;
 ///
 /// # Examples
 /// ```
-/// # use std::error::Error;
 /// # use undo::{merge, Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn apply(&mut self, s: &mut String) -> undo::Result {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn undo(&mut self, s: &mut String) -> undo::Result {
 ///         self.0 = s.pop().ok_or("`s` is empty")?;
 ///         Ok(())
 ///     }
 /// }
 ///
-/// fn main() -> undo::Result<String> {
+/// fn main() -> undo::Result {
 ///     let mut record = Record::default();
 ///     record.apply(merge![Add('a'), Add('b'), Add('c')])?;
 ///     assert_eq!(record.as_receiver(), "abc");
@@ -88,7 +86,7 @@ impl<R> Merged<R> {
 
 impl<R> Command<R> for Merged<R> {
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn apply(&mut self, receiver: &mut R) -> crate::Result {
         for command in &mut self.commands {
             command.apply(receiver)?;
         }
@@ -96,7 +94,7 @@ impl<R> Command<R> for Merged<R> {
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn undo(&mut self, receiver: &mut R) -> crate::Result {
         for command in self.commands.iter_mut().rev() {
             command.undo(receiver)?;
         }
@@ -104,7 +102,7 @@ impl<R> Command<R> for Merged<R> {
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn redo(&mut self, receiver: &mut R) -> crate::Result {
         for command in &mut self.commands {
             command.redo(receiver)?;
         }

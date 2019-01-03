@@ -1,11 +1,12 @@
 #[cfg(feature = "display")]
 use crate::Display;
-use crate::{Checkpoint, Command, Error, History, Merge, Merged, Meta, Queue, Result, Signal};
+use crate::{Checkpoint, Command, History, Merge, Merged, Meta, Queue, Result, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "chrono")]
 use std::cmp::Ordering;
 use std::collections::VecDeque;
+use std::error::Error;
 use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
@@ -23,24 +24,23 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 ///
 /// # Examples
 /// ```
-/// # use std::error::Error;
 /// # use undo::{Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn apply(&mut self, s: &mut String) -> undo::Result {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn undo(&mut self, s: &mut String) -> undo::Result {
 ///         self.0 = s.pop().ok_or("`s` is empty")?;
 ///         Ok(())
 ///     }
 /// }
 ///
-/// fn main() -> undo::Result<String> {
+/// fn main() -> undo::Result {
 ///     let mut record = Record::default();
 ///     record.apply(Add('a'))?;
 ///     record.apply(Add('b'))?;
@@ -221,7 +221,7 @@ impl<R> Record<R> {
 
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result<R>> {
+    pub fn revert(&mut self) -> Option<Result> {
         self.saved.and_then(|saved| self.go_to(saved))
     }
 
@@ -256,11 +256,11 @@ impl<R> Record<R> {
     /// Pushes the command to the top of the record and executes its [`apply`] method.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned together with the command.
+    /// If an error occur when executing [`apply`] the error is returned and the command is removed.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<R>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result
     where
         R: 'static,
     {
@@ -271,12 +271,12 @@ impl<R> Record<R> {
     pub(crate) fn __apply(
         &mut self,
         mut meta: Meta<R>,
-    ) -> std::result::Result<(bool, VecDeque<Meta<R>>), Error<R>>
+    ) -> std::result::Result<(bool, VecDeque<Meta<R>>), Box<dyn Error + Send + Sync>>
     where
         R: 'static,
     {
         if let Err(error) = meta.apply(&mut self.receiver) {
-            return Err(Error::new(meta, error));
+            return Err(error);
         }
         let cursor = self.cursor();
         let could_undo = self.can_undo();
@@ -331,17 +331,17 @@ impl<R> Record<R> {
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned together with the command.
+    /// If an error occur when executing [`undo`] the error is returned and the command is removed.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     #[must_use]
-    pub fn undo(&mut self) -> Option<Result<R>> {
+    pub fn undo(&mut self) -> Option<Result> {
         if !self.can_undo() {
             return None;
         } else if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
-            let meta = self.commands.remove(self.cursor - 1).unwrap();
-            return Some(Err(Error::new(meta, error)));
+            self.commands.remove(self.cursor - 1).unwrap();
+            return Some(Err(error));
         }
         let was_saved = self.is_saved();
         let old = self.cursor();
@@ -370,17 +370,17 @@ impl<R> Record<R> {
     /// new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned together with the command.
+    /// If an error occur when executing [`redo`] the error is returned and the command is removed.
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn redo(&mut self) -> Option<Result<R>> {
+    pub fn redo(&mut self) -> Option<Result> {
         if !self.can_redo() {
             return None;
         } else if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
-            let meta = self.commands.remove(self.cursor).unwrap();
-            return Some(Err(Error::new(meta, error)));
+            self.commands.remove(self.cursor).unwrap();
+            return Some(Err(error));
         }
         let was_saved = self.is_saved();
         let old = self.cursor();
@@ -408,13 +408,13 @@ impl<R> Record<R> {
     /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned and the command is removed.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, cursor: usize) -> Option<Result<R>> {
+    pub fn go_to(&mut self, cursor: usize) -> Option<Result> {
         if cursor > self.len() {
             return None;
         }
@@ -468,7 +468,7 @@ impl<R> Record<R> {
     #[inline]
     #[must_use]
     #[cfg(feature = "chrono")]
-    pub fn time_travel<Tz: TimeZone>(&mut self, to: impl AsRef<DateTime<Tz>>) -> Option<Result<R>> {
+    pub fn time_travel<Tz: TimeZone>(&mut self, to: impl AsRef<DateTime<Tz>>) -> Option<Result> {
         let to = Utc.from_utc_datetime(&to.as_ref().naive_utc());
         let cursor = match self.commands.as_slices() {
             ([], []) => return None,
@@ -494,15 +494,15 @@ impl<R> Record<R> {
     /// Applies each command in the iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned together with the command
-    /// and the remaining commands in the iterator are discarded.
+    /// If an error occur when executing [`apply`] the error is returned and the command is removed.
+    /// The remaining commands in the iterator are discarded.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
     pub fn extend<C: Command<R> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
-    ) -> Result<R>
+    ) -> Result
     where
         R: 'static,
     {
@@ -738,18 +738,17 @@ impl<R: fmt::Debug> fmt::Debug for RecordBuilder<R> {
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
     use crate::{Command, Record};
-    use std::error::Error;
 
     #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        fn apply(&mut self, s: &mut String) -> crate::Result {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        fn undo(&mut self, s: &mut String) -> crate::Result {
             self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }

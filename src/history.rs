@@ -1,10 +1,11 @@
 #[cfg(feature = "display")]
 use crate::Display;
-use crate::{At, Checkpoint, Command, Error, Meta, Queue, Record, RecordBuilder, Result, Signal};
+use crate::{At, Checkpoint, Command, Meta, Queue, Record, RecordBuilder, Result, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
+use std::error::Error;
 #[cfg(feature = "display")]
 use std::fmt;
 
@@ -16,24 +17,23 @@ use std::fmt;
 ///
 /// # Examples
 /// ```
-/// # use std::error::Error;
 /// # use undo::{Command, History};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn apply(&mut self, s: &mut String) -> undo::Result {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn undo(&mut self, s: &mut String) -> undo::Result {
 ///         self.0 = s.pop().ok_or("`s` is empty")?;
 ///         Ok(())
 ///     }
 /// }
 ///
-/// fn main() -> undo::Result<String> {
+/// fn main() -> undo::Result {
 ///     let mut history = History::default();
 ///     history.apply(Add('a'))?;
 ///     history.apply(Add('b'))?;
@@ -182,7 +182,7 @@ impl<R> History<R> {
 
     /// Revert the changes done to the receiver since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result<R>>
+    pub fn revert(&mut self) -> Option<Result>
     where
         R: 'static,
     {
@@ -223,11 +223,11 @@ impl<R> History<R> {
     /// Pushes the command to the top of the history and executes its [`apply`] method.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned together with the command.
+    /// If an error occur when executing [`apply`] the error is returned and the command is removed.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<R>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result
     where
         R: 'static,
     {
@@ -235,7 +235,10 @@ impl<R> History<R> {
     }
 
     #[inline]
-    pub(crate) fn __apply(&mut self, meta: Meta<R>) -> std::result::Result<bool, Error<R>>
+    pub(crate) fn __apply(
+        &mut self,
+        meta: Meta<R>,
+    ) -> std::result::Result<bool, Box<dyn Error + Send + Sync>>
     where
         R: 'static,
     {
@@ -289,12 +292,12 @@ impl<R> History<R> {
     /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned together with the command.
+    /// If an error occur when executing [`undo`] the error is returned and the command is removed.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     #[must_use]
-    pub fn undo(&mut self) -> Option<Result<R>> {
+    pub fn undo(&mut self) -> Option<Result> {
         self.record.undo()
     }
 
@@ -302,25 +305,25 @@ impl<R> History<R> {
     /// new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned together with the command.
+    /// If an error occur when executing [`redo`] the error is returned and the command is removed.
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn redo(&mut self) -> Option<Result<R>> {
+    pub fn redo(&mut self) -> Option<Result> {
         self.record.redo()
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `cursor` is reached.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned together with the command.
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned and the command is removed.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<R>>
+    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result>
     where
         R: 'static,
     {
@@ -384,22 +387,22 @@ impl<R> History<R> {
     #[inline]
     #[must_use]
     #[cfg(feature = "chrono")]
-    pub fn time_travel<Tz: TimeZone>(&mut self, to: impl AsRef<DateTime<Tz>>) -> Option<Result<R>> {
+    pub fn time_travel<Tz: TimeZone>(&mut self, to: impl AsRef<DateTime<Tz>>) -> Option<Result> {
         self.record.time_travel(to)
     }
 
     /// Applies each command in the iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned together with the command
-    /// and the remaining commands in the iterator are discarded.
+    /// If an error occur when executing [`apply`] the error is returned and the command is removed.
+    /// The remaining commands in the iterator are discarded.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
     pub fn extend<C: Command<R> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
-    ) -> Result<R>
+    ) -> Result
     where
         R: 'static,
     {
@@ -699,18 +702,17 @@ impl<R: Default> HistoryBuilder<R> {
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
     use crate::{Command, History};
-    use std::error::Error;
 
     #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        fn apply(&mut self, receiver: &mut String) -> crate::Result {
             receiver.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        fn undo(&mut self, receiver: &mut String) -> crate::Result {
             self.0 = receiver.pop().ok_or("`receiver` is empty")?;
             Ok(())
         }

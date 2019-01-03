@@ -16,24 +16,23 @@ enum Action<R> {
 ///
 /// # Examples
 /// ```
-/// # use std::error::Error;
 /// # use undo::{Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn apply(&mut self, s: &mut String) -> undo::Result {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn undo(&mut self, s: &mut String) -> undo::Result {
 ///         self.0 = s.pop().ok_or("`s` is empty")?;
 ///         Ok(())
 ///     }
 /// }
 ///
-/// fn main() -> undo::Result<String> {
+/// fn main() -> undo::Result {
 ///     let mut record = Record::default();
 ///     let mut cp = record.checkpoint();
 ///     cp.apply(Add('a'))?;
@@ -108,7 +107,7 @@ impl<R> Checkpoint<'_, Record<R>, R> {
     ///
     /// [`apply`]: struct.Record.html#method.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<R>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result
     where
         R: 'static,
     {
@@ -122,7 +121,7 @@ impl<R> Checkpoint<'_, Record<R>, R> {
     /// [`undo`]: struct.Record.html#method.undo
     #[inline]
     #[must_use]
-    pub fn undo(&mut self) -> Option<Result<R>> {
+    pub fn undo(&mut self) -> Option<Result> {
         match self.inner.undo() {
             Some(Ok(_)) => {
                 self.stack.push(Action::Undo);
@@ -137,7 +136,7 @@ impl<R> Checkpoint<'_, Record<R>, R> {
     /// [`redo`]: struct.Record.html#method.redo
     #[inline]
     #[must_use]
-    pub fn redo(&mut self) -> Option<Result<R>> {
+    pub fn redo(&mut self) -> Option<Result> {
         match self.inner.redo() {
             Some(Ok(_)) => {
                 self.stack.push(Action::Redo);
@@ -152,7 +151,7 @@ impl<R> Checkpoint<'_, Record<R>, R> {
     /// [`go_to`]: struct.Record.html#method.go_to
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, cursor: usize) -> Option<Result<R>> {
+    pub fn go_to(&mut self, cursor: usize) -> Option<Result> {
         let old = self.inner.cursor();
         match self.inner.go_to(cursor) {
             Some(Ok(_)) => {
@@ -170,7 +169,7 @@ impl<R> Checkpoint<'_, Record<R>, R> {
     pub fn extend<C: Command<R> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
-    ) -> Result<R>
+    ) -> Result
     where
         R: 'static,
     {
@@ -185,7 +184,7 @@ impl<R> Checkpoint<'_, Record<R>, R> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned together with the command.
     #[inline]
-    pub fn cancel(self) -> Result<R> {
+    pub fn cancel(self) -> Result {
         for action in self.stack.into_iter().rev() {
             match action {
                 Action::Apply(mut v) => {
@@ -262,7 +261,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     ///
     /// [`apply`]: struct.History.html#method.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result<R>
+    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result
     where
         R: 'static,
     {
@@ -278,7 +277,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     /// [`undo`]: struct.History.html#method.undo
     #[inline]
     #[must_use]
-    pub fn undo(&mut self) -> Option<Result<R>> {
+    pub fn undo(&mut self) -> Option<Result> {
         match self.inner.undo() {
             Some(Ok(_)) => {
                 self.stack.push(Action::Undo);
@@ -293,7 +292,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     /// [`redo`]: struct.History.html#method.redo
     #[inline]
     #[must_use]
-    pub fn redo(&mut self) -> Option<Result<R>> {
+    pub fn redo(&mut self) -> Option<Result> {
         match self.inner.redo() {
             Some(Ok(_)) => {
                 self.stack.push(Action::Redo);
@@ -308,7 +307,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
     #[must_use]
-    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result<R>>
+    pub fn go_to(&mut self, branch: usize, cursor: usize) -> Option<Result>
     where
         R: 'static,
     {
@@ -330,7 +329,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     pub fn extend<C: Command<R> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
-    ) -> Result<R>
+    ) -> Result
     where
         R: 'static,
     {
@@ -345,7 +344,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned together with the command.
     #[inline]
-    pub fn cancel(self) -> Result<R>
+    pub fn cancel(self) -> Result
     where
         R: 'static,
     {
@@ -416,18 +415,17 @@ impl<R> AsMut<R> for Checkpoint<'_, History<R>, R> {
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
     use crate::{Command, Record};
-    use std::error::Error;
 
     #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        fn apply(&mut self, s: &mut String) -> crate::Result {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        fn undo(&mut self, s: &mut String) -> crate::Result {
             self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }

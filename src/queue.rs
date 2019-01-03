@@ -15,24 +15,23 @@ enum Action<R> {
 ///
 /// # Examples
 /// ```
-/// # use std::error::Error;
 /// # use undo::{Command, Record};
 /// #[derive(Debug)]
 /// struct Add(char);
 ///
 /// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn apply(&mut self, s: &mut String) -> undo::Result {
 ///         s.push(self.0);
 ///         Ok(())
 ///     }
 ///
-///     fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+///     fn undo(&mut self, s: &mut String) -> undo::Result {
 ///         self.0 = s.pop().ok_or("`s` is empty")?;
 ///         Ok(())
 ///     }
 /// }
 ///
-/// fn main() -> undo::Result<String> {
+/// fn main() -> undo::Result {
 ///     let mut record = Record::default();
 ///     let mut queue = record.queue();
 ///     queue.apply(Add('a'));
@@ -143,7 +142,7 @@ impl<R> Queue<'_, Record<R>, R> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result<R>
+    pub fn commit(self) -> Result
     where
         R: 'static,
     {
@@ -225,7 +224,7 @@ impl<R> Queue<'_, History<R>, R> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result<R>
+    pub fn commit(self) -> Result
     where
         R: 'static,
     {
@@ -298,18 +297,17 @@ impl<R> AsMut<R> for Queue<'_, History<R>, R> {
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
     use crate::{Command, Record};
-    use std::error::Error;
 
     #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        fn apply(&mut self, s: &mut String) -> crate::Result {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), Box<dyn Error + Send + Sync>> {
+        fn undo(&mut self, s: &mut String) -> crate::Result {
             self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }
