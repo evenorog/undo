@@ -335,7 +335,6 @@ impl<R> Record<R> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
-    #[must_use]
     pub fn undo(&mut self) -> Option<Result> {
         if !self.can_undo() {
             return None;
@@ -374,7 +373,6 @@ impl<R> Record<R> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    #[must_use]
     pub fn redo(&mut self) -> Option<Result> {
         if !self.can_redo() {
             return None;
@@ -413,7 +411,6 @@ impl<R> Record<R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    #[must_use]
     pub fn go_to(&mut self, cursor: usize) -> Option<Result> {
         if cursor > self.len() {
             return None;
@@ -466,7 +463,6 @@ impl<R> Record<R> {
 
     /// Go back or forward in time.
     #[inline]
-    #[must_use]
     #[cfg(feature = "chrono")]
     pub fn time_travel<Tz: TimeZone>(&mut self, to: impl AsRef<DateTime<Tz>>) -> Option<Result> {
         let to = Utc.from_utc_datetime(&to.as_ref().naive_utc());
@@ -528,7 +524,6 @@ impl<R> Record<R> {
     ///
     /// [`undo`]: struct.Record.html#method.undo
     #[inline]
-    #[must_use]
     #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
@@ -542,7 +537,6 @@ impl<R> Record<R> {
     ///
     /// [`redo`]: struct.Record.html#method.redo
     #[inline]
-    #[must_use]
     #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
