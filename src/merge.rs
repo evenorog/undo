@@ -131,7 +131,8 @@ impl<R, C: Command<R> + 'static> FromIterator<C> for Merged<R> {
     fn from_iter<T: IntoIterator<Item = C>>(commands: T) -> Self {
         Merged {
             commands: commands.into_iter().map(|c| Box::new(c) as _).collect(),
-            ..Default::default()
+            #[cfg(feature = "display")]
+            summary: None,
         }
     }
 }

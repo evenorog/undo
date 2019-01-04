@@ -114,20 +114,18 @@ impl<'a, T, R> Queue<'a, T, R> {
         self.queue.push(Action::Redo);
     }
 
-    /// Queues an `apply` action for each command in the iterator.
+    /// Cancels the queued actions.
     #[inline]
-    pub fn extend<C: Command<R> + 'static>(&mut self, commands: impl IntoIterator<Item = C>)
-    where
-        R: 'static,
-    {
+    pub fn cancel(self) {}
+}
+
+impl<T, R: 'static, C: Command<R> + 'static> Extend<C> for Queue<'_, T, R> {
+    #[inline]
+    fn extend<I: IntoIterator<Item = C>>(&mut self, commands: I) {
         for command in commands {
             self.apply(command);
         }
     }
-
-    /// Cancels the queued actions.
-    #[inline]
-    pub fn cancel(self) {}
 }
 
 impl<R> Queue<'_, Record<R>, R> {
