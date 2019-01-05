@@ -11,17 +11,13 @@
 //! * Configurable display formatting is provided when the `display` feature is enabled.
 //! * Time stamps and time travel is provided when the `chrono` feature is enabled.
 //!
-//! # Differences between the undo and redo crates
-//!
-//! TODO
-//!
 //! # Examples
 //!
 //! Add this to `Cargo.toml`:
 //!
 //! ```toml
 //! [dependencies]
-//! undo = "0.29"
+//! undo = "0.30"
 //! ```
 //!
 //! And this to `main.rs`:
@@ -69,7 +65,7 @@
 //! [merge!]: macro.merge.html
 //! [merge]: trait.Command.html#method.merge
 
-#![doc(html_root_url = "https://docs.rs/undo/0.29.8")]
+#![doc(html_root_url = "https://docs.rs/undo/0.30.0")]
 #![deny(
     bad_style,
     bare_trait_objects,
