@@ -241,6 +241,28 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
     }
 }
 
+impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
+    #[inline]
+    fn apply(&mut self, receiver: &mut R) -> Result {
+        (**self).apply(receiver)
+    }
+
+    #[inline]
+    fn undo(&mut self, receiver: &mut R) -> Result {
+        (**self).undo(receiver)
+    }
+
+    #[inline]
+    fn redo(&mut self, receiver: &mut R) -> Result {
+        (**self).redo(receiver)
+    }
+
+    #[inline]
+    fn merge(&self) -> Merge {
+        (**self).merge()
+    }
+}
+
 /// The signal sent when the record, the history, or the receiver changes.
 ///
 /// When one of these states changes, they will send a corresponding signal to the user.
