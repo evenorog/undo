@@ -16,10 +16,6 @@ Provides undo-redo functionality with dynamic dispatch and automatic command mer
 * Configurable display formatting is provided when the `display` feature is enabled.
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 
-## Differences between the undo and redo crates
-
-TODO
-
 ## Examples
 
 Add this to `Cargo.toml`:

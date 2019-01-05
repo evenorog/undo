@@ -572,12 +572,6 @@ impl<R> Record<R> {
     pub fn into_receiver(self) -> R {
         self.receiver
     }
-
-    /// Returns an iterator over the commands in the record.
-    #[inline]
-    pub fn commands(&self) -> impl Iterator<Item = &impl Command<R>> {
-        self.commands.iter()
-    }
 }
 
 impl<R: Default> Default for Record<R> {
