@@ -147,7 +147,7 @@ impl<R> Record<R> {
             let old = self.cursor();
             let could_undo = self.can_undo();
             let was_saved = self.is_saved();
-            let begin = usize::min(old, self.len() - limit);
+            let begin = old.min(self.len() - limit);
             self.commands = self.commands.split_off(begin);
             self.limit = NonZeroUsize::new(self.len()).unwrap();
             self.cursor -= begin;
