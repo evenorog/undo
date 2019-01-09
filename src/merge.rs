@@ -36,8 +36,8 @@ use std::vec::IntoIter;
 /// ```
 #[macro_export]
 macro_rules! merge {
-    ($cmd1:expr, $cmd2:expr, $($commands:expr),*) => {{
-        let mut merged = $crate::Merged::new($cmd1, $cmd2);
+    ($($commands:expr),*) => {{
+        let mut merged = $crate::Merged::default();
         $(merged.push($commands);)*
         merged
     }};
