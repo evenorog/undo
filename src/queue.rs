@@ -3,7 +3,7 @@ use crate::{Checkpoint, Command, History, Meta, Record, Result};
 /// An action that can be applied to a Record or History.
 #[derive(Debug)]
 enum Action<R> {
-    Apply(Box<dyn Command<R> + 'static>),
+    Apply(Box<dyn Command<R>>),
     Undo,
     Redo,
     GoTo(usize, usize),

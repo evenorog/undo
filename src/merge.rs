@@ -47,7 +47,7 @@ macro_rules! merge {
 ///
 /// The [`merge!`](macro.merge.html) macro can be used for convenience when merging commands.
 pub struct Merged<R> {
-    commands: Vec<Box<dyn Command<R> + 'static>>,
+    commands: Vec<Box<dyn Command<R>>>,
     #[cfg(feature = "display")]
     summary: Option<String>,
 }
@@ -138,7 +138,7 @@ impl<R, C: Command<R> + 'static> FromIterator<C> for Merged<R> {
 }
 
 impl<R> IntoIterator for Merged<R> {
-    type Item = Box<dyn Command<R> + 'static>;
+    type Item = Box<dyn Command<R>>;
     type IntoIter = IntoIter<Self::Item>;
 
     #[inline]

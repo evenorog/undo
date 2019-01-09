@@ -339,7 +339,7 @@ struct At {
 }
 
 struct Meta<R> {
-    command: Box<dyn Command<R> + 'static>,
+    command: Box<dyn Command<R>>,
     #[cfg(feature = "chrono")]
     timestamp: DateTime<Utc>,
 }
@@ -355,9 +355,9 @@ impl<R> Meta<R> {
     }
 }
 
-impl<R> From<Box<dyn Command<R> + 'static>> for Meta<R> {
+impl<R> From<Box<dyn Command<R>>> for Meta<R> {
     #[inline]
-    fn from(command: Box<dyn Command<R> + 'static>) -> Self {
+    fn from(command: Box<dyn Command<R>>) -> Self {
         Meta {
             command,
             #[cfg(feature = "chrono")]

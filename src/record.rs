@@ -66,7 +66,7 @@ pub struct Record<R> {
     cursor: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
-    pub(crate) signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
+    pub(crate) signal: Option<Box<dyn FnMut(Signal) + Send + Sync>>,
 }
 
 impl<R> Record<R> {
@@ -649,7 +649,7 @@ pub struct RecordBuilder<R> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
-    signal: Option<Box<dyn FnMut(Signal) + Send + Sync + 'static>>,
+    signal: Option<Box<dyn FnMut(Signal) + Send + Sync>>,
 }
 
 impl<R> RecordBuilder<R> {
