@@ -99,7 +99,7 @@ pub use self::queue::Queue;
 pub use self::record::{Record, RecordBuilder};
 
 /// A specialized Result type for undo-redo operations.
-pub type Result = std::result::Result<(), Box<dyn Error + Send + Sync>>;
+pub type Result = std::result::Result<(), Box<dyn Error + Send + Sync + 'static>>;
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
