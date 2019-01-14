@@ -383,7 +383,7 @@ impl<R> History<R> {
     /// Go back or forward in time.
     #[inline]
     #[cfg(feature = "chrono")]
-    pub fn time_travel<Tz: TimeZone>(&mut self, to: impl AsRef<DateTime<Tz>>) -> Option<Result> {
+    pub fn time_travel<Tz: TimeZone>(&mut self, to: &DateTime<Tz>) -> Option<Result> {
         self.record.time_travel(to)
     }
 
