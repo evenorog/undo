@@ -338,8 +338,10 @@ impl<R> Record<R> {
     pub fn undo(&mut self) -> Option<Result> {
         if !self.can_undo() {
             return None;
-        } else if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
-            self.commands.remove(self.cursor - 1).unwrap();
+        }
+        let index = self.cursor - 1;
+        if let Err(error) = self.commands[index].undo(&mut self.receiver) {
+            self.commands.remove(index).unwrap();
             return Some(Err(error));
         }
         let was_saved = self.is_saved();
@@ -376,8 +378,10 @@ impl<R> Record<R> {
     pub fn redo(&mut self) -> Option<Result> {
         if !self.can_redo() {
             return None;
-        } else if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
-            self.commands.remove(self.cursor).unwrap();
+        }
+        let index = self.cursor;
+        if let Err(error) = self.commands[index].redo(&mut self.receiver) {
+            self.commands.remove(index).unwrap();
             return Some(Err(error));
         }
         let was_saved = self.is_saved();

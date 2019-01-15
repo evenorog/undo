@@ -1,7 +1,7 @@
 use crate::{At, History, Meta, Record};
 use bitflags::bitflags;
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, Local, TimeZone};
+use chrono::{DateTime, Utc};
 use colored::{Color, Colorize};
 use std::fmt::{self, Write};
 
@@ -372,18 +372,17 @@ impl View {
 
     #[inline]
     #[cfg(feature = "chrono")]
-    fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<impl TimeZone>) -> fmt::Result {
-        let local = Local.from_utc_datetime(&timestamp.naive_utc());
+    fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Utc>) -> fmt::Result {
         if self.contains(View::COLORED) {
             write!(
                 f,
                 " {}{}{}",
                 "[".yellow(),
-                local.to_rfc2822().yellow(),
+                timestamp.to_rfc2822().yellow(),
                 "]".yellow()
             )
         } else {
-            write!(f, " [{}]", local.to_rfc2822())
+            write!(f, " [{}]", timestamp.to_rfc2822())
         }
     }
 }
