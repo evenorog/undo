@@ -299,7 +299,7 @@ impl<R> Record<R> {
             self.commands.push_back(Meta::new(merged));
         } else {
             // If commands are not merged push it onto the record.
-            if self.limit.get() == self.cursor {
+            if self.limit() == self.cursor() {
                 // If limit is reached, pop off the first command.
                 self.commands.pop_front();
                 self.saved = self.saved.and_then(|saved| saved.checked_sub(1));

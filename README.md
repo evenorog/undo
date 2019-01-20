@@ -7,8 +7,8 @@ Provides undo-redo functionality with dynamic dispatch and automatic command mer
 
 ## Contents
 
-* [Record] provides a stack based undo-redo functionality.
-* [History] provides a tree based undo-redo functionality that allows you to jump between different branches.
+* [Record] provides stack based undo-redo functionality.
+* [History] provides tree based undo-redo functionality that allows you to jump between different branches.
 * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
 * Commands can be merged using the [merge!] macro or the [merge] method.
