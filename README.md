@@ -1,11 +1,12 @@
-# undo
+<img src="https://raw.githubusercontent.com/evenorog/undo/nightly/undo.svg?sanitize=true" alt="undo" width="100%">
+
 [![Travis](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 
 Provides undo-redo functionality with dynamic dispatch and automatic command merging.
 
-## Contents
+# Contents
 
 * [Record] provides stack based undo-redo functionality.
 * [History] provides tree based undo-redo functionality that allows you to jump between different branches.
@@ -16,7 +17,7 @@ Provides undo-redo functionality with dynamic dispatch and automatic command mer
 * Configurable display formatting is provided when the `display` feature is enabled.
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 
-## Examples
+# Examples
 
 Add this to `Cargo.toml`:
 
@@ -63,7 +64,7 @@ fn main() -> undo::Result {
 }
  ```
 
-### License
+## License
 
 Licensed under either of
 
