@@ -25,3 +25,6 @@ display = ["bitflags", "colored"]
 [badges]
 travis-ci = { repository = "evenorog/undo" }
 maintenance = { status = "actively-developed" }
+
+[package.metadata.docs.rs]
+features = ["chrono"]
