@@ -343,14 +343,13 @@ impl<R> Record<R> {
         if !self.can_undo() {
             return None;
         }
-        let index = self.cursor - 1;
-        if let Err(error) = self.commands[index].undo(&mut self.receiver) {
-            self.commands.remove(index).unwrap();
-            return Some(Err(error));
-        }
         let was_saved = self.is_saved();
         let old = self.cursor();
         self.cursor -= 1;
+        if let Err(error) = self.commands[self.cursor].undo(&mut self.receiver) {
+            self.commands.remove(self.cursor).unwrap();
+            return Some(Err(error));
+        }
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signal {
@@ -383,13 +382,12 @@ impl<R> Record<R> {
         if !self.can_redo() {
             return None;
         }
-        let index = self.cursor;
-        if let Err(error) = self.commands[index].redo(&mut self.receiver) {
-            self.commands.remove(index).unwrap();
-            return Some(Err(error));
-        }
         let was_saved = self.is_saved();
         let old = self.cursor();
+        if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
+            self.commands.remove(self.cursor).unwrap();
+            return Some(Err(error));
+        }
         self.cursor += 1;
         let len = self.len();
         let is_saved = self.is_saved();
