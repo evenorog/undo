@@ -260,7 +260,8 @@ impl<R> Record<R> {
     /// Pushes the command to the top of the record and executes its [`apply`] method.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned and the command is removed.
+    /// If an error occur when executing [`apply`] the error is returned
+    /// and the state of the record is left unchanged.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
@@ -332,10 +333,12 @@ impl<R> Record<R> {
         Ok((merges, v))
     }
 
-    /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
+    /// Calls the [`undo`] method for the active command and sets
+    /// the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned and the command is removed.
+    /// If an error occur when executing [`undo`] the error is returned
+    /// and the state of the record is left unchanged.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
@@ -345,11 +348,10 @@ impl<R> Record<R> {
         }
         let was_saved = self.is_saved();
         let old = self.cursor();
-        self.cursor -= 1;
-        if let Err(error) = self.commands[self.cursor].undo(&mut self.receiver) {
-            self.commands.remove(self.cursor).unwrap();
+        if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
             return Some(Err(error));
         }
+        self.cursor -= 1;
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signal {
@@ -374,7 +376,8 @@ impl<R> Record<R> {
     /// new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned and the command is removed.
+    /// If an error occur when executing [`redo`] the error is returned and the state
+    /// of the record is left unchanged.
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
@@ -385,7 +388,6 @@ impl<R> Record<R> {
         let was_saved = self.is_saved();
         let old = self.cursor();
         if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
-            self.commands.remove(self.cursor).unwrap();
             return Some(Err(error));
         }
         self.cursor += 1;
@@ -412,7 +414,8 @@ impl<R> Record<R> {
     /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned and the command is removed.
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned
+    /// and the state of the record is left unchanged.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
@@ -496,7 +499,8 @@ impl<R> Record<R> {
     /// Applies each command in the iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned and the command is removed.
+    /// If an error occur when executing [`apply`] the error is returned and
+    /// the state of the record is left unchanged.
     /// The remaining commands in the iterator are discarded.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply

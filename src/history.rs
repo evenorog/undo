@@ -228,7 +228,8 @@ impl<R> History<R> {
     /// Pushes the command to the top of the history and executes its [`apply`] method.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned and the command is removed.
+    /// If an error occur when executing [`apply`] the error is returned
+    /// and the state of the history is left unchanged.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
@@ -294,10 +295,12 @@ impl<R> History<R> {
         Ok(merged)
     }
 
-    /// Calls the [`undo`] method for the active command and sets the previous one as the new active one.
+    /// Calls the [`undo`] method for the active command
+    /// and sets the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned and the command is removed.
+    /// If an error occur when executing [`undo`] the error is returned
+    /// and the state of the history is left unchanged.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
@@ -305,11 +308,12 @@ impl<R> History<R> {
         self.record.undo()
     }
 
-    /// Calls the [`redo`] method for the active command and sets the next one as the
-    /// new active one.
+    /// Calls the [`redo`] method for the active command
+    /// and sets the next one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned and the command is removed.
+    /// If an error occur when executing [`redo`] the error is returned
+    /// and the state of the history is left unchanged.
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
@@ -320,7 +324,8 @@ impl<R> History<R> {
     /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `cursor` is reached.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned and the command is removed.
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned
+    /// and the state of the history is left unchanged.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
@@ -395,8 +400,8 @@ impl<R> History<R> {
     /// Applies each command in the iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned and the command is removed.
-    /// The remaining commands in the iterator are discarded.
+    /// If an error occur when executing [`apply`] the error is returned
+    /// and the remaining commands in the iterator are discarded.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]

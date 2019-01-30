@@ -179,7 +179,8 @@ impl<R> Checkpoint<'_, Record<R>, R> {
     /// Cancels the changes and consumes the checkpoint.
     ///
     /// # Errors
-    /// If an error occur when canceling the changes, the error is returned together with the command.
+    /// If an error occur when canceling the changes, the error is returned
+    /// and the remaining commands are not canceled.
     #[inline]
     pub fn cancel(self) -> Result {
         for action in self.stack.into_iter().rev() {
@@ -336,7 +337,8 @@ impl<R> Checkpoint<'_, History<R>, R> {
     /// Cancels the changes and consumes the checkpoint.
     ///
     /// # Errors
-    /// If an error occur when canceling the changes, the error is returned together with the command.
+    /// If an error occur when canceling the changes, the error is returned
+    /// and the remaining commands are not canceled.
     #[inline]
     pub fn cancel(self) -> Result
     where

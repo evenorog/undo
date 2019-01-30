@@ -90,13 +90,15 @@ use chrono::{DateTime, Utc};
 use std::error::Error;
 use std::fmt;
 
-pub use self::checkpoint::Checkpoint;
 #[cfg(feature = "display")]
 pub use self::display::Display;
-pub use self::history::{History, HistoryBuilder};
-pub use self::merge::Merged;
-pub use self::queue::Queue;
-pub use self::record::{Record, RecordBuilder};
+pub use self::{
+    checkpoint::Checkpoint,
+    history::{History, HistoryBuilder},
+    merge::Merged,
+    queue::Queue,
+    record::{Record, RecordBuilder},
+};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result = std::result::Result<(), Box<dyn Error + Send + Sync + 'static>>;
