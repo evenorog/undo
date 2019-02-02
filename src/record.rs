@@ -63,7 +63,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 pub struct Record<R> {
     pub(crate) commands: VecDeque<Meta<R>>,
     receiver: R,
-    cursor: usize,
+    current: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
     pub(crate) signal: Option<Box<dyn FnMut(Signal) + Send + Sync>>,
@@ -76,7 +76,7 @@ impl<R> Record<R> {
         Record {
             commands: VecDeque::new(),
             receiver: receiver.into(),
-            cursor: 0,
+            current: 0,
             limit: MAX_LIMIT,
             saved: Some(0),
             signal: None,
@@ -144,21 +144,21 @@ impl<R> Record<R> {
     pub fn set_limit(&mut self, limit: usize) -> usize {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         if limit < self.len() {
-            let old = self.cursor();
+            let old = self.current();
             let could_undo = self.can_undo();
             let was_saved = self.is_saved();
             let begin = old.min(self.len() - limit);
             self.commands = self.commands.split_off(begin);
             self.limit = NonZeroUsize::new(self.len()).unwrap();
-            self.cursor -= begin;
+            self.current -= begin;
             // Check if the saved state has been removed.
             self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
-            let new = self.cursor();
+            let new = self.current();
             let can_undo = self.can_undo();
             let is_saved = self.is_saved();
             if let Some(ref mut f) = self.signal {
                 if old != new {
-                    f(Signal::Cursor { old, new });
+                    f(Signal::Current { old, new });
                 }
                 if could_undo != can_undo {
                     f(Signal::Undo(can_undo));
@@ -187,13 +187,13 @@ impl<R> Record<R> {
     /// Returns `true` if the record can undo.
     #[inline]
     pub fn can_undo(&self) -> bool {
-        self.cursor() > 0
+        self.current() > 0
     }
 
     /// Returns `true` if the record can redo.
     #[inline]
     pub fn can_redo(&self) -> bool {
-        self.cursor() < self.len()
+        self.current() < self.len()
     }
 
     /// Marks the receiver as currently being in a saved or unsaved state.
@@ -201,7 +201,7 @@ impl<R> Record<R> {
     pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
         if saved {
-            self.saved = Some(self.cursor());
+            self.saved = Some(self.current());
             if let Some(ref mut f) = self.signal {
                 if !was_saved {
                     f(Signal::Saved(true));
@@ -220,7 +220,7 @@ impl<R> Record<R> {
     /// Returns `true` if the receiver is in a saved state, `false` otherwise.
     #[inline]
     pub fn is_saved(&self) -> bool {
-        self.saved.map_or(false, |saved| saved == self.cursor())
+        self.saved.map_or(false, |saved| saved == self.current())
     }
 
     /// Revert the changes done to the receiver since the saved state.
@@ -231,22 +231,22 @@ impl<R> Record<R> {
 
     /// Returns the position of the current command.
     #[inline]
-    pub fn cursor(&self) -> usize {
-        self.cursor
+    pub fn current(&self) -> usize {
+        self.current
     }
 
     /// Removes all commands from the record without undoing them.
     #[inline]
     pub fn clear(&mut self) {
-        let old = self.cursor();
+        let old = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         self.commands.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
-        self.cursor = 0;
+        self.current = 0;
         if let Some(ref mut f) = self.signal {
             if old != 0 {
-                f(Signal::Cursor { old, new: 0 });
+                f(Signal::Current { old, new: 0 });
             }
             if could_undo {
                 f(Signal::Undo(false));
@@ -283,15 +283,15 @@ impl<R> Record<R> {
         if let Err(error) = meta.apply(&mut self.receiver) {
             return Err(error);
         }
-        let cursor = self.cursor();
+        let current = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
-        // Pop off all elements after cursor from record.
-        let v = self.commands.split_off(cursor);
-        debug_assert_eq!(cursor, self.len());
+        // Pop off all elements after current from record.
+        let v = self.commands.split_off(current);
+        debug_assert_eq!(current, self.len());
         // Check if the saved state was popped off.
-        self.saved = self.saved.filter(|&saved| saved <= cursor);
+        self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the receiver is in a saved state.
         let merges = match (meta.merge(), self.commands.back().map(|last| last.merge())) {
             (Merge::Always, Some(_)) => !self.is_saved(),
@@ -304,21 +304,21 @@ impl<R> Record<R> {
             self.commands.push_back(Meta::new(merged));
         } else {
             // If commands are not merged push it onto the record.
-            if self.limit() == self.cursor() {
+            if self.limit() == self.current() {
                 // If limit is reached, pop off the first command.
                 self.commands.pop_front();
                 self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
             } else {
-                self.cursor += 1;
+                self.current += 1;
             }
             self.commands.push_back(meta);
         }
-        debug_assert_eq!(self.cursor(), self.len());
+        debug_assert_eq!(self.current(), self.len());
         if let Some(ref mut f) = self.signal {
             // We emit this signal even if the commands might have been merged.
-            f(Signal::Cursor {
-                old: cursor,
-                new: self.cursor,
+            f(Signal::Current {
+                old: current,
+                new: self.current,
             });
             if could_redo {
                 f(Signal::Redo(false));
@@ -347,17 +347,17 @@ impl<R> Record<R> {
             return None;
         }
         let was_saved = self.is_saved();
-        let old = self.cursor();
-        if let Err(error) = self.commands[self.cursor - 1].undo(&mut self.receiver) {
+        let old = self.current();
+        if let Err(error) = self.commands[self.current - 1].undo(&mut self.receiver) {
             return Some(Err(error));
         }
-        self.cursor -= 1;
+        self.current -= 1;
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signal {
-            f(Signal::Cursor {
+            f(Signal::Current {
                 old,
-                new: self.cursor,
+                new: self.current,
             });
             if old == len {
                 f(Signal::Redo(true));
@@ -386,17 +386,17 @@ impl<R> Record<R> {
             return None;
         }
         let was_saved = self.is_saved();
-        let old = self.cursor();
-        if let Err(error) = self.commands[self.cursor].redo(&mut self.receiver) {
+        let old = self.current();
+        if let Err(error) = self.commands[self.current].redo(&mut self.receiver) {
             return Some(Err(error));
         }
-        self.cursor += 1;
+        self.current += 1;
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signal {
-            f(Signal::Cursor {
+            f(Signal::Current {
                 old,
-                new: self.cursor,
+                new: self.current,
             });
             if old == len - 1 {
                 f(Signal::Redo(false));
@@ -411,7 +411,7 @@ impl<R> Record<R> {
         Some(Ok(()))
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the command at `cursor` is reached.
+    /// Repeatedly calls [`undo`] or [`redo`] until the command at `current` is reached.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] or [`redo`] the error is returned
@@ -420,19 +420,19 @@ impl<R> Record<R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn go_to(&mut self, cursor: usize) -> Option<Result> {
-        if cursor > self.len() {
+    pub fn go_to(&mut self, current: usize) -> Option<Result> {
+        if current > self.len() {
             return None;
         }
         let was_saved = self.is_saved();
-        let old = self.cursor();
+        let old = self.current();
         let len = self.len();
         // Temporarily remove signal so they are not called each iteration.
         let signal = self.signal.take();
-        // Decide if we need to undo or redo to reach cursor.
-        let redo = cursor > self.cursor();
+        // Decide if we need to undo or redo to reach current.
+        let redo = current > self.current();
         let f = if redo { Record::redo } else { Record::undo };
-        while self.cursor() != cursor {
+        while self.current() != current {
             if let Err(error) = f(self).unwrap() {
                 self.signal = signal;
                 return Some(Err(error));
@@ -442,10 +442,10 @@ impl<R> Record<R> {
         self.signal = signal;
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signal {
-            if old != self.cursor {
-                f(Signal::Cursor {
+            if old != self.current {
+                f(Signal::Current {
                     old,
-                    new: self.cursor,
+                    new: self.current,
                 });
             }
             if was_saved != is_saved {
@@ -475,25 +475,25 @@ impl<R> Record<R> {
     #[cfg(feature = "chrono")]
     pub fn time_travel<Tz: TimeZone>(&mut self, to: &DateTime<Tz>) -> Option<Result> {
         let to = Utc.from_utc_datetime(&to.naive_utc());
-        let cursor = match self.commands.as_slices() {
+        let current = match self.commands.as_slices() {
             ([], []) => return None,
             (start, []) => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
-                Ok(cursor) | Err(cursor) => cursor,
+                Ok(current) | Err(current) => current,
             },
             ([], end) => match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
-                Ok(cursor) | Err(cursor) => cursor,
+                Ok(current) | Err(current) => current,
             },
             (start, end) => match start.last().unwrap().timestamp.cmp(&to) {
                 Ordering::Less => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
-                    Ok(cursor) | Err(cursor) => cursor,
+                    Ok(current) | Err(current) => current,
                 },
                 Ordering::Equal => start.len(),
                 Ordering::Greater => match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
-                    Ok(cursor) | Err(cursor) => start.len() + cursor,
+                    Ok(current) | Err(current) => start.len() + current,
                 },
             },
         };
-        self.go_to(cursor)
+        self.go_to(current)
     }
 
     /// Applies each command in the iterator.
@@ -537,7 +537,7 @@ impl<R> Record<R> {
     #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
-            Some(self.commands[self.cursor - 1].to_string())
+            Some(self.commands[self.current - 1].to_string())
         } else {
             None
         }
@@ -550,7 +550,7 @@ impl<R> Record<R> {
     #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
-            Some(self.commands[self.cursor].to_string())
+            Some(self.commands[self.current].to_string())
         } else {
             None
         }
@@ -625,7 +625,7 @@ impl<R: fmt::Debug> fmt::Debug for Record<R> {
         f.debug_struct("Record")
             .field("commands", &self.commands)
             .field("receiver", &self.receiver)
-            .field("cursor", &self.cursor)
+            .field("current", &self.current)
             .field("limit", &self.limit)
             .field("saved", &self.saved)
             .finish()
@@ -702,7 +702,7 @@ impl<R> RecordBuilder<R> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             receiver: receiver.into(),
-            cursor: 0,
+            current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
             signal: self.signal,
@@ -759,7 +759,7 @@ mod tests {
         record.apply(Add('e')).unwrap();
 
         record.set_limit(3);
-        assert_eq!(record.cursor(), 3);
+        assert_eq!(record.current(), 3);
         assert_eq!(record.limit(), 3);
         assert_eq!(record.len(), 3);
         assert!(record.can_undo());
@@ -778,7 +778,7 @@ mod tests {
         record.undo().unwrap().unwrap();
 
         record.set_limit(2);
-        assert_eq!(record.cursor(), 0);
+        assert_eq!(record.current(), 0);
         assert_eq!(record.limit(), 3);
         assert_eq!(record.len(), 3);
         assert!(!record.can_undo());
@@ -803,7 +803,7 @@ mod tests {
         record.undo().unwrap().unwrap();
 
         record.set_limit(2);
-        assert_eq!(record.cursor(), 0);
+        assert_eq!(record.current(), 0);
         assert_eq!(record.limit(), 5);
         assert_eq!(record.len(), 5);
         assert!(!record.can_undo());
@@ -826,24 +826,24 @@ mod tests {
         record.apply(Add('e')).unwrap();
 
         record.go_to(0).unwrap().unwrap();
-        assert_eq!(record.cursor(), 0);
+        assert_eq!(record.current(), 0);
         assert_eq!(record.as_receiver(), "");
         record.go_to(5).unwrap().unwrap();
-        assert_eq!(record.cursor(), 5);
+        assert_eq!(record.current(), 5);
         assert_eq!(record.as_receiver(), "abcde");
         record.go_to(1).unwrap().unwrap();
-        assert_eq!(record.cursor(), 1);
+        assert_eq!(record.current(), 1);
         assert_eq!(record.as_receiver(), "a");
         record.go_to(4).unwrap().unwrap();
-        assert_eq!(record.cursor(), 4);
+        assert_eq!(record.current(), 4);
         assert_eq!(record.as_receiver(), "abcd");
         record.go_to(2).unwrap().unwrap();
-        assert_eq!(record.cursor(), 2);
+        assert_eq!(record.current(), 2);
         assert_eq!(record.as_receiver(), "ab");
         record.go_to(3).unwrap().unwrap();
-        assert_eq!(record.cursor(), 3);
+        assert_eq!(record.current(), 3);
         assert_eq!(record.as_receiver(), "abc");
         assert!(record.go_to(6).is_none());
-        assert_eq!(record.cursor(), 3);
+        assert_eq!(record.current(), 3);
     }
 }

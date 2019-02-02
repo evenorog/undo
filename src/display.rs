@@ -94,7 +94,7 @@ impl<R> Display<'_, Record<R>> {
             at,
             At {
                 branch: 0,
-                cursor: self.data.cursor(),
+                current: self.data.current(),
             },
         )?;
         self.view.saved(
@@ -102,7 +102,7 @@ impl<R> Display<'_, Record<R>> {
             at,
             self.data.saved.map(|saved| At {
                 branch: 0,
-                cursor: saved,
+                current: saved,
             }),
         )?;
         if self.view.contains(View::DETAILED) {
@@ -136,7 +136,7 @@ impl<R> Display<'_, History<R>> {
             at,
             At {
                 branch: self.data.root(),
-                cursor: self.data.cursor(),
+                current: self.data.current(),
             },
         )?;
         self.view.saved(
@@ -147,7 +147,7 @@ impl<R> Display<'_, History<R>> {
                 .saved
                 .map(|saved| At {
                     branch: self.data.root(),
-                    cursor: saved,
+                    current: saved,
                 })
                 .or(self.data.saved),
         )?;
@@ -178,7 +178,7 @@ impl<R> Display<'_, History<R>> {
             for (j, cmd) in branch.commands.iter().enumerate().rev() {
                 let at = At {
                     branch: i,
-                    cursor: j + branch.parent.cursor + 1,
+                    current: j + branch.parent.current + 1,
                 };
                 self.fmt_graph(f, at, cmd, level + 1)?;
             }
@@ -213,7 +213,7 @@ impl<R> fmt::Display for Display<'_, Record<R>> {
         for (i, cmd) in self.data.commands.iter().enumerate().rev() {
             let at = At {
                 branch: 0,
-                cursor: i + 1,
+                current: i + 1,
             };
             self.fmt_list(f, at, cmd)?;
         }
@@ -227,7 +227,7 @@ impl<R> fmt::Display for Display<'_, History<R>> {
         for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {
             let at = At {
                 branch: self.data.root(),
-                cursor: i + 1,
+                current: i + 1,
             };
             if self.view.contains(View::GRAPH) {
                 self.fmt_graph(f, at, cmd, 0)?;
@@ -323,15 +323,15 @@ impl View {
         if self.contains(View::POSITION) {
             if self.contains(View::COLORED) {
                 let position = if use_branch {
-                    format!("[{}:{}]", at.branch, at.cursor)
+                    format!("[{}:{}]", at.branch, at.current)
                 } else {
-                    format!("[{}]", at.cursor)
+                    format!("[{}]", at.current)
                 };
                 write!(f, " {}", position.yellow())
             } else if use_branch {
-                write!(f, " [{}:{}]", at.branch, at.cursor)
+                write!(f, " [{}:{}]", at.branch, at.current)
             } else {
-                write!(f, " [{}]", at.cursor)
+                write!(f, " [{}]", at.current)
             }
         } else {
             Ok(())
