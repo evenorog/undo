@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/evenorog/undo/nightly/undo.svg?sanitize=true" alt="undo" width="100%">
+<img src="https://raw.githubusercontent.com/evenorog/undo/master/undo.svg?sanitize=true" alt="undo" width="100%">
 
 [![Travis](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
