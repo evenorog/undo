@@ -1,17 +1,9 @@
 use crate::{Checkpoint, Command, History, Meta, Record, Result};
 
-/// An action that can be applied to a Record or History.
-#[derive(Debug)]
-enum Action<R> {
-    Apply(Box<dyn Command<R>>),
-    Undo,
-    Redo,
-    GoTo(usize, usize),
-}
-
 /// A command queue wrapper.
 ///
-/// Wraps a Record or History and gives it batch queue functionality.
+/// Wraps a record or history and gives it batch queue functionality.
+/// This allows the record or history to queue up commands and either cancel or apply them later.
 ///
 /// # Examples
 /// ```
@@ -290,6 +282,15 @@ impl<R> AsMut<R> for Queue<'_, History<R>, R> {
     fn as_mut(&mut self) -> &mut R {
         self.inner.as_mut()
     }
+}
+
+/// An action that can be applied to a Record or History.
+#[derive(Debug)]
+enum Action<R> {
+    Apply(Box<dyn Command<R>>),
+    Undo,
+    Redo,
+    GoTo(usize, usize),
 }
 
 #[cfg(all(test, not(feature = "display")))]
