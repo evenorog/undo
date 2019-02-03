@@ -70,7 +70,7 @@
 //! [merge!]: macro.merge.html
 //! [merge]: trait.Command.html#method.merge
 
-#![doc(html_root_url = "https://docs.rs/undo/0.31.0")]
+#![doc(html_root_url = "https://docs.rs/undo/latest")]
 #![deny(
     bad_style,
     bare_trait_objects,
