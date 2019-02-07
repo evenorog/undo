@@ -113,6 +113,11 @@ impl<R> Command<R> for Merged<R> {
     fn merge(&self) -> Merge {
         self.commands.first().map_or(Merge::Always, |c| c.merge())
     }
+
+    #[inline]
+    fn is_dead(&self) -> bool {
+        self.commands.iter().any(|c| c.is_dead())
+    }
 }
 
 impl<R> Default for Merged<R> {

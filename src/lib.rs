@@ -176,6 +176,18 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
     fn merge(&self) -> Merge {
         Merge::Never
     }
+
+    /// Says if the command is dead.
+    ///
+    /// A dead command will be removed the next time it becomes the current command.
+    /// This can be used to remove command if for example executing it caused an error,
+    /// and it needs to be removed.
+    ///
+    /// This flag will be checked before applying, undoing, and redoing the command.
+    #[inline]
+    fn is_dead(&self) -> bool {
+        false
+    }
 }
 
 /// Base functionality for all commands.
@@ -246,6 +258,18 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
     fn merge(&self) -> Merge {
         Merge::Never
     }
+
+    /// Says if the command is dead.
+    ///
+    /// A dead command will be removed the next time it becomes the current command.
+    /// This can be used to remove command if for example executing it caused an error,
+    /// and it needs to be removed.
+    ///
+    /// This flag will be checked before applying, undoing, and redoing the command.
+    #[inline]
+    fn is_dead(&self) -> bool {
+        false
+    }
 }
 
 impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
@@ -267,6 +291,11 @@ impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     #[inline]
     fn merge(&self) -> Merge {
         (**self).merge()
+    }
+
+    #[inline]
+    fn is_dead(&self) -> bool {
+        (**self).is_dead()
     }
 }
 
@@ -392,6 +421,11 @@ impl<R> Command<R> for Meta<R> {
     #[inline]
     fn merge(&self) -> Merge {
         self.command.merge()
+    }
+
+    #[inline]
+    fn is_dead(&self) -> bool {
+        self.command.is_dead()
     }
 }
 

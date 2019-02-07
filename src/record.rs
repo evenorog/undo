@@ -280,6 +280,9 @@ impl<R> Record<R> {
     where
         R: 'static,
     {
+        if meta.is_dead() {
+            return Ok((false, VecDeque::new()));
+        }
         if let Err(error) = meta.apply(&mut self.receiver) {
             return Err(error);
         }
@@ -343,11 +346,18 @@ impl<R> Record<R> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result> {
-        if !self.can_undo() {
-            return None;
-        }
         let was_saved = self.is_saved();
         let old = self.current();
+        loop {
+            if !self.can_undo() {
+                return None;
+            } else if self.commands[self.current - 1].is_dead() {
+                self.current -= 1;
+                self.commands.remove(self.current).unwrap();
+            } else {
+                break;
+            }
+        }
         if let Err(error) = self.commands[self.current - 1].undo(&mut self.receiver) {
             return Some(Err(error));
         }
@@ -382,11 +392,17 @@ impl<R> Record<R> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result> {
-        if !self.can_redo() {
-            return None;
-        }
         let was_saved = self.is_saved();
         let old = self.current();
+        loop {
+            if !self.can_redo() {
+                return None;
+            } else if self.commands[self.current].is_dead() {
+                self.commands.remove(self.current).unwrap();
+            } else {
+                break;
+            }
+        }
         if let Err(error) = self.commands[self.current].redo(&mut self.receiver) {
             return Some(Err(error));
         }
@@ -424,15 +440,19 @@ impl<R> Record<R> {
         if current > self.len() {
             return None;
         }
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         let old = self.current();
-        let len = self.len();
         // Temporarily remove signal so they are not called each iteration.
         let signal = self.signal.take();
-        // Decide if we need to undo or redo to reach current.
-        let redo = current > self.current();
-        let f = if redo { Record::redo } else { Record::undo };
         while self.current() != current {
+            // Decide if we need to undo or redo to reach current.
+            let f = if current > self.current() {
+                Record::redo
+            } else {
+                Record::undo
+            };
             if let Err(error) = f(self).unwrap() {
                 self.signal = signal;
                 return Some(Err(error));
@@ -440,6 +460,8 @@ impl<R> Record<R> {
         }
         // Add signal back.
         self.signal = signal;
+        let can_undo = self.can_undo();
+        let can_redo = self.can_redo();
         let is_saved = self.is_saved();
         if let Some(ref mut f) = self.signal {
             if old != self.current {
@@ -448,23 +470,14 @@ impl<R> Record<R> {
                     new: self.current,
                 });
             }
+            if could_undo != can_undo {
+                f(Signal::Undo(can_undo));
+            }
+            if could_redo != can_redo {
+                f(Signal::Redo(can_redo));
+            }
             if was_saved != is_saved {
                 f(Signal::Saved(is_saved));
-            }
-            if redo {
-                if old == len - 1 {
-                    f(Signal::Redo(false));
-                }
-                if old == 0 {
-                    f(Signal::Undo(true));
-                }
-            } else {
-                if old == len {
-                    f(Signal::Redo(true));
-                }
-                if old == 1 {
-                    f(Signal::Undo(false));
-                }
             }
         }
         Some(Ok(()))
