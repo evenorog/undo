@@ -10,6 +10,7 @@ use std::error::Error;
 use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
+use std::result;
 
 #[allow(unsafe_code)]
 const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_value()) };
@@ -276,7 +277,7 @@ impl<R> Record<R> {
     pub(crate) fn __apply(
         &mut self,
         mut meta: Meta<R>,
-    ) -> std::result::Result<(bool, VecDeque<Meta<R>>), Box<dyn Error + Send + Sync>>
+    ) -> result::Result<(bool, VecDeque<Meta<R>>), Box<dyn Error + Send + Sync + 'static>>
     where
         R: 'static,
     {

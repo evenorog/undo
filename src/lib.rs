@@ -7,6 +7,7 @@
 //!
 //! # Contents
 //!
+//! * [Command] provides the base functionality for all commands.
 //! * [Record] provides stack based undo-redo functionality.
 //! * [History] provides tree based undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
@@ -63,6 +64,7 @@
 //! }
 //! ```
 //!
+//! [Command]: trait.Command.html
 //! [Record]: struct.Record.html
 //! [History]: struct.History.html
 //! [Queue]: struct.Queue.html
@@ -182,8 +184,6 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
     /// A dead command will be removed the next time it becomes the current command.
     /// This can be used to remove command if for example executing it caused an error,
     /// and it needs to be removed.
-    ///
-    /// This flag will be checked before applying, undoing, and redoing the command.
     #[inline]
     fn is_dead(&self) -> bool {
         false
@@ -264,8 +264,6 @@ pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
     /// A dead command will be removed the next time it becomes the current command.
     /// This can be used to remove command if for example executing it caused an error,
     /// and it needs to be removed.
-    ///
-    /// This flag will be checked before applying, undoing, and redoing the command.
     #[inline]
     fn is_dead(&self) -> bool {
         false

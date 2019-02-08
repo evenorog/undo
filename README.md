@@ -13,6 +13,7 @@ it is easy to apply, undo, and redo changes made to a receiver.
 
 # Contents
 
+* [Command] provides the base functionality for all commands.
 * [Record] provides stack based undo-redo functionality.
 * [History] provides tree based undo-redo functionality that allows you to jump between different branches.
 * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
@@ -84,6 +85,7 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
 additional terms or conditions.
 
+[Command]: https://docs.rs/undo/latest/undo/trait.Command.html
 [Record]: https://docs.rs/undo/latest/undo/struct.Record.html
 [History]: https://docs.rs/undo/latest/undo/struct.History.html
 [Queue]: https://docs.rs/undo/latest/undo/struct.Queue.html
