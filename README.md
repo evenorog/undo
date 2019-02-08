@@ -11,6 +11,9 @@ by creating objects of commands that applies the modifications. All commands kno
 how to undo the changes it applies, and by using the provided data structures
 it is easy to apply, undo, and redo changes made to a receiver.
 
+This library provides more or less the same functionality as the [redo] library but is more focused on
+ease of use instead of performance and control.
+
 # Contents
 
 * [Command] provides the base functionality for all commands.
@@ -18,10 +21,20 @@ it is easy to apply, undo, and redo changes made to a receiver.
 * [History] provides tree based undo-redo functionality that allows you to jump between different branches.
 * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
-* Commands can be merged using the [merge!] macro or the [merge] method.
-  When two commands are merged, undoing and redoing them are done in a single step.
 * Configurable display formatting is provided when the `display` feature is enabled.
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
+
+# Concepts
+
+* Commands can be merged before it is applied to the data-structures by using the [merge!] macro.
+  This makes it easy to build complex operations from smaller ones by combining them into a single command
+  that can be applied, undone, and redone in a single step.
+* Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
+  This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
+  in a single step.
+* The receiver can be marked as being saved to disk and the data-structures can track the saved state and tell the user
+  when it changes.
+* The amount of changes being tracked can be configured by the user so only the `n` most recent changes are stored.
 
 # Examples
 
@@ -92,3 +105,4 @@ additional terms or conditions.
 [Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
 [merge!]: https://docs.rs/undo/latest/undo/macro.merge.html
 [merge]: https://docs.rs/undo/latest/undo/trait.Command.html#method.merge
+[redo]: https://github.com/evenorog/redo
