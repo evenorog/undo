@@ -4,15 +4,16 @@
 //! by creating objects of commands that applies the modifications. All commands knows
 //! how to undo the changes it applies, and by using the provided data structures
 //! it is easy to apply, undo, and redo changes made to a receiver.
-//!
-//! This library provides more or less the same functionality as the [redo] library but is more focused on
-//! ease of use instead of performance and control.
+//! Both linear and non-linear undo-redo functionality is provided through
+//! the [Record] and [History] data structures.
+//! This library provides more or less the same functionality as the [redo] library
+//! but is more focused on ease of use instead of performance and control.
 //!
 //! # Contents
 //!
 //! * [Command] provides the base functionality for all commands.
-//! * [Record] provides stack based undo-redo functionality.
-//! * [History] provides tree based undo-redo functionality that allows you to jump between different branches.
+//! * [Record] provides linear undo-redo functionality.
+//! * [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 //! * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
 //! * Configurable display formatting is provided when the `display` feature is enabled.
@@ -122,11 +123,11 @@ pub use self::{
 };
 
 /// A specialized Result type for undo-redo operations.
-pub type Result = std::result::Result<(), Box<dyn Error + Send + Sync + 'static>>;
+pub type Result = std::result::Result<(), Box<dyn Error + 'static>>;
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
-pub trait Command<R>: fmt::Debug + Send + Sync {
+pub trait Command<R>: fmt::Debug {
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     fn apply(&mut self, receiver: &mut R) -> Result;
@@ -206,7 +207,7 @@ pub trait Command<R>: fmt::Debug + Send + Sync {
 
 /// Base functionality for all commands.
 #[cfg(feature = "display")]
-pub trait Command<R>: fmt::Debug + fmt::Display + Send + Sync {
+pub trait Command<R>: fmt::Debug + fmt::Display {
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     fn apply(&mut self, receiver: &mut R) -> Result;
@@ -316,23 +317,6 @@ impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
 /// When one of these states changes, they will send a corresponding signal to the user.
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
 /// signal to tell the user.
-///
-/// # Examples
-/// ```
-/// # use undo::{History, Signal};
-/// # fn foo() -> History<String> {
-/// let history = History::builder()
-///     .connect(|signal| match signal {
-///         Signal::Undo(on) => println!("undo: {}", on),
-///         Signal::Redo(on) => println!("redo: {}", on),
-///         Signal::Saved(on) => println!("saved: {}", on),
-///         Signal::Current { old, new } => println!("current: {} -> {}", old, new),
-///         Signal::Root { old, new } => println!("root: {} -> {}", old, new),
-///     })
-///     .default();
-/// # history
-/// # }
-/// ```
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the record can undo.

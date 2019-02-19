@@ -39,9 +39,7 @@ use std::fmt;
 ///     history.apply(Add('b'))?;
 ///     history.apply(Add('c'))?;
 ///     let abc = history.root();
-///     assert_eq!(history.as_receiver(), "abc");
 ///     history.go_to(abc, 1).unwrap()?;
-///     assert_eq!(history.as_receiver(), "a");
 ///     history.apply(Add('f'))?;
 ///     history.apply(Add('g'))?;
 ///     assert_eq!(history.as_receiver(), "afg");
@@ -148,16 +146,16 @@ impl<R> History<R> {
 
     /// Sets how the signal should be handled when the state changes.
     ///
-    /// The previous signal handler is returned if it exists.
+    /// The previous slot is returned if it exists.
     #[inline]
     pub fn connect(
         &mut self,
-        f: impl FnMut(Signal) + Send + Sync + 'static,
-    ) -> Option<impl FnMut(Signal) + Send + Sync + 'static>
+        slot: impl FnMut(Signal) + 'static,
+    ) -> Option<impl FnMut(Signal) + 'static>
     where
         R: 'static,
     {
-        self.record.connect(f)
+        self.record.connect(slot)
     }
 
     /// Returns `true` if the history can undo.
@@ -191,7 +189,7 @@ impl<R> History<R> {
     where
         R: 'static,
     {
-        if self.is_saved() {
+        if self.record.saved.is_some() {
             self.record.revert()
         } else {
             self.saved
@@ -220,8 +218,8 @@ impl<R> History<R> {
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-        if let Some(ref mut f) = self.record.signal {
-            f(Signal::Root { old, new: 0 });
+        if let Some(ref mut slot) = self.record.slot {
+            slot(Signal::Root { old, new: 0 });
         }
     }
 
@@ -241,10 +239,7 @@ impl<R> History<R> {
     }
 
     #[inline]
-    pub(crate) fn __apply(
-        &mut self,
-        meta: Meta<R>,
-    ) -> std::result::Result<bool, Box<dyn Error + Send + Sync>>
+    pub(crate) fn __apply(&mut self, meta: Meta<R>) -> std::result::Result<bool, Box<dyn Error>>
     where
         R: 'static,
     {
@@ -288,8 +283,8 @@ impl<R> History<R> {
                 (None, None, None) => (),
                 _ => unreachable!(),
             }
-            if let Some(ref mut f) = self.record.signal {
-                f(Signal::Root { old, new })
+            if let Some(ref mut slot) = self.record.slot {
+                slot(Signal::Root { old, new })
             }
         }
         Ok(merged)
@@ -381,8 +376,8 @@ impl<R> History<R> {
         }
         if let Err(err) = self.record.go_to(current)? {
             return Some(Err(err));
-        } else if let Some(ref mut f) = self.record.signal {
-            f(Signal::Root {
+        } else if let Some(ref mut slot) = self.record.slot {
+            slot(Signal::Root {
                 old: root,
                 new: self.root,
             });
@@ -501,8 +496,8 @@ impl<R> History<R> {
         {
             self.saved = None;
             self.record.saved = Some(saved);
-            if let Some(ref mut f) = self.record.signal {
-                f(Signal::Saved(true));
+            if let Some(ref mut slot) = self.record.slot {
+                slot(Signal::Saved(true));
             }
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At {
@@ -510,8 +505,8 @@ impl<R> History<R> {
                 current: saved,
             });
             self.record.saved = None;
-            if let Some(ref mut f) = self.record.signal {
-                f(Signal::Saved(false));
+            if let Some(ref mut slot) = self.record.slot {
+                slot(Signal::Saved(false));
             }
         }
     }
@@ -619,12 +614,11 @@ pub(crate) struct Branch<R> {
 /// ```
 /// # use undo::History;
 /// # fn foo() -> History<String> {
-/// let history = History::builder()
+/// History::builder()
 ///     .capacity(100)
 ///     .limit(100)
 ///     .saved(false)
-///     .default();
-/// # history
+///     .default()
 /// # }
 /// ```
 #[derive(Debug)]
@@ -661,8 +655,8 @@ impl<R> HistoryBuilder<R> {
     /// Decides how the signal should be handled when the state changes.
     /// By default the history does not handle any signals.
     #[inline]
-    pub fn connect(mut self, f: impl FnMut(Signal) + Send + Sync + 'static) -> HistoryBuilder<R> {
-        self.inner = self.inner.connect(f);
+    pub fn connect(mut self, slot: impl FnMut(Signal) + 'static) -> HistoryBuilder<R> {
+        self.inner = self.inner.connect(slot);
         self
     }
 

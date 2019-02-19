@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/evenorog/undo/master/undo.svg?sanitize=true" alt="undo" width="100%">
+![undo](undo.svg)
 
 [![Travis](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
@@ -10,15 +10,16 @@ It is an implementation of the command pattern, where all modifications are done
 by creating objects of commands that applies the modifications. All commands knows
 how to undo the changes it applies, and by using the provided data structures
 it is easy to apply, undo, and redo changes made to a receiver.
-
-This library provides more or less the same functionality as the [redo] library but is more focused on
-ease of use instead of performance and control.
+Both linear and non-linear undo-redo functionality is provided through
+the [Record] and [History] data structures.
+This library provides more or less the same functionality as the [redo] library
+but is more focused on ease of use instead of performance.
 
 # Contents
 
 * [Command] provides the base functionality for all commands.
-* [Record] provides stack based undo-redo functionality.
-* [History] provides tree based undo-redo functionality that allows you to jump between different branches.
+* [Record] provides linear undo-redo functionality.
+* [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
 * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
 * Configurable display formatting is provided when the `display` feature is enabled.
@@ -47,7 +48,7 @@ undo = "0.31"
 
 And this to `main.rs`:
 
- ```rust
+```rust
 use undo::{Command, Record};
 
 #[derive(Debug)]
@@ -81,7 +82,7 @@ fn main() -> undo::Result {
     assert_eq!(record.as_receiver(), "abc");
     Ok(())
 }
- ```
+```
 
 ## License
 
