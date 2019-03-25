@@ -37,7 +37,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! undo = "0.31"
+//! undo = "0.32"
 //! ```
 //!
 //! And this to `main.rs`:

@@ -1,4 +1,4 @@
-![undo](undo.svg)
+![undo](https://raw.githubusercontent.com/evenorog/undo/master/undo.svg?sanitize=true)
 
 [![Travis](https://travis-ci.org/evenorog/undo.svg?branch=master)](https://travis-ci.org/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
@@ -43,7 +43,7 @@ Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-undo = "0.31"
+undo = "0.32"
 ```
 
 And this to `main.rs`:
