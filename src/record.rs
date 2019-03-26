@@ -26,37 +26,34 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// # Examples
 /// ```
 /// # use undo::{Command, Record};
-/// #[derive(Debug)]
-/// struct Add(char);
-///
-/// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> undo::Result {
-///         s.push(self.0);
-///         Ok(())
-///     }
-///
-///     fn undo(&mut self, s: &mut String) -> undo::Result {
-///         self.0 = s.pop().ok_or("`s` is empty")?;
-///         Ok(())
-///     }
-/// }
-///
-/// fn main() -> undo::Result {
-///     let mut record = Record::default();
-///     record.apply(Add('a'))?;
-///     record.apply(Add('b'))?;
-///     record.apply(Add('c'))?;
-///     assert_eq!(record.as_receiver(), "abc");
-///     record.undo().unwrap()?;
-///     record.undo().unwrap()?;
-///     record.undo().unwrap()?;
-///     assert_eq!(record.as_receiver(), "");
-///     record.redo().unwrap()?;
-///     record.redo().unwrap()?;
-///     record.redo().unwrap()?;
-///     assert_eq!(record.as_receiver(), "abc");
-///     Ok(())
-/// }
+/// # #[derive(Debug)]
+/// # struct Add(char);
+/// # impl Command<String> for Add {
+/// #     fn apply(&mut self, s: &mut String) -> undo::Result {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> undo::Result {
+/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// # fn main() -> undo::Result {
+/// let mut record = Record::default();
+/// record.apply(Add('a'))?;
+/// record.apply(Add('b'))?;
+/// record.apply(Add('c'))?;
+/// assert_eq!(record.as_receiver(), "abc");
+/// record.undo().unwrap()?;
+/// record.undo().unwrap()?;
+/// record.undo().unwrap()?;
+/// assert_eq!(record.as_receiver(), "");
+/// record.redo().unwrap()?;
+/// record.redo().unwrap()?;
+/// record.redo().unwrap()?;
+/// assert_eq!(record.as_receiver(), "abc");
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// [`builder`]: struct.RecordBuilder.html
@@ -297,7 +294,7 @@ impl<R> Record<R> {
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the receiver is in a saved state.
-        let merges = match (meta.merge(), self.commands.back().map(|last| last.merge())) {
+        let merges = match (meta.merge(), self.commands.back().map(Command::merge)) {
             (Merge::Always, Some(_)) => !self.is_saved(),
             (Merge::If(id1), Some(Merge::If(id2))) => id1 == id2 && !self.is_saved(),
             _ => false,

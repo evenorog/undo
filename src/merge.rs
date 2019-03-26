@@ -8,31 +8,28 @@ use std::vec::IntoIter;
 /// # Examples
 /// ```
 /// # use undo::{merge, Command, Record};
-/// #[derive(Debug)]
-/// struct Add(char);
-///
-/// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> undo::Result {
-///         s.push(self.0);
-///         Ok(())
-///     }
-///
-///     fn undo(&mut self, s: &mut String) -> undo::Result {
-///         self.0 = s.pop().ok_or("`s` is empty")?;
-///         Ok(())
-///     }
-/// }
-///
-/// fn main() -> undo::Result {
-///     let mut record = Record::default();
-///     record.apply(merge![Add('a'), Add('b'), Add('c')])?;
-///     assert_eq!(record.as_receiver(), "abc");
-///     record.undo().unwrap()?;
-///     assert_eq!(record.as_receiver(), "");
-///     record.redo().unwrap()?;
-///     assert_eq!(record.as_receiver(), "abc");
-///     Ok(())
-/// }
+/// # #[derive(Debug)]
+/// # struct Add(char);
+/// # impl Command<String> for Add {
+/// #     fn apply(&mut self, s: &mut String) -> undo::Result {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> undo::Result {
+/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// # fn main() -> undo::Result {
+/// let mut record = Record::default();
+/// record.apply(merge![Add('a'), Add('b'), Add('c')])?;
+/// assert_eq!(record.as_receiver(), "abc");
+/// record.undo().unwrap()?;
+/// assert_eq!(record.as_receiver(), "");
+/// record.redo().unwrap()?;
+/// assert_eq!(record.as_receiver(), "abc");
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! merge {

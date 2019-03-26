@@ -9,32 +9,29 @@ use std::collections::VecDeque;
 /// # Examples
 /// ```
 /// # use undo::{Command, Record};
-/// #[derive(Debug)]
-/// struct Add(char);
-///
-/// impl Command<String> for Add {
-///     fn apply(&mut self, s: &mut String) -> undo::Result {
-///         s.push(self.0);
-///         Ok(())
-///     }
-///
-///     fn undo(&mut self, s: &mut String) -> undo::Result {
-///         self.0 = s.pop().ok_or("`s` is empty")?;
-///         Ok(())
-///     }
-/// }
-///
-/// fn main() -> undo::Result {
-///     let mut record = Record::default();
-///     let mut cp = record.checkpoint();
-///     cp.apply(Add('a'))?;
-///     cp.apply(Add('b'))?;
-///     cp.apply(Add('c'))?;
-///     assert_eq!(cp.as_receiver(), "abc");
-///     cp.cancel()?;
-///     assert_eq!(record.as_receiver(), "");
-///     Ok(())
-/// }
+/// # #[derive(Debug)]
+/// # struct Add(char);
+/// # impl Command<String> for Add {
+/// #     fn apply(&mut self, s: &mut String) -> undo::Result {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> undo::Result {
+/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// # fn main() -> undo::Result {
+/// let mut record = Record::default();
+/// let mut cp = record.checkpoint();
+/// cp.apply(Add('a'))?;
+/// cp.apply(Add('b'))?;
+/// cp.apply(Add('c'))?;
+/// assert_eq!(cp.as_receiver(), "abc");
+/// cp.cancel()?;
+/// assert_eq!(record.as_receiver(), "");
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct Checkpoint<'a, T, R> {
@@ -257,7 +254,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     {
         let root = self.inner.root();
         let old = self.inner.current();
-        self.inner.__apply(Meta::new(command))?;
+        self.inner.apply(command)?;
         self.stack.push(Action::GoTo(root, old));
         Ok(())
     }
