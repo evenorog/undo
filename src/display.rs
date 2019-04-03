@@ -19,7 +19,7 @@ use std::fmt::{self, Write};
 /// # history
 /// # }
 /// ```
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Display<'a, T> {
     data: &'a T,
     view: View,

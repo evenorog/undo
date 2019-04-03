@@ -123,7 +123,7 @@ pub use self::{
 };
 
 /// A specialized Result type for undo-redo operations.
-pub type Result = std::result::Result<(), Box<dyn Error + 'static>>;
+pub type Result = std::result::Result<(), Box<dyn Error>>;
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]

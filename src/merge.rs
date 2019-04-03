@@ -46,7 +46,7 @@ macro_rules! merge {
 pub struct Merged<R> {
     commands: Vec<Box<dyn Command<R>>>,
     #[cfg(feature = "display")]
-    summary: Option<String>,
+    text: Option<String>,
 }
 
 impl<R> Merged<R> {
@@ -56,7 +56,7 @@ impl<R> Merged<R> {
         Merged {
             commands: vec![Box::new(cmd1), Box::new(cmd2)],
             #[cfg(feature = "display")]
-            summary: None,
+            text: None,
         }
     }
 
@@ -73,11 +73,11 @@ impl<R> Merged<R> {
         self
     }
 
-    /// Sets a summary for the two merged commands. This overrides the default display text.
+    /// Overrides the text for the two merged commands.
     #[inline]
     #[cfg(feature = "display")]
-    pub fn set_summary(&mut self, summary: impl Into<String>) {
-        self.summary = Some(summary.into());
+    pub fn set_text(&mut self, text: impl Into<String>) {
+        self.text = Some(text.into());
     }
 }
 
@@ -108,12 +108,12 @@ impl<R> Command<R> for Merged<R> {
 
     #[inline]
     fn merge(&self) -> Merge {
-        self.commands.first().map_or(Merge::Always, |c| c.merge())
+        self.commands.first().map_or(Merge::Always, Command::merge)
     }
 
     #[inline]
     fn is_dead(&self) -> bool {
-        self.commands.iter().any(|c| c.is_dead())
+        self.commands.iter().any(Command::is_dead)
     }
 }
 
@@ -123,7 +123,7 @@ impl<R> Default for Merged<R> {
         Merged {
             commands: Vec::default(),
             #[cfg(feature = "display")]
-            summary: None,
+            text: None,
         }
     }
 }
@@ -134,7 +134,7 @@ impl<R, C: Command<R> + 'static> FromIterator<C> for Merged<R> {
         Merged {
             commands: commands.into_iter().map(|c| Box::new(c) as _).collect(),
             #[cfg(feature = "display")]
-            summary: None,
+            text: None,
         }
     }
 }
@@ -171,7 +171,7 @@ impl<R> fmt::Debug for Merged<R> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Merged")
             .field("commands", &self.commands)
-            .field("summary", &self.summary)
+            .field("text", &self.text)
             .finish()
     }
 }
@@ -180,8 +180,8 @@ impl<R> fmt::Debug for Merged<R> {
 impl<R> fmt::Display for Merged<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.summary {
-            Some(summary) => f.write_str(summary),
+        match &self.text {
+            Some(text) => f.write_str(text),
             None => {
                 if let Some((first, commands)) = self.commands.split_first() {
                     (first as &dyn fmt::Display).fmt(f)?;

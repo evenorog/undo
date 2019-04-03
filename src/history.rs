@@ -154,6 +154,15 @@ impl<R> History<R> {
         self.record.connect(slot)
     }
 
+    /// Removes and returns the slot.
+    #[inline]
+    pub fn disconnect(&mut self) -> Option<impl FnMut(Signal) + 'static>
+    where
+        R: 'static,
+    {
+        self.record.disconnect()
+    }
+
     /// Returns `true` if the history can undo.
     #[inline]
     pub fn can_undo(&self) -> bool {

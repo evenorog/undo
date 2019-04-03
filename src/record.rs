@@ -182,6 +182,12 @@ impl<R> Record<R> {
             .map(|mut slot| move |signal| slot(signal))
     }
 
+    /// Removes and returns the slot.
+    #[inline]
+    pub fn disconnect(&mut self) -> Option<impl FnMut(Signal) + 'static> {
+        self.slot.take().map(|mut slot| move |signal| slot(signal))
+    }
+
     /// Returns `true` if the record can undo.
     #[inline]
     pub fn can_undo(&self) -> bool {
@@ -274,7 +280,7 @@ impl<R> Record<R> {
     pub(crate) fn __apply(
         &mut self,
         mut meta: Meta<R>,
-    ) -> result::Result<(bool, VecDeque<Meta<R>>), Box<dyn Error + 'static>>
+    ) -> result::Result<(bool, VecDeque<Meta<R>>), Box<dyn Error>>
     where
         R: 'static,
     {
@@ -510,9 +516,8 @@ impl<R> Record<R> {
     /// Applies each command in the iterator.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned and
-    /// the state of the record is left unchanged.
-    /// The remaining commands in the iterator are discarded.
+    /// If an error occur when executing [`apply`] the error is returned
+    /// and the remaining commands in the iterator are discarded.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
