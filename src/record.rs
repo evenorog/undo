@@ -861,4 +861,19 @@ mod tests {
         assert!(record.go_to(6).is_none());
         assert_eq!(record.current(), 3);
     }
+
+    #[test]
+    #[cfg(feature = "chrono")]
+    fn time_travel() {
+        let mut record = Record::default();
+        record.apply(Add('a')).unwrap();
+        let a = chrono::Utc::now();
+        record.apply(Add('b')).unwrap();
+        record.apply(Add('c')).unwrap();
+        let abc = chrono::Utc::now();
+        record.time_travel(&a).unwrap().unwrap();
+        assert_eq!(record.as_receiver(), "a");
+        record.time_travel(&abc).unwrap().unwrap();
+        assert_eq!(record.as_receiver(), "abc");
+    }
 }
