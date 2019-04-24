@@ -51,7 +51,6 @@ And this to `main.rs`:
 ```rust
 use undo::{Command, Record};
 
-#[derive(Debug)]
 struct Add(char);
 
 impl Command<String> for Add {

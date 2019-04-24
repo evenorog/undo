@@ -1,4 +1,5 @@
 use crate::{Command, Merge};
+#[cfg(feature = "display")]
 use std::fmt;
 use std::iter::{FromIterator, IntoIterator};
 use std::vec::IntoIter;
@@ -7,8 +8,7 @@ use std::vec::IntoIter;
 ///
 /// # Examples
 /// ```
-/// # use undo::{merge, Command, Record};
-/// # #[derive(Debug)]
+/// # use undo::*;
 /// # struct Add(char);
 /// # impl Command<String> for Add {
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result {
@@ -157,6 +157,7 @@ impl<R, C: Command<R> + 'static> Extend<C> for Merged<R> {
     }
 }
 
+#[cfg(feature = "display")]
 impl<R> fmt::Debug for Merged<R> {
     #[inline]
     #[cfg(not(feature = "display"))]

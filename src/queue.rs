@@ -7,8 +7,7 @@ use crate::{Checkpoint, Command, History, Record, Result};
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, Record};
-/// # #[derive(Debug)]
+/// # use undo::*;
 /// # struct Add(char);
 /// # impl Command<String> for Add {
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result {
@@ -32,7 +31,7 @@ use crate::{Checkpoint, Command, History, Record, Result};
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug)]
+#[cfg_attr(feature = "display", derive(Debug))]
 pub struct Queue<'a, T, R> {
     inner: &'a mut T,
     queue: Vec<Action<R>>,
@@ -278,7 +277,7 @@ impl<R> AsMut<R> for Queue<'_, History<R>, R> {
 }
 
 /// An action that can be applied to a Record or History.
-#[derive(Debug)]
+#[cfg_attr(feature = "display", derive(Debug))]
 enum Action<R> {
     Apply(Box<dyn Command<R>>),
     Undo,
@@ -288,18 +287,17 @@ enum Action<R> {
 
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
-    use crate::{Command, Record};
+    use crate::*;
 
-    #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, s: &mut String) -> crate::Result {
+        fn apply(&mut self, s: &mut String) -> Result {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> crate::Result {
+        fn undo(&mut self, s: &mut String) -> Result {
             self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }

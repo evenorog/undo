@@ -25,8 +25,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, Record};
-/// # #[derive(Debug)]
+/// # use undo::*;
 /// # struct Add(char);
 /// # impl Command<String> for Add {
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result {
@@ -635,6 +634,7 @@ impl<R> From<History<R>> for Record<R> {
     }
 }
 
+#[cfg(feature = "display")]
 impl<R: fmt::Debug> fmt::Debug for Record<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -747,18 +747,17 @@ impl<R: fmt::Debug> fmt::Debug for RecordBuilder<R> {
 
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
-    use crate::{Command, Record};
+    use crate::*;
 
-    #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, s: &mut String) -> crate::Result {
+        fn apply(&mut self, s: &mut String) -> Result {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> crate::Result {
+        fn undo(&mut self, s: &mut String) -> Result {
             self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }

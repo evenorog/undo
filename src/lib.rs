@@ -45,7 +45,6 @@
 //! ```
 //! use undo::{Command, Record};
 //!
-//! #[derive(Debug)]
 //! struct Add(char);
 //!
 //! impl Command<String> for Add {
@@ -91,7 +90,6 @@
 #![deny(
     bad_style,
     bare_trait_objects,
-    missing_debug_implementations,
     missing_docs,
     unused_import_braces,
     unused_qualifications,
@@ -110,6 +108,7 @@ mod record;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
 use std::error::Error;
+#[cfg(feature = "display")]
 use std::fmt;
 
 #[cfg(feature = "display")]
@@ -127,7 +126,7 @@ pub type Result = std::result::Result<(), Box<dyn Error>>;
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
-pub trait Command<R>: fmt::Debug {
+pub trait Command<R> {
     /// Applies the command on the receiver and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     fn apply(&mut self, receiver: &mut R) -> Result;
@@ -153,8 +152,7 @@ pub trait Command<R>: fmt::Debug {
     ///
     /// # Examples
     /// ```
-    /// # use undo::{Command, Merge, Record};
-    /// #[derive(Debug)]
+    /// # use undo::*;
     /// struct Add(char);
     ///
     /// impl Command<String> for Add {
@@ -425,6 +423,7 @@ impl<R> Command<R> for Meta<R> {
     }
 }
 
+#[cfg(feature = "display")]
 impl<R> fmt::Debug for Meta<R> {
     #[inline]
     #[cfg(not(feature = "chrono"))]

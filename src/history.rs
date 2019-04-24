@@ -16,8 +16,7 @@ use std::fmt;
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, History};
-/// # #[derive(Debug)]
+/// # use undo::*;
 /// # struct Add(char);
 /// # impl Command<String> for Add {
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result {
@@ -46,7 +45,7 @@ use std::fmt;
 /// ```
 ///
 /// [Record]: struct.Record.html
-#[derive(Debug)]
+#[cfg_attr(feature = "display", derive(Debug))]
 pub struct History<R> {
     root: usize,
     next: usize,
@@ -599,7 +598,7 @@ impl<R> fmt::Display for History<R> {
 }
 
 /// A branch in the history.
-#[derive(Debug)]
+#[cfg_attr(feature = "display", derive(Debug))]
 pub(crate) struct Branch<R> {
     pub(crate) parent: At,
     pub(crate) commands: VecDeque<Meta<R>>,
@@ -680,18 +679,17 @@ impl<R: Default> HistoryBuilder<R> {
 
 #[cfg(all(test, not(feature = "display")))]
 mod tests {
-    use crate::{Command, History};
+    use crate::*;
 
-    #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
-        fn apply(&mut self, receiver: &mut String) -> crate::Result {
+        fn apply(&mut self, receiver: &mut String) -> Result {
             receiver.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, receiver: &mut String) -> crate::Result {
+        fn undo(&mut self, receiver: &mut String) -> Result {
             self.0 = receiver.pop().ok_or("`receiver` is empty")?;
             Ok(())
         }
