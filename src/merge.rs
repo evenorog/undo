@@ -108,7 +108,7 @@ impl<R> Command<R> for Merged<R> {
 
     #[inline]
     fn merge(&self) -> Merge {
-        self.commands.first().map_or(Merge::Always, Command::merge)
+        self.commands.first().map_or(Merge::Yes, Command::merge)
     }
 
     #[inline]

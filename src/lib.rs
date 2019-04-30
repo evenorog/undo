@@ -167,7 +167,7 @@ pub trait Command<R> {
     ///     }
     ///
     ///     fn merge(&self) -> Merge {
-    ///         Merge::Always
+    ///         Merge::Yes
     ///     }
     /// }
     ///
@@ -189,7 +189,7 @@ pub trait Command<R> {
     /// ```
     #[inline]
     fn merge(&self) -> Merge {
-        Merge::Never
+        Merge::No
     }
 
     /// Says if the command is dead.
@@ -247,7 +247,7 @@ pub trait Command<R>: fmt::Debug + fmt::Display {
     ///     }
     ///
     ///     fn merge(&self) -> Merge {
-    ///         Merge::Always
+    ///         Merge::Yes
     ///     }
     /// }
     ///
@@ -269,7 +269,7 @@ pub trait Command<R>: fmt::Debug + fmt::Display {
     /// ```
     #[inline]
     fn merge(&self) -> Merge {
-        Merge::Never
+        Merge::No
     }
 
     /// Says if the command is dead.
@@ -354,11 +354,11 @@ pub enum Signal {
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Merge {
     /// Always merges.
-    Always,
+    Yes,
     /// Merges if the two commands have the same value.
     If(u32),
     /// Never merges.
-    Never,
+    No,
 }
 
 /// A position in a history tree.

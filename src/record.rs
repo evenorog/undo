@@ -300,7 +300,7 @@ impl<R> Record<R> {
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the receiver is in a saved state.
         let merges = match (meta.merge(), self.commands.back().map(Command::merge)) {
-            (Merge::Always, Some(_)) => !self.is_saved(),
+            (Merge::Yes, Some(_)) => !self.is_saved(),
             (Merge::If(id1), Some(Merge::If(id2))) => id1 == id2 && !self.is_saved(),
             _ => false,
         };
@@ -490,7 +490,7 @@ impl<R> Record<R> {
     #[inline]
     #[cfg(feature = "chrono")]
     pub fn time_travel<Tz: TimeZone>(&mut self, to: &DateTime<Tz>) -> Option<Result> {
-        let to = Utc.from_utc_datetime(&to.naive_utc());
+        let to = to.with_timezone(&Utc);
         let current = match self.commands.as_slices() {
             ([], []) => return None,
             (start, []) => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
