@@ -1,8 +1,10 @@
 use crate::{Command, Merge};
 #[cfg(feature = "display")]
 use std::fmt;
-use std::iter::{FromIterator, IntoIterator};
-use std::vec::IntoIter;
+use std::{
+    iter::{FromIterator, IntoIterator},
+    vec::IntoIter,
+};
 
 /// Macro for merging commands.
 ///
@@ -71,6 +73,18 @@ impl<R> Merged<R> {
     pub fn join(mut self, command: impl Command<R> + 'static) -> Merged<R> {
         self.push(command);
         self
+    }
+
+    /// Returns the amount of commands that have been merged.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
+
+    /// Returns `true` if no commands have been merged.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
     }
 
     /// Overrides the text for the two merged commands.

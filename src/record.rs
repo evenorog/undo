@@ -1,16 +1,14 @@
 #[cfg(feature = "display")]
 use crate::Display;
 use crate::{Checkpoint, Command, History, Merge, Merged, Meta, Queue, Result, Signal};
+use std::{
+    collections::VecDeque, error::Error, fmt, marker::PhantomData, num::NonZeroUsize, result,
+};
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, TimeZone, Utc};
-#[cfg(feature = "chrono")]
-use std::cmp::Ordering;
-use std::collections::VecDeque;
-use std::error::Error;
-use std::fmt;
-use std::marker::PhantomData;
-use std::num::NonZeroUsize;
-use std::result;
+use {
+    chrono::{DateTime, TimeZone, Utc},
+    std::cmp::Ordering,
+};
 
 #[allow(unsafe_code)]
 const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_value()) };

@@ -1,12 +1,10 @@
-#[cfg(feature = "display")]
-use crate::Display;
 use crate::{At, Checkpoint, Command, Meta, Queue, Record, RecordBuilder, Result, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 #[cfg(feature = "display")]
-use std::fmt;
+use {crate::Display, std::fmt};
 
 /// A history of commands.
 ///
