@@ -27,4 +27,4 @@ travis-ci = { repository = "evenorog/undo" }
 maintenance = { status = "actively-developed" }
 
 [package.metadata.docs.rs]
-features = ["chrono"]
+features = ["chrono", "display"]

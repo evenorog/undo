@@ -2,7 +2,8 @@
 use crate::Display;
 use crate::{Checkpoint, Command, History, Merge, Merged, Meta, Queue, Result, Signal};
 use std::{
-    collections::VecDeque, error::Error, fmt, marker::PhantomData, num::NonZeroUsize, result,
+    collections::vec_deque::VecDeque, error::Error, fmt, marker::PhantomData, num::NonZeroUsize,
+    result,
 };
 #[cfg(feature = "chrono")]
 use {

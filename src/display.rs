@@ -49,7 +49,7 @@ impl<T> Display<'_, T> {
 
     /// Use ligature (unicode) in the output (off by default).
     ///
-    /// The ligatures only works as expected with monospaced fonts.
+    /// The ligatures might only work as expected with monospaced fonts.
     #[inline]
     pub fn ligatures(&mut self, on: bool) -> &mut Self {
         self.view.set(View::LIGATURES, on);
