@@ -262,8 +262,7 @@ impl<R> Record<R> {
     /// Pushes the command to the top of the record and executes its [`apply`] method.
     ///
     /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned
-    /// and the state of the record is left unchanged.
+    /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
@@ -342,8 +341,7 @@ impl<R> Record<R> {
     /// the previous one as the new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned
-    /// and the state of the record is left unchanged.
+    /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
@@ -388,8 +386,7 @@ impl<R> Record<R> {
     /// new active one.
     ///
     /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned and the state
-    /// of the record is left unchanged.
+    /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
@@ -432,8 +429,7 @@ impl<R> Record<R> {
     /// Repeatedly calls [`undo`] or [`redo`] until the command at `current` is reached.
     ///
     /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned
-    /// and the state of the record is left unchanged.
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
