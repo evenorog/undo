@@ -375,10 +375,12 @@ impl<R> History<R> {
         Some(Ok(()))
     }
 
-    /// Go back or forward in time.
+    /// Go back or forward in the history to the command that was made closest to the datetime provided.
+    ///
+    /// This method does not jump across branches.
     #[inline]
     #[cfg(feature = "chrono")]
-    pub fn time_travel<Tz: TimeZone>(&mut self, to: &DateTime<Tz>) -> Option<Result> {
+    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result> {
         self.record.time_travel(to)
     }
 

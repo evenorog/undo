@@ -481,10 +481,10 @@ impl<R> Record<R> {
         Some(Ok(()))
     }
 
-    /// Go back or forward in time.
+    /// Go back or forward in the record to the command that was made closest to the datetime provided.
     #[inline]
     #[cfg(feature = "chrono")]
-    pub fn time_travel<Tz: TimeZone>(&mut self, to: &DateTime<Tz>) -> Option<Result> {
+    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result> {
         let to = to.with_timezone(&Utc);
         let current = match self.commands.as_slices() {
             ([], []) => return None,
@@ -864,10 +864,9 @@ mod tests {
         let a = chrono::Utc::now();
         record.apply(Add('b')).unwrap();
         record.apply(Add('c')).unwrap();
-        let abc = chrono::Utc::now();
         record.time_travel(&a).unwrap().unwrap();
         assert_eq!(record.as_receiver(), "a");
-        record.time_travel(&abc).unwrap().unwrap();
+        record.time_travel(&chrono::Utc::now()).unwrap().unwrap();
         assert_eq!(record.as_receiver(), "abc");
     }
 }
