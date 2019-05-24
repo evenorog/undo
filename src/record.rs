@@ -175,15 +175,13 @@ impl<R> Record<R> {
         &mut self,
         slot: impl FnMut(Signal) + 'static,
     ) -> Option<impl FnMut(Signal) + 'static> {
-        self.slot
-            .replace(Box::new(slot))
-            .map(|mut slot| move |signal| slot(signal))
+        self.slot.replace(Box::from(slot))
     }
 
     /// Removes and returns the slot.
     #[inline]
     pub fn disconnect(&mut self) -> Option<impl FnMut(Signal) + 'static> {
-        self.slot.take().map(|mut slot| move |signal| slot(signal))
+        self.slot.take()
     }
 
     /// Returns `true` if the record can undo.
