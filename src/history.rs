@@ -2,7 +2,7 @@ use crate::{At, Checkpoint, Command, Meta, Queue, Record, RecordBuilder, Result,
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
-use std::collections::vec_deque::VecDeque;
+use std::collections::VecDeque;
 #[cfg(feature = "display")]
 use {crate::Display, std::fmt};
 
