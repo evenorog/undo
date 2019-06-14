@@ -36,13 +36,15 @@ use std::{
 #[macro_export]
 macro_rules! merge {
     ($($commands:expr),*) => {{
-        let mut merged = $crate::Merged::default();
+        let mut merged = $crate::Merged::new();
         $(merged.push($commands);)*
         merged
     }};
 }
 
-/// The result of merging commands.
+/// Merged commands.
+///
+/// Commands that have been merged are all executed in the order they was merged in when applied.
 ///
 /// The [`merge!`](macro.merge.html) macro can be used for convenience when merging commands.
 pub struct Merged<R> {
@@ -52,13 +54,34 @@ pub struct Merged<R> {
 }
 
 impl<R> Merged<R> {
+    /// Returns an empty command.
+    #[inline]
+    pub fn new() -> Merged<R> {
+        Merged {
+            commands: vec![],
+            #[cfg(feature = "display")]
+            text: None,
+        }
+    }
+
     /// Merges `cmd1` and `cmd2` into a single command.
     #[inline]
-    pub fn new(cmd1: impl Command<R> + 'static, cmd2: impl Command<R> + 'static) -> Merged<R> {
+    pub fn merge(cmd1: impl Command<R> + 'static, cmd2: impl Command<R> + 'static) -> Merged<R> {
         Merged {
             commands: vec![Box::new(cmd1), Box::new(cmd2)],
             #[cfg(feature = "display")]
             text: None,
+        }
+    }
+
+    /// Creates a new command with the provided text.
+    #[inline]
+    #[cfg(feature = "display")]
+    pub fn with_text(text: impl Into<String>) -> Merged<R> {
+        Merged {
+            commands: vec![],
+            #[cfg(feature = "display")]
+            text: Some(text.into()),
         }
     }
 
@@ -87,7 +110,14 @@ impl<R> Merged<R> {
         self.commands.is_empty()
     }
 
-    /// Overrides the text for the two merged commands.
+    /// Returns the text for the merged commands.
+    #[inline]
+    #[cfg(feature = "display")]
+    pub fn text(&self) -> Option<&str> {
+        self.text.as_ref().map(String::as_str)
+    }
+
+    /// Sets the text for the merged commands.
     #[inline]
     #[cfg(feature = "display")]
     pub fn set_text(&mut self, text: impl Into<String>) {
@@ -134,11 +164,7 @@ impl<R> Command<R> for Merged<R> {
 impl<R> Default for Merged<R> {
     #[inline]
     fn default() -> Self {
-        Merged {
-            commands: Vec::default(),
-            #[cfg(feature = "display")]
-            text: None,
-        }
+        Merged::new()
     }
 }
 

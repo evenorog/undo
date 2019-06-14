@@ -301,7 +301,7 @@ impl<R> Record<R> {
         };
         if merges {
             // Merge the command with the one on the top of the stack.
-            let merged = Merged::new(self.commands.pop_back().unwrap(), meta);
+            let merged = Merged::merge(self.commands.pop_back().unwrap(), meta);
             self.commands.push_back(Meta::new(merged));
         } else {
             // If commands are not merged push it onto the record.
