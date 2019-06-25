@@ -21,7 +21,7 @@
 //!
 //! # Concepts
 //!
-//! * Commands can be merged before it is applied to the data-structures by using the [merge!] macro.
+//! * Commands can be merged before it is applied to the data-structures using [Merged].
 //!   This makes it easy to build complex operations from smaller ones by combining them into a single command
 //!   that can be applied, undone, and redone in a single step.
 //! * Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
@@ -82,7 +82,7 @@
 //! [History]: struct.History.html
 //! [Queue]: struct.Queue.html
 //! [Checkpoint]: struct.Checkpoint.html
-//! [merge!]: macro.merge.html
+//! [Merged]: struct.Merged.html
 //! [merge]: trait.Command.html#method.merge
 //! [redo]: https://github.com/evenorog/redo
 

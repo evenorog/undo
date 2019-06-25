@@ -6,9 +6,12 @@ use std::{
     vec::IntoIter,
 };
 
-/// Macro for merging commands.
+/// Merged commands.
+///
+/// Commands that have been merged are all executed in the order they was merged in when applied.
 ///
 /// # Examples
+///
 /// ```
 /// # use undo::*;
 /// # struct Add(char);
@@ -24,29 +27,15 @@ use std::{
 /// # }
 /// # fn main() -> undo::Result {
 /// let mut record = Record::default();
-/// record.apply(merge![Add('a'), Add('b'), Add('c')])?;
-/// assert_eq!(record.as_receiver(), "abc");
+/// record.apply(Merged::merge(Add('a'), Add('b')))?;
+/// assert_eq!(record.as_receiver(), "ab");
 /// record.undo().unwrap()?;
 /// assert_eq!(record.as_receiver(), "");
 /// record.redo().unwrap()?;
-/// assert_eq!(record.as_receiver(), "abc");
+/// assert_eq!(record.as_receiver(), "ab");
 /// # Ok(())
 /// # }
 /// ```
-#[macro_export]
-macro_rules! merge {
-    ($($commands:expr),*) => {{
-        let mut merged = $crate::Merged::new();
-        $(merged.push($commands);)*
-        merged
-    }};
-}
-
-/// Merged commands.
-///
-/// Commands that have been merged are all executed in the order they was merged in when applied.
-///
-/// The [`merge!`](macro.merge.html) macro can be used for convenience when merging commands.
 pub struct Merged<R> {
     commands: Vec<Box<dyn Command<R>>>,
     #[cfg(feature = "display")]
@@ -64,16 +53,6 @@ impl<R> Merged<R> {
         }
     }
 
-    /// Merges `cmd1` and `cmd2` into a single command.
-    #[inline]
-    pub fn merge(cmd1: impl Command<R> + 'static, cmd2: impl Command<R> + 'static) -> Merged<R> {
-        Merged {
-            commands: vec![Box::new(cmd1), Box::new(cmd2)],
-            #[cfg(feature = "display")]
-            text: None,
-        }
-    }
-
     /// Creates a new command with the provided text.
     #[inline]
     #[cfg(feature = "display")]
@@ -82,6 +61,16 @@ impl<R> Merged<R> {
             commands: vec![],
             #[cfg(feature = "display")]
             text: Some(text.into()),
+        }
+    }
+
+    /// Merges `cmd1` and `cmd2` into a single command.
+    #[inline]
+    pub fn merge(cmd1: impl Command<R> + 'static, cmd2: impl Command<R> + 'static) -> Merged<R> {
+        Merged {
+            commands: vec![Box::new(cmd1), Box::new(cmd2)],
+            #[cfg(feature = "display")]
+            text: None,
         }
     }
 
@@ -224,11 +213,8 @@ impl<R> fmt::Display for Merged<R> {
         match &self.text {
             Some(text) => f.write_str(text),
             None => {
-                if let Some((first, commands)) = self.commands.split_first() {
-                    (first as &dyn fmt::Display).fmt(f)?;
-                    for command in commands {
-                        write!(f, "\n\n{}", command)?;
-                    }
+                for command in &self.commands {
+                    writeln!(f, "- {}", command)?;
                 }
                 Ok(())
             }

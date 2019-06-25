@@ -27,7 +27,7 @@ but is more focused on ease of use instead of performance.
 
 # Concepts
 
-* Commands can be merged before it is applied to the data-structures by using the [merge!] macro.
+* Commands can be merged before it is applied to the data-structures using [Merged].
   This makes it easy to build complex operations from smaller ones by combining them into a single command
   that can be applied, undone, and redone in a single step.
 * Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
@@ -83,7 +83,7 @@ fn main() -> undo::Result {
 }
 ```
 
-## License
+### License
 
 Licensed under either of
 
@@ -103,6 +103,6 @@ additional terms or conditions.
 [History]: https://docs.rs/undo/latest/undo/struct.History.html
 [Queue]: https://docs.rs/undo/latest/undo/struct.Queue.html
 [Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
-[merge!]: https://docs.rs/undo/latest/undo/macro.merge.html
+[Merged]: https://docs.rs/undo/latest/undo/struct.Merged.html
 [merge]: https://docs.rs/undo/latest/undo/trait.Command.html#method.merge
 [redo]: https://github.com/evenorog/redo
