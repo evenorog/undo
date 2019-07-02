@@ -6,9 +6,9 @@ use std::{
     vec::IntoIter,
 };
 
-/// Merged commands.
+/// A chain of merged commands.
 ///
-/// Commands that have been merged are all executed in the order they was merged in when applied.
+/// Commands in a chain are all executed in the order they was merged in.
 ///
 /// # Examples
 ///
@@ -27,7 +27,10 @@ use std::{
 /// # }
 /// # fn main() -> undo::Result {
 /// let mut record = Record::default();
-/// record.apply(Merged::merge(Add('a'), Add('b')))?;
+/// let chain = Chain::new()
+///     .join(Add('a'))
+///     .join(Add('b'));
+/// record.apply(chain)?;
 /// assert_eq!(record.as_receiver(), "ab");
 /// record.undo().unwrap()?;
 /// assert_eq!(record.as_receiver(), "");
@@ -36,18 +39,20 @@ use std::{
 /// # Ok(())
 /// # }
 /// ```
-pub struct Merged<R> {
+pub struct Chain<R> {
     commands: Vec<Box<dyn Command<R>>>,
+    merge: Option<Merge>,
     #[cfg(feature = "display")]
     text: Option<String>,
 }
 
-impl<R> Merged<R> {
+impl<R> Chain<R> {
     /// Returns an empty command.
     #[inline]
-    pub fn new() -> Merged<R> {
-        Merged {
+    pub fn new() -> Chain<R> {
+        Chain {
             commands: vec![],
+            merge: None,
             #[cfg(feature = "display")]
             text: None,
         }
@@ -56,35 +61,39 @@ impl<R> Merged<R> {
     /// Creates a new command with the provided text.
     #[inline]
     #[cfg(feature = "display")]
-    pub fn with_text(text: impl Into<String>) -> Merged<R> {
-        Merged {
+    pub fn with_text(text: impl Into<String>) -> Chain<R> {
+        Chain {
             commands: vec![],
+            merge: None,
             #[cfg(feature = "display")]
             text: Some(text.into()),
         }
     }
 
-    /// Merges `cmd1` and `cmd2` into a single command.
+    /// Returns an empty command with the specified capacity.
     #[inline]
-    pub fn merge(cmd1: impl Command<R> + 'static, cmd2: impl Command<R> + 'static) -> Merged<R> {
-        Merged {
-            commands: vec![Box::new(cmd1), Box::new(cmd2)],
+    pub fn with_capacity(capacity: usize) -> Chain<R> {
+        Chain {
+            commands: Vec::with_capacity(capacity),
+            merge: None,
             #[cfg(feature = "display")]
             text: None,
         }
     }
 
-    /// Merges `self` with `command`.
+    /// Reserves capacity for at least `additional` more commands in the chain.
+    ///
+    /// # Panics
+    /// Panics if the new capacity overflows usize.
     #[inline]
-    pub fn push(&mut self, command: impl Command<R> + 'static) {
-        self.commands.push(Box::new(command));
+    pub fn reserve(&mut self, additional: usize) {
+        self.commands.reserve(additional);
     }
 
-    /// Merges `self` with `command` and returns the merged command.
+    /// Returns the capacity of the chain.
     #[inline]
-    pub fn join(mut self, command: impl Command<R> + 'static) -> Merged<R> {
-        self.push(command);
-        self
+    pub fn capacity(&self) -> usize {
+        self.commands.capacity()
     }
 
     /// Returns the amount of commands that have been merged.
@@ -99,14 +108,33 @@ impl<R> Merged<R> {
         self.commands.is_empty()
     }
 
-    /// Returns the text for the merged commands.
+    /// Merges the command with the chain.
+    #[inline]
+    pub fn push(&mut self, command: impl Command<R> + 'static) {
+        self.commands.push(Box::new(command));
+    }
+
+    /// Merges the command with the chain and returns the chain.
+    #[inline]
+    pub fn join(mut self, command: impl Command<R> + 'static) -> Chain<R> {
+        self.push(command);
+        self
+    }
+
+    /// Sets the merge behavior of the chain.
+    #[inline]
+    pub fn set_merge(&mut self, merge: Merge) {
+        self.merge = Some(merge);
+    }
+
+    /// Returns the text for the chain.
     #[inline]
     #[cfg(feature = "display")]
     pub fn text(&self) -> Option<&str> {
         self.text.as_ref().map(String::as_str)
     }
 
-    /// Sets the text for the merged commands.
+    /// Sets the text for the chain.
     #[inline]
     #[cfg(feature = "display")]
     pub fn set_text(&mut self, text: impl Into<String>) {
@@ -114,7 +142,7 @@ impl<R> Merged<R> {
     }
 }
 
-impl<R> Command<R> for Merged<R> {
+impl<R> Command<R> for Chain<R> {
     #[inline]
     fn apply(&mut self, receiver: &mut R) -> crate::Result {
         for command in &mut self.commands {
@@ -141,7 +169,9 @@ impl<R> Command<R> for Merged<R> {
 
     #[inline]
     fn merge(&self) -> Merge {
-        self.commands.first().map_or(Merge::Yes, Command::merge)
+        self.merge
+            .or_else(|| self.commands.first().map(Command::merge))
+            .unwrap_or(Merge::Yes)
     }
 
     #[inline]
@@ -150,25 +180,26 @@ impl<R> Command<R> for Merged<R> {
     }
 }
 
-impl<R> Default for Merged<R> {
+impl<R> Default for Chain<R> {
     #[inline]
     fn default() -> Self {
-        Merged::new()
+        Chain::new()
     }
 }
 
-impl<R, C: Command<R> + 'static> FromIterator<C> for Merged<R> {
+impl<R, C: Command<R> + 'static> FromIterator<C> for Chain<R> {
     #[inline]
     fn from_iter<T: IntoIterator<Item = C>>(commands: T) -> Self {
-        Merged {
+        Chain {
             commands: commands.into_iter().map(|c| Box::new(c) as _).collect(),
+            merge: None,
             #[cfg(feature = "display")]
             text: None,
         }
     }
 }
 
-impl<R> IntoIterator for Merged<R> {
+impl<R> IntoIterator for Chain<R> {
     type Item = Box<dyn Command<R>>;
     type IntoIter = IntoIter<Self::Item>;
 
@@ -178,7 +209,7 @@ impl<R> IntoIterator for Merged<R> {
     }
 }
 
-impl<R, C: Command<R> + 'static> Extend<C> for Merged<R> {
+impl<R, C: Command<R> + 'static> Extend<C> for Chain<R> {
     #[inline]
     fn extend<T: IntoIterator<Item = C>>(&mut self, iter: T) {
         self.commands
@@ -187,7 +218,7 @@ impl<R, C: Command<R> + 'static> Extend<C> for Merged<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Debug for Merged<R> {
+impl<R> fmt::Debug for Chain<R> {
     #[inline]
     #[cfg(not(feature = "display"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -207,7 +238,7 @@ impl<R> fmt::Debug for Merged<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Display for Merged<R> {
+impl<R> fmt::Display for Chain<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.text {

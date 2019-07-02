@@ -1,6 +1,6 @@
 #[cfg(feature = "display")]
 use crate::Display;
-use crate::{Checkpoint, Command, History, Merge, Merged, Meta, Queue, Result, Signal};
+use crate::{Chain, Checkpoint, Command, History, Merge, Meta, Queue, Result, Signal};
 use std::{
     collections::VecDeque, error::Error, fmt, marker::PhantomData, num::NonZeroUsize, result,
 };
@@ -301,8 +301,10 @@ impl<R> Record<R> {
         };
         if merges {
             // Merge the command with the one on the top of the stack.
-            let merged = Merged::merge(self.commands.pop_back().unwrap(), meta);
-            self.commands.push_back(Meta::new(merged));
+            let command = Chain::with_capacity(2)
+                .join(self.commands.pop_back().unwrap())
+                .join(meta);
+            self.commands.push_back(Meta::new(command));
         } else {
             // If commands are not merged push it onto the record.
             if self.limit() == self.current() {
