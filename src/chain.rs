@@ -27,7 +27,7 @@ use std::{
 /// # }
 /// # fn main() -> undo::Result {
 /// let mut record = Record::default();
-/// let chain = Chain::new()
+/// let chain = Chain::with_capacity(2)
 ///     .join(Add('a'))
 ///     .join(Add('b'));
 /// record.apply(chain)?;
@@ -96,7 +96,7 @@ impl<R> Chain<R> {
         self.commands.capacity()
     }
 
-    /// Returns the amount of commands that have been merged.
+    /// Returns the amount of commands in the chain.
     #[inline]
     pub fn len(&self) -> usize {
         self.commands.len()
@@ -122,6 +122,9 @@ impl<R> Chain<R> {
     }
 
     /// Sets the merge behavior of the chain.
+    ///
+    /// By default the merge behavior of the first command in the chain is used,
+    /// and it always merges if the chain is empty.
     #[inline]
     pub fn set_merge(&mut self, merge: Merge) {
         self.merge = Some(merge);
@@ -220,18 +223,10 @@ impl<R, C: Command<R> + 'static> Extend<C> for Chain<R> {
 #[cfg(feature = "display")]
 impl<R> fmt::Debug for Chain<R> {
     #[inline]
-    #[cfg(not(feature = "display"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Merged")
+        f.debug_struct("Chain")
             .field("commands", &self.commands)
-            .finish()
-    }
-
-    #[inline]
-    #[cfg(feature = "display")]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Merged")
-            .field("commands", &self.commands)
+            .field("merge", &self.merge)
             .field("text", &self.text)
             .finish()
     }
