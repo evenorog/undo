@@ -58,7 +58,7 @@ impl<R> Chain<R> {
         }
     }
 
-    /// Creates a new command with the provided text.
+    /// Returns an empty command with the specified display text.
     #[inline]
     #[cfg(feature = "display")]
     pub fn with_text(text: impl Into<String>) -> Chain<R> {
@@ -124,20 +124,15 @@ impl<R> Chain<R> {
     /// Sets the merge behavior of the chain.
     ///
     /// By default the merge behavior of the first command in the chain is used,
-    /// and it always merges if the chain is empty.
+    /// and it merges if the chain is empty.
     #[inline]
     pub fn set_merge(&mut self, merge: Merge) {
         self.merge = Some(merge);
     }
 
-    /// Returns the text for the chain.
-    #[inline]
-    #[cfg(feature = "display")]
-    pub fn text(&self) -> Option<&str> {
-        self.text.as_ref().map(String::as_str)
-    }
-
-    /// Sets the text for the chain.
+    /// Sets the display text for the chain.
+    ///
+    /// By default the display text will be the display text for every command in the chain.
     #[inline]
     #[cfg(feature = "display")]
     pub fn set_text(&mut self, text: impl Into<String>) {
