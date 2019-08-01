@@ -1,6 +1,6 @@
 [package]
 name = "undo"
-version = "0.35.0"
+version = "0.36.0"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "Provides undo-redo functionality with dynamic dispatch and automatic command merging."
 documentation = "https://docs.rs/undo"
