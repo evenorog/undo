@@ -96,6 +96,12 @@ impl<R> Chain<R> {
         self.commands.capacity()
     }
 
+    /// Shrinks the capacity of the chain as much as possible.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.commands.shrink_to_fit();
+    }
+
     /// Returns the amount of commands in the chain.
     #[inline]
     pub fn len(&self) -> usize {

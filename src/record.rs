@@ -105,6 +105,12 @@ impl<R> Record<R> {
         self.commands.capacity()
     }
 
+    /// Shrinks the capacity of the record as much as possible.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.commands.shrink_to_fit();
+    }
+
     /// Returns the number of commands in the record.
     #[inline]
     pub fn len(&self) -> usize {

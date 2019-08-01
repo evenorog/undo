@@ -72,6 +72,12 @@ impl<'a, T, R> Queue<'a, T, R> {
         self.queue.capacity()
     }
 
+    /// Shrinks the capacity of the queue as much as possible.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.queue.shrink_to_fit();
+    }
+
     /// Returns the number of commands in the queue.
     #[inline]
     pub fn len(&self) -> usize {

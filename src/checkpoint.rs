@@ -73,6 +73,12 @@ impl<'a, T, R> Checkpoint<'a, T, R> {
         self.stack.capacity()
     }
 
+    /// Shrinks the capacity of the checkpoint as much as possible.
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.stack.shrink_to_fit();
+    }
+
     /// Returns the number of commands in the checkpoint.
     #[inline]
     pub fn len(&self) -> usize {
