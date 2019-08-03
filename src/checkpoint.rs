@@ -257,7 +257,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     where
         R: 'static,
     {
-        let root = self.inner.root();
+        let root = self.inner.branch();
         let old = self.inner.current();
         self.inner.apply(command)?;
         self.stack.push(Action::GoTo(root, old));
@@ -300,7 +300,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     where
         R: 'static,
     {
-        let root = self.inner.root();
+        let root = self.inner.branch();
         let old = self.inner.current();
         match self.inner.go_to(branch, current) {
             Some(Ok(_)) => {

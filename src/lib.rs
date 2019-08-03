@@ -339,10 +339,10 @@ pub enum Signal {
         /// The new current command.
         new: usize,
     },
-    /// Says if the current branch, or root, has changed.
+    /// Says if the current branch has changed.
     ///
     /// This is only emitted from `History`.
-    Root {
+    Branch {
         /// The old root.
         old: usize,
         /// The new root.
