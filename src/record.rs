@@ -81,13 +81,7 @@ impl<R> Record<R> {
     /// Returns a builder for a record.
     #[inline]
     pub fn builder() -> RecordBuilder<R> {
-        RecordBuilder {
-            receiver: PhantomData,
-            capacity: 0,
-            limit: MAX_LIMIT,
-            saved: true,
-            slot: None,
-        }
+        RecordBuilder::new()
     }
 
     /// Reserves capacity for at least `additional` more commands.
@@ -678,6 +672,18 @@ pub struct RecordBuilder<R> {
 }
 
 impl<R> RecordBuilder<R> {
+    /// Returns a builder for a record.
+    #[inline]
+    pub fn new() -> RecordBuilder<R> {
+        RecordBuilder {
+            receiver: PhantomData,
+            capacity: 0,
+            limit: MAX_LIMIT,
+            saved: true,
+            slot: None,
+        }
+    }
+
     /// Sets the capacity for the record.
     #[inline]
     pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R> {
@@ -722,6 +728,13 @@ impl<R> RecordBuilder<R> {
             saved: if self.saved { Some(0) } else { None },
             slot: self.slot,
         }
+    }
+}
+
+impl<R> Default for RecordBuilder<R> {
+    #[inline]
+    fn default() -> Self {
+        RecordBuilder::new()
     }
 }
 
