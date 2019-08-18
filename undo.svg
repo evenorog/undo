@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg">
-    <text fill="#2d8474" dominant-baseline="text-before-edge" font-size="120" font-family="Times New Roman" font-weight="lighter">
-        und<tspan alignment-baseline="text-before-edge" fill="#ab56bc">↺</tspan>
+    <text fill="#2d8474" dominant-baseline="text-before-edge" font-size="120" font-family="Times New Roman" font-weight="lighter" style="stroke: #226559;">
+        und<tspan alignment-baseline="text-before-edge" fill="#ab56bc" style="stroke: #824090">↺</tspan>
     </text>
 </svg>
