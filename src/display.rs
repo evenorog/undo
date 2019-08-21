@@ -1,4 +1,4 @@
-use crate::{At, History, Meta, Record};
+use crate::{At, Entry, History, Record};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
 use colored::{Color, Colorize};
@@ -81,12 +81,12 @@ impl<R> Display<'_, History<R>> {
 
 impl<R> Display<'_, Record<R>> {
     #[inline]
-    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, meta: &Meta<R>) -> fmt::Result {
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<R>) -> fmt::Result {
         self.view.mark(f, 0)?;
         self.view.position(f, at, false)?;
         if self.view.detailed {
             #[cfg(feature = "chrono")]
-            self.view.timestamp(f, &meta.timestamp)?;
+            self.view.timestamp(f, &entry.timestamp)?;
         }
         self.view.current(
             f,
@@ -106,10 +106,10 @@ impl<R> Display<'_, Record<R>> {
         )?;
         if self.view.detailed {
             writeln!(f)?;
-            self.view.message(f, meta, 0)
+            self.view.message(f, entry, 0)
         } else {
             f.write_char(' ')?;
-            self.view.message(f, meta, 0)?;
+            self.view.message(f, entry, 0)?;
             writeln!(f)
         }
     }
@@ -121,14 +121,14 @@ impl<R> Display<'_, History<R>> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        meta: &Meta<R>,
+        entry: &Entry<R>,
         level: usize,
     ) -> fmt::Result {
         self.view.mark(f, level)?;
         self.view.position(f, at, true)?;
         if self.view.detailed {
             #[cfg(feature = "chrono")]
-            self.view.timestamp(f, &meta.timestamp)?;
+            self.view.timestamp(f, &entry.timestamp)?;
         }
         self.view.current(
             f,
@@ -152,10 +152,10 @@ impl<R> Display<'_, History<R>> {
         )?;
         if self.view.detailed {
             writeln!(f)?;
-            self.view.message(f, meta, level)
+            self.view.message(f, entry, level)
         } else {
             f.write_char(' ')?;
-            self.view.message(f, meta, level)?;
+            self.view.message(f, entry, level)?;
             writeln!(f)
         }
     }
@@ -165,7 +165,7 @@ impl<R> Display<'_, History<R>> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        meta: &Meta<R>,
+        entry: &Entry<R>,
         level: usize,
     ) -> fmt::Result {
         for (&i, branch) in self
@@ -192,7 +192,7 @@ impl<R> Display<'_, History<R>> {
             self.view.edge(f, i)?;
             f.write_char(' ')?;
         }
-        self.fmt_list(f, at, meta, level)
+        self.fmt_list(f, at, entry, level)
     }
 }
 

@@ -368,16 +368,16 @@ struct At {
     current: usize,
 }
 
-struct Meta<R> {
+struct Entry<R> {
     command: Box<dyn Command<R>>,
     #[cfg(feature = "chrono")]
     timestamp: DateTime<Utc>,
 }
 
-impl<R> Meta<R> {
+impl<R> Entry<R> {
     #[inline]
-    fn new(command: impl Command<R> + 'static) -> Meta<R> {
-        Meta {
+    fn new(command: impl Command<R> + 'static) -> Entry<R> {
+        Entry {
             command: Box::new(command),
             #[cfg(feature = "chrono")]
             timestamp: Utc::now(),
@@ -385,10 +385,10 @@ impl<R> Meta<R> {
     }
 }
 
-impl<R> From<Box<dyn Command<R>>> for Meta<R> {
+impl<R> From<Box<dyn Command<R>>> for Entry<R> {
     #[inline]
     fn from(command: Box<dyn Command<R>>) -> Self {
-        Meta {
+        Entry {
             command,
             #[cfg(feature = "chrono")]
             timestamp: Utc::now(),
@@ -396,7 +396,7 @@ impl<R> From<Box<dyn Command<R>>> for Meta<R> {
     }
 }
 
-impl<R> Command<R> for Meta<R> {
+impl<R> Command<R> for Entry<R> {
     #[inline]
     fn apply(&mut self, receiver: &mut R) -> Result {
         self.command.apply(receiver)
@@ -424,7 +424,7 @@ impl<R> Command<R> for Meta<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Debug for Meta<R> {
+impl<R> fmt::Debug for Entry<R> {
     #[inline]
     #[cfg(not(feature = "chrono"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -444,7 +444,7 @@ impl<R> fmt::Debug for Meta<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Display for Meta<R> {
+impl<R> fmt::Display for Entry<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.command as &dyn fmt::Display).fmt(f)

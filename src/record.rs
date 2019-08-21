@@ -1,6 +1,6 @@
 #[cfg(feature = "display")]
 use crate::Display;
-use crate::{Chain, Checkpoint, Command, History, Merge, Meta, Queue, Result, Signal};
+use crate::{Chain, Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal};
 use std::{
     collections::VecDeque, error::Error, fmt, marker::PhantomData, num::NonZeroUsize, result,
 };
@@ -56,7 +56,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
 pub struct Record<R> {
-    pub(crate) commands: VecDeque<Meta<R>>,
+    pub(crate) commands: VecDeque<Entry<R>>,
     receiver: R,
     current: usize,
     limit: NonZeroUsize,
@@ -267,21 +267,21 @@ impl<R> Record<R> {
     where
         R: 'static,
     {
-        self.__apply(Meta::new(command)).map(|_| ())
+        self.__apply(Entry::new(command)).map(|_| ())
     }
 
     #[inline]
     pub(crate) fn __apply(
         &mut self,
-        mut meta: Meta<R>,
-    ) -> result::Result<(bool, VecDeque<Meta<R>>), Box<dyn Error>>
+        mut entry: Entry<R>,
+    ) -> result::Result<(bool, VecDeque<Entry<R>>), Box<dyn Error>>
     where
         R: 'static,
     {
-        if meta.is_dead() {
+        if entry.is_dead() {
             return Ok((false, VecDeque::new()));
         }
-        if let Err(error) = meta.apply(&mut self.receiver) {
+        if let Err(error) = entry.apply(&mut self.receiver) {
             return Err(error);
         }
         let current = self.current();
@@ -294,7 +294,7 @@ impl<R> Record<R> {
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the receiver is in a saved state.
-        let merges = match (meta.merge(), self.commands.back().map(Command::merge)) {
+        let merges = match (entry.merge(), self.commands.back().map(Command::merge)) {
             (Merge::Yes, Some(_)) => !self.is_saved(),
             (Merge::If(id1), Some(Merge::If(id2))) => id1 == id2 && !self.is_saved(),
             _ => false,
@@ -303,8 +303,8 @@ impl<R> Record<R> {
             // Merge the command with the one on the top of the stack.
             let command = Chain::with_capacity(2)
                 .join(self.commands.pop_back().unwrap())
-                .join(meta);
-            self.commands.push_back(Meta::new(command));
+                .join(entry);
+            self.commands.push_back(Entry::new(command));
         } else {
             // If commands are not merged push it onto the record.
             if self.limit() == self.current() {
@@ -314,7 +314,7 @@ impl<R> Record<R> {
             } else {
                 self.current += 1;
             }
-            self.commands.push_back(meta);
+            self.commands.push_back(entry);
         }
         debug_assert_eq!(self.current(), self.len());
         if let Some(ref mut slot) = self.slot {
@@ -487,18 +487,18 @@ impl<R> Record<R> {
         let to = to.with_timezone(&Utc);
         let current = match self.commands.as_slices() {
             ([], []) => return None,
-            (start, []) => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+            (start, []) => match start.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
                 Ok(current) | Err(current) => current,
             },
-            ([], end) => match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+            ([], end) => match end.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
                 Ok(current) | Err(current) => current,
             },
             (start, end) => match start.last().unwrap().timestamp.cmp(&to) {
-                Ordering::Less => match start.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+                Ordering::Less => match start.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
                     Ok(current) | Err(current) => current,
                 },
                 Ordering::Equal => start.len(),
-                Ordering::Greater => match end.binary_search_by(|meta| meta.timestamp.cmp(&to)) {
+                Ordering::Greater => match end.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
                     Ok(current) | Err(current) => start.len() + current,
                 },
             },

@@ -1,4 +1,4 @@
-use crate::{Command, History, Meta, Queue, Record, Result};
+use crate::{Command, Entry, History, Queue, Record, Result};
 use std::collections::VecDeque;
 
 /// A checkpoint wrapper.
@@ -105,7 +105,7 @@ impl<R> Checkpoint<'_, Record<R>, R> {
     where
         R: 'static,
     {
-        let (_, v) = self.inner.__apply(Meta::new(command))?;
+        let (_, v) = self.inner.__apply(Entry::new(command))?;
         self.stack.push(Action::Apply(v));
         Ok(())
     }
@@ -405,7 +405,7 @@ impl<R> AsMut<R> for Checkpoint<'_, History<R>, R> {
 /// An action that can be applied to a Record or History.
 #[cfg_attr(feature = "display", derive(Debug))]
 enum Action<R> {
-    Apply(VecDeque<Meta<R>>),
+    Apply(VecDeque<Entry<R>>),
     Undo,
     Redo,
     GoTo(usize, usize),

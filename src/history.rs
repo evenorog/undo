@@ -1,4 +1,4 @@
-use crate::{At, Checkpoint, Command, Meta, Queue, Record, RecordBuilder, Result, Signal};
+use crate::{At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Result, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use rustc_hash::FxHashMap;
@@ -242,7 +242,7 @@ impl<R> History<R> {
     {
         let current = self.current();
         let saved = self.record.saved.filter(|&saved| saved > current);
-        let (merged, commands) = self.record.__apply(Meta::new(command))?;
+        let (merged, commands) = self.record.__apply(Entry::new(command))?;
         // Check if the limit has been reached.
         if !merged && current == self.current() {
             let root = self.branch();
@@ -334,10 +334,10 @@ impl<R> History<R> {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
-            for meta in branch.commands {
+            for entry in branch.commands {
                 let current = self.current();
                 let saved = self.record.saved.filter(|&saved| saved > current);
-                let commands = match self.record.__apply(meta) {
+                let commands = match self.record.__apply(entry) {
                     Ok((_, commands)) => commands,
                     Err(err) => return Some(Err(err)),
                 };
@@ -601,7 +601,7 @@ impl<R> fmt::Display for History<R> {
 #[cfg_attr(feature = "display", derive(Debug))]
 pub(crate) struct Branch<R> {
     pub(crate) parent: At,
-    pub(crate) commands: VecDeque<Meta<R>>,
+    pub(crate) commands: VecDeque<Entry<R>>,
 }
 
 /// Builder for a History.
