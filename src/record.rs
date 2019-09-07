@@ -541,6 +541,8 @@ impl<R> Record<R> {
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
+    /// Requires the `display` feature to be enabled.
+    ///
     /// [`undo`]: struct.Record.html#method.undo
     #[inline]
     #[cfg(feature = "display")]
@@ -554,6 +556,8 @@ impl<R> Record<R> {
 
     /// Returns the string of the command which will be redone in the next call to [`redo`].
     ///
+    /// Requires the `display` feature to be enabled.
+    ///
     /// [`redo`]: struct.Record.html#method.redo
     #[inline]
     #[cfg(feature = "display")]
@@ -566,6 +570,8 @@ impl<R> Record<R> {
     }
 
     /// Returns a structure for configurable formatting of the record.
+    ///
+    /// Requires the `display` feature to be enabled.
     #[inline]
     #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {

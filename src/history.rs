@@ -423,6 +423,8 @@ impl<R> History<R> {
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
+    /// Requires the `display` feature to be enabled.
+    ///
     /// [`undo`]: struct.History.html#method.undo
     #[inline]
     #[cfg(feature = "display")]
@@ -432,6 +434,8 @@ impl<R> History<R> {
 
     /// Returns the string of the command which will be redone in the next call to [`redo`].
     ///
+    /// Requires the `display` feature to be enabled.
+    ///
     /// [`redo`]: struct.History.html#method.redo
     #[inline]
     #[cfg(feature = "display")]
@@ -440,6 +444,8 @@ impl<R> History<R> {
     }
 
     /// Returns a structure for configurable formatting of the history.
+    ///
+    /// Requires the `display` feature to be enabled.
     #[inline]
     #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
