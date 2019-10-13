@@ -341,11 +341,11 @@ pub enum Signal {
     },
     /// Says if the current branch has changed.
     ///
-    /// This is only emitted from `History`.
+    /// This is currently only emitted from `History`.
     Branch {
-        /// The old root.
+        /// The old branch.
         old: usize,
-        /// The new root.
+        /// The new branch.
         new: usize,
     },
 }
@@ -353,11 +353,11 @@ pub enum Signal {
 /// Says if the command should merge with another command.
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Merge {
-    /// Always merges.
+    /// The command should merge.
     Yes,
-    /// Merges if the two commands have the same value.
+    /// The command should merge if the two commands have the same value.
     If(u32),
-    /// Never merges.
+    /// The command should not merge.
     No,
 }
 
