@@ -1,8 +1,7 @@
 use crate::{At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Result, Signal};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
-use rustc_hash::FxHashMap;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 #[cfg(feature = "display")]
 use {crate::Display, std::fmt};
 
@@ -49,7 +48,7 @@ pub struct History<R> {
     next: usize,
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<R>,
-    pub(crate) branches: FxHashMap<usize, Branch<R>>,
+    pub(crate) branches: BTreeMap<usize, Branch<R>>,
 }
 
 impl<R> History<R> {
@@ -61,7 +60,7 @@ impl<R> History<R> {
             next: 1,
             saved: None,
             record: Record::new(receiver),
-            branches: FxHashMap::default(),
+            branches: BTreeMap::default(),
         }
     }
 
@@ -590,7 +589,7 @@ impl<R> From<Record<R>> for History<R> {
             next: 1,
             saved: None,
             record,
-            branches: FxHashMap::default(),
+            branches: BTreeMap::default(),
         }
     }
 }
@@ -678,7 +677,7 @@ impl<R> HistoryBuilder<R> {
             next: 1,
             saved: None,
             record: self.inner.build(receiver),
-            branches: FxHashMap::default(),
+            branches: BTreeMap::default(),
         }
     }
 }
