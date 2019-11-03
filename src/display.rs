@@ -379,16 +379,11 @@ impl View {
     #[inline]
     #[cfg(feature = "chrono")]
     fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Utc>) -> fmt::Result {
+        let rfc2822 = timestamp.with_timezone(&Local).to_rfc2822();
         if self.colored {
-            write!(
-                f,
-                " {}{}{}",
-                "[".yellow(),
-                timestamp.with_timezone(&Local).to_rfc2822().yellow(),
-                "]".yellow()
-            )
+            write!(f, " {}{}{}", "[".yellow(), rfc2822.yellow(), "]".yellow())
         } else {
-            write!(f, " [{}]", timestamp.with_timezone(&Local).to_rfc2822())
+            write!(f, " [{}]", rfc2822)
         }
     }
 }
