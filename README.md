@@ -12,8 +12,6 @@ how to undo the changes it applies, and by using the provided data structures
 it is easy to apply, undo, and redo changes made to a receiver.
 Both linear and non-linear undo-redo functionality is provided through
 the [Record] and [History] data structures.
-This library provides more or less the same functionality as the [redo] library
-but is more focused on ease of use instead of performance.
 
 # Contents
 
@@ -105,4 +103,3 @@ additional terms or conditions.
 [Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
 [Chain]: https://docs.rs/undo/latest/undo/struct.Chain.html
 [merge]: https://docs.rs/undo/latest/undo/trait.Command.html#method.merge
-[redo]: https://github.com/evenorog/redo
