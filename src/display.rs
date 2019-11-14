@@ -70,7 +70,7 @@ impl<T> Display<'_, T> {
     }
 }
 
-impl<R> Display<'_, History<R>> {
+impl<T> Display<'_, History<T>> {
     /// Show the history as a graph (off by default).
     #[inline]
     pub fn graph(&mut self, on: bool) -> &mut Self {
@@ -79,9 +79,9 @@ impl<R> Display<'_, History<R>> {
     }
 }
 
-impl<R> Display<'_, Record<R>> {
+impl<T> Display<'_, Record<T>> {
     #[inline]
-    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<R>) -> fmt::Result {
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<T>) -> fmt::Result {
         self.view.mark(f, 0)?;
         self.view.position(f, at, false)?;
         if self.view.detailed {
@@ -115,13 +115,13 @@ impl<R> Display<'_, Record<R>> {
     }
 }
 
-impl<R> Display<'_, History<R>> {
+impl<T> Display<'_, History<T>> {
     #[inline]
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: &Entry<R>,
+        entry: &Entry<T>,
         level: usize,
     ) -> fmt::Result {
         self.view.mark(f, level)?;
@@ -165,7 +165,7 @@ impl<R> Display<'_, History<R>> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: &Entry<R>,
+        entry: &Entry<T>,
         level: usize,
     ) -> fmt::Result {
         for (&i, branch) in self
@@ -206,7 +206,7 @@ impl<'a, T> From<&'a T> for Display<'a, T> {
     }
 }
 
-impl<R> fmt::Display for Display<'_, Record<R>> {
+impl<T> fmt::Display for Display<'_, Record<T>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.commands.iter().enumerate().rev() {
@@ -220,7 +220,7 @@ impl<R> fmt::Display for Display<'_, Record<R>> {
     }
 }
 
-impl<R> fmt::Display for Display<'_, History<R>> {
+impl<T> fmt::Display for Display<'_, History<T>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {

@@ -25,21 +25,21 @@ use crate::{Checkpoint, Command, History, Record, Result};
 /// queue.apply(Add('a'));
 /// queue.apply(Add('b'));
 /// queue.apply(Add('c'));
-/// assert_eq!(queue.as_receiver(), "");
+/// assert_eq!(queue.as_target(), "");
 /// queue.commit()?;
-/// assert_eq!(record.as_receiver(), "abc");
+/// assert_eq!(record.as_target(), "abc");
 /// # Ok(())
 /// # }
 /// ```
 #[cfg_attr(feature = "display", derive(Debug))]
-pub struct Queue<'a, T, R> {
-    inner: &'a mut T,
-    queue: Vec<Action<R>>,
+pub struct Queue<'a, R, T> {
+    inner: &'a mut R,
+    queue: Vec<Action<T>>,
 }
 
-impl<'a, T, R> From<&'a mut T> for Queue<'a, T, R> {
+impl<'a, R, T> From<&'a mut R> for Queue<'a, R, T> {
     #[inline]
-    fn from(inner: &'a mut T) -> Self {
+    fn from(inner: &'a mut R) -> Self {
         Queue {
             inner,
             queue: Vec::new(),
@@ -47,10 +47,10 @@ impl<'a, T, R> From<&'a mut T> for Queue<'a, T, R> {
     }
 }
 
-impl<'a, T, R> Queue<'a, T, R> {
+impl<'a, R, T> Queue<'a, R, T> {
     /// Returns a queue.
     #[inline]
-    pub fn new(inner: &'a mut T) -> Queue<'a, T, R> {
+    pub fn new(inner: &'a mut R) -> Queue<'a, R, T> {
         Queue {
             inner,
             queue: Vec::new(),
@@ -92,7 +92,7 @@ impl<'a, T, R> Queue<'a, T, R> {
 
     /// Queues an `apply` action.
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) {
+    pub fn apply(&mut self, command: impl Command<T> + 'static) {
         self.queue.push(Action::Apply(Box::new(command)));
     }
 
@@ -113,7 +113,7 @@ impl<'a, T, R> Queue<'a, T, R> {
     pub fn cancel(self) {}
 }
 
-impl<T, R: 'static, C: Command<R> + 'static> Extend<C> for Queue<'_, T, R> {
+impl<R, T: 'static, C: Command<T> + 'static> Extend<C> for Queue<'_, R, T> {
     #[inline]
     fn extend<I: IntoIterator<Item = C>>(&mut self, commands: I) {
         for command in commands {
@@ -122,7 +122,7 @@ impl<T, R: 'static, C: Command<R> + 'static> Extend<C> for Queue<'_, T, R> {
     }
 }
 
-impl<R> Queue<'_, Record<R>, R> {
+impl<T> Queue<'_, Record<T>, T> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, current: usize) {
@@ -136,7 +136,7 @@ impl<R> Queue<'_, Record<R>, R> {
     #[inline]
     pub fn commit(self) -> Result
     where
-        R: 'static,
+        T: 'static,
     {
         for action in self.queue {
             match action {
@@ -163,46 +163,46 @@ impl<R> Queue<'_, Record<R>, R> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>, R> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>, T> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<R>, R> {
+    pub fn queue(&mut self) -> Queue<Record<T>, T> {
         self.inner.queue()
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
-        self.inner.as_receiver()
+    pub fn as_target(&self) -> &T {
+        self.inner.as_target()
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
-        self.inner.as_mut_receiver()
+    pub fn as_mut_target(&mut self) -> &mut T {
+        self.inner.as_mut_target()
     }
 }
 
-impl<R> AsRef<R> for Queue<'_, Record<R>, R> {
+impl<T> AsRef<T> for Queue<'_, Record<T>, T> {
     #[inline]
-    fn as_ref(&self) -> &R {
+    fn as_ref(&self) -> &T {
         self.inner.as_ref()
     }
 }
 
-impl<R> AsMut<R> for Queue<'_, Record<R>, R> {
+impl<T> AsMut<T> for Queue<'_, Record<T>, T> {
     #[inline]
-    fn as_mut(&mut self) -> &mut R {
+    fn as_mut(&mut self) -> &mut T {
         self.inner.as_mut()
     }
 }
 
-impl<R> Queue<'_, History<R>, R> {
+impl<T> Queue<'_, History<T>, T> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) {
@@ -216,7 +216,7 @@ impl<R> Queue<'_, History<R>, R> {
     #[inline]
     pub fn commit(self) -> Result
     where
-        R: 'static,
+        T: 'static,
     {
         for action in self.queue {
             match action {
@@ -243,49 +243,49 @@ impl<R> Queue<'_, History<R>, R> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R>, R> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<T>, T> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<R>, R> {
+    pub fn queue(&mut self) -> Queue<History<T>, T> {
         self.inner.queue()
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
-        self.inner.as_receiver()
+    pub fn as_target(&self) -> &T {
+        self.inner.as_target()
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
-        self.inner.as_mut_receiver()
+    pub fn as_mut_target(&mut self) -> &mut T {
+        self.inner.as_mut_target()
     }
 }
 
-impl<R> AsRef<R> for Queue<'_, History<R>, R> {
+impl<T> AsRef<T> for Queue<'_, History<T>, T> {
     #[inline]
-    fn as_ref(&self) -> &R {
+    fn as_ref(&self) -> &T {
         self.inner.as_ref()
     }
 }
 
-impl<R> AsMut<R> for Queue<'_, History<R>, R> {
+impl<T> AsMut<T> for Queue<'_, History<T>, T> {
     #[inline]
-    fn as_mut(&mut self) -> &mut R {
+    fn as_mut(&mut self) -> &mut T {
         self.inner.as_mut()
     }
 }
 
 /// An action that can be applied to a Record or History.
 #[cfg_attr(feature = "display", derive(Debug))]
-enum Action<R> {
-    Apply(Box<dyn Command<R>>),
+enum Action<T> {
+    Apply(Box<dyn Command<T>>),
     Undo,
     Redo,
     GoTo(usize, usize),
@@ -324,12 +324,12 @@ mod tests {
         q3.apply(Add('a'));
         q3.apply(Add('b'));
         q3.apply(Add('c'));
-        assert_eq!(q3.as_receiver(), "");
+        assert_eq!(q3.as_target(), "");
         q3.commit().unwrap();
-        assert_eq!(q2.as_receiver(), "abc");
+        assert_eq!(q2.as_target(), "abc");
         q2.commit().unwrap();
-        assert_eq!(q1.as_receiver(), "");
+        assert_eq!(q1.as_target(), "");
         q1.commit().unwrap();
-        assert_eq!(record.as_receiver(), "abc");
+        assert_eq!(record.as_target(), "abc");
     }
 }

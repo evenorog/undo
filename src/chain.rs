@@ -31,25 +31,25 @@ use std::{
 ///     .join(Add('a'))
 ///     .join(Add('b'));
 /// record.apply(chain)?;
-/// assert_eq!(record.as_receiver(), "ab");
+/// assert_eq!(record.as_target(), "ab");
 /// record.undo().unwrap()?;
-/// assert_eq!(record.as_receiver(), "");
+/// assert_eq!(record.as_target(), "");
 /// record.redo().unwrap()?;
-/// assert_eq!(record.as_receiver(), "ab");
+/// assert_eq!(record.as_target(), "ab");
 /// # Ok(())
 /// # }
 /// ```
-pub struct Chain<R> {
-    commands: Vec<Box<dyn Command<R>>>,
+pub struct Chain<T> {
+    commands: Vec<Box<dyn Command<T>>>,
     merge: Option<Merge>,
     #[cfg(feature = "display")]
     text: Option<String>,
 }
 
-impl<R> Chain<R> {
+impl<T> Chain<T> {
     /// Returns an empty command.
     #[inline]
-    pub fn new() -> Chain<R> {
+    pub fn new() -> Chain<T> {
         Chain {
             commands: vec![],
             merge: None,
@@ -61,7 +61,7 @@ impl<R> Chain<R> {
     /// Returns an empty command with the specified display text.
     #[inline]
     #[cfg(feature = "display")]
-    pub fn with_text(text: impl Into<String>) -> Chain<R> {
+    pub fn with_text(text: impl Into<String>) -> Chain<T> {
         Chain {
             commands: vec![],
             merge: None,
@@ -72,7 +72,7 @@ impl<R> Chain<R> {
 
     /// Returns an empty command with the specified capacity.
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Chain<R> {
+    pub fn with_capacity(capacity: usize) -> Chain<T> {
         Chain {
             commands: Vec::with_capacity(capacity),
             merge: None,
@@ -116,13 +116,13 @@ impl<R> Chain<R> {
 
     /// Merges the command with the chain.
     #[inline]
-    pub fn push(&mut self, command: impl Command<R> + 'static) {
+    pub fn push(&mut self, command: impl Command<T> + 'static) {
         self.commands.push(Box::new(command));
     }
 
     /// Merges the command with the chain and returns the chain.
     #[inline]
-    pub fn join(mut self, command: impl Command<R> + 'static) -> Chain<R> {
+    pub fn join(mut self, command: impl Command<T> + 'static) -> Chain<T> {
         self.push(command);
         self
     }
@@ -146,27 +146,27 @@ impl<R> Chain<R> {
     }
 }
 
-impl<R> Command<R> for Chain<R> {
+impl<T> Command<T> for Chain<T> {
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> crate::Result {
+    fn apply(&mut self, target: &mut T) -> crate::Result {
         for command in &mut self.commands {
-            command.apply(receiver)?;
+            command.apply(target)?;
         }
         Ok(())
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> crate::Result {
+    fn undo(&mut self, target: &mut T) -> crate::Result {
         for command in self.commands.iter_mut().rev() {
-            command.undo(receiver)?;
+            command.undo(target)?;
         }
         Ok(())
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> crate::Result {
+    fn redo(&mut self, target: &mut T) -> crate::Result {
         for command in &mut self.commands {
-            command.redo(receiver)?;
+            command.redo(target)?;
         }
         Ok(())
     }
@@ -184,16 +184,16 @@ impl<R> Command<R> for Chain<R> {
     }
 }
 
-impl<R> Default for Chain<R> {
+impl<T> Default for Chain<T> {
     #[inline]
     fn default() -> Self {
         Chain::new()
     }
 }
 
-impl<R, C: Command<R> + 'static> FromIterator<C> for Chain<R> {
+impl<T, C: Command<T> + 'static> FromIterator<C> for Chain<T> {
     #[inline]
-    fn from_iter<T: IntoIterator<Item = C>>(commands: T) -> Self {
+    fn from_iter<I: IntoIterator<Item = C>>(commands: I) -> Self {
         Chain {
             commands: commands.into_iter().map(|c| Box::new(c) as _).collect(),
             merge: None,
@@ -203,8 +203,8 @@ impl<R, C: Command<R> + 'static> FromIterator<C> for Chain<R> {
     }
 }
 
-impl<R> IntoIterator for Chain<R> {
-    type Item = Box<dyn Command<R>>;
+impl<T> IntoIterator for Chain<T> {
+    type Item = Box<dyn Command<T>>;
     type IntoIter = IntoIter<Self::Item>;
 
     #[inline]
@@ -213,16 +213,16 @@ impl<R> IntoIterator for Chain<R> {
     }
 }
 
-impl<R, C: Command<R> + 'static> Extend<C> for Chain<R> {
+impl<T, C: Command<T> + 'static> Extend<C> for Chain<T> {
     #[inline]
-    fn extend<T: IntoIterator<Item = C>>(&mut self, iter: T) {
+    fn extend<I: IntoIterator<Item = C>>(&mut self, iter: I) {
         self.commands
             .extend(iter.into_iter().map(|c| Box::new(c) as _));
     }
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Debug for Chain<R> {
+impl<T> fmt::Debug for Chain<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Chain")
@@ -234,7 +234,7 @@ impl<R> fmt::Debug for Chain<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Display for Chain<R> {
+impl<T> fmt::Display for Chain<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.text {

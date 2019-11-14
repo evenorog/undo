@@ -15,9 +15,9 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 
 /// A record of commands.
 ///
-/// The record can roll the receivers state backwards and forwards by using
+/// The record can roll the targets state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
-/// about changes to the stack or the receiver through [signal]. The user
+/// about changes to the stack or the target through [signal]. The user
 /// can give the record a function that is called each time the state changes
 /// by using the [`builder`].
 ///
@@ -40,37 +40,37 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// record.apply(Add('a'))?;
 /// record.apply(Add('b'))?;
 /// record.apply(Add('c'))?;
-/// assert_eq!(record.as_receiver(), "abc");
+/// assert_eq!(record.as_target(), "abc");
 /// record.undo().unwrap()?;
 /// record.undo().unwrap()?;
 /// record.undo().unwrap()?;
-/// assert_eq!(record.as_receiver(), "");
+/// assert_eq!(record.as_target(), "");
 /// record.redo().unwrap()?;
 /// record.redo().unwrap()?;
 /// record.redo().unwrap()?;
-/// assert_eq!(record.as_receiver(), "abc");
+/// assert_eq!(record.as_target(), "abc");
 /// # Ok(())
 /// # }
 /// ```
 ///
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
-pub struct Record<R> {
-    pub(crate) commands: VecDeque<Entry<R>>,
-    receiver: R,
+pub struct Record<T> {
+    pub(crate) commands: VecDeque<Entry<T>>,
+    target: T,
     current: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
     pub(crate) slot: Option<Box<dyn FnMut(Signal)>>,
 }
 
-impl<R> Record<R> {
+impl<T> Record<T> {
     /// Returns a new record.
     #[inline]
-    pub fn new(receiver: impl Into<R>) -> Record<R> {
+    pub fn new(target: T) -> Record<T> {
         Record {
             commands: VecDeque::new(),
-            receiver: receiver.into(),
+            target,
             current: 0,
             limit: MAX_LIMIT,
             saved: Some(0),
@@ -80,7 +80,7 @@ impl<R> Record<R> {
 
     /// Returns a builder for a record.
     #[inline]
-    pub fn builder() -> RecordBuilder<R> {
+    pub fn builder() -> RecordBuilder<T> {
         RecordBuilder::new()
     }
 
@@ -195,7 +195,7 @@ impl<R> Record<R> {
         self.current() < self.len()
     }
 
-    /// Marks the receiver as currently being in a saved or unsaved state.
+    /// Marks the target as currently being in a saved or unsaved state.
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
@@ -216,13 +216,13 @@ impl<R> Record<R> {
         }
     }
 
-    /// Returns `true` if the receiver is in a saved state, `false` otherwise.
+    /// Returns `true` if the target is in a saved state, `false` otherwise.
     #[inline]
     pub fn is_saved(&self) -> bool {
         self.saved.map_or(false, |saved| saved == self.current())
     }
 
-    /// Revert the changes done to the receiver since the saved state.
+    /// Revert the changes done to the target since the saved state.
     #[inline]
     pub fn revert(&mut self) -> Option<Result> {
         self.saved.and_then(|saved| self.go_to(saved))
@@ -263,9 +263,9 @@ impl<R> Record<R> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result
+    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result
     where
-        R: 'static,
+        T: 'static,
     {
         self.__apply(Entry::new(command)).map(|_| ())
     }
@@ -273,15 +273,15 @@ impl<R> Record<R> {
     #[inline]
     pub(crate) fn __apply(
         &mut self,
-        mut entry: Entry<R>,
-    ) -> result::Result<(bool, VecDeque<Entry<R>>), Box<dyn Error>>
+        mut entry: Entry<T>,
+    ) -> result::Result<(bool, VecDeque<Entry<T>>), Box<dyn Error>>
     where
-        R: 'static,
+        T: 'static,
     {
         if entry.is_dead() {
             return Ok((false, VecDeque::new()));
         }
-        if let Err(error) = entry.apply(&mut self.receiver) {
+        if let Err(error) = entry.apply(&mut self.target) {
             return Err(error);
         }
         let current = self.current();
@@ -293,7 +293,7 @@ impl<R> Record<R> {
         debug_assert_eq!(current, self.len());
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
-        // Try to merge commands unless the receiver is in a saved state.
+        // Try to merge commands unless the target is in a saved state.
         let merges = match (entry.merge(), self.commands.back().map(Command::merge)) {
             (Merge::Yes, Some(_)) => !self.is_saved(),
             (Merge::If(id1), Some(Merge::If(id2))) => id1 == id2 && !self.is_saved(),
@@ -357,7 +357,7 @@ impl<R> Record<R> {
                 break;
             }
         }
-        if let Err(error) = self.commands[self.current - 1].undo(&mut self.receiver) {
+        if let Err(error) = self.commands[self.current - 1].undo(&mut self.target) {
             return Some(Err(error));
         }
         self.current -= 1;
@@ -401,7 +401,7 @@ impl<R> Record<R> {
                 break;
             }
         }
-        if let Err(error) = self.commands[self.current].redo(&mut self.receiver) {
+        if let Err(error) = self.commands[self.current].redo(&mut self.target) {
             return Some(Err(error));
         }
         self.current += 1;
@@ -514,12 +514,12 @@ impl<R> Record<R> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn extend<C: Command<R> + 'static>(
+    pub fn extend<C: Command<T> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
     ) -> Result
     where
-        R: 'static,
+        T: 'static,
     {
         for command in commands {
             self.apply(command)?;
@@ -529,13 +529,13 @@ impl<R> Record<R> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>, R> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>, T> {
         Checkpoint::from(self)
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<R>, R> {
+    pub fn queue(&mut self) -> Queue<Record<T>, T> {
         Queue::from(self)
     }
 
@@ -578,69 +578,69 @@ impl<R> Record<R> {
         Display::from(self)
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
-        &self.receiver
+    pub fn as_target(&self) -> &T {
+        &self.target
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
-        &mut self.receiver
+    pub fn as_mut_target(&mut self) -> &mut T {
+        &mut self.target
     }
 
-    /// Consumes the record, returning the `receiver`.
+    /// Consumes the record, returning the `target`.
     #[inline]
-    pub fn into_receiver(self) -> R {
-        self.receiver
-    }
-}
-
-impl<R: Default> Default for Record<R> {
-    #[inline]
-    fn default() -> Record<R> {
-        Record::new(R::default())
+    pub fn into_target(self) -> T {
+        self.target
     }
 }
 
-impl<R> AsRef<R> for Record<R> {
+impl<T: Default> Default for Record<T> {
     #[inline]
-    fn as_ref(&self) -> &R {
-        self.as_receiver()
+    fn default() -> Record<T> {
+        Record::new(T::default())
     }
 }
 
-impl<R> AsMut<R> for Record<R> {
+impl<T> AsRef<T> for Record<T> {
     #[inline]
-    fn as_mut(&mut self) -> &mut R {
-        self.as_mut_receiver()
+    fn as_ref(&self) -> &T {
+        self.as_target()
     }
 }
 
-impl<R> From<R> for Record<R> {
+impl<T> AsMut<T> for Record<T> {
     #[inline]
-    fn from(receiver: R) -> Record<R> {
-        Record::new(receiver)
+    fn as_mut(&mut self) -> &mut T {
+        self.as_mut_target()
     }
 }
 
-impl<R> From<History<R>> for Record<R> {
+impl<T> From<T> for Record<T> {
     #[inline]
-    fn from(history: History<R>) -> Record<R> {
+    fn from(target: T) -> Record<T> {
+        Record::new(target)
+    }
+}
+
+impl<T> From<History<T>> for Record<T> {
+    #[inline]
+    fn from(history: History<T>) -> Record<T> {
         history.record
     }
 }
 
 #[cfg(feature = "display")]
-impl<R: fmt::Debug> fmt::Debug for Record<R> {
+impl<T: fmt::Debug> fmt::Debug for Record<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
             .field("commands", &self.commands)
-            .field("receiver", &self.receiver)
+            .field("target", &self.target)
             .field("current", &self.current)
             .field("limit", &self.limit)
             .field("saved", &self.saved)
@@ -649,7 +649,7 @@ impl<R: fmt::Debug> fmt::Debug for Record<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Display for Record<R> {
+impl<T> fmt::Display for Record<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
@@ -669,20 +669,20 @@ impl<R> fmt::Display for Record<R> {
 ///     .default()
 /// # }
 /// ```
-pub struct RecordBuilder<R> {
-    receiver: PhantomData<R>,
+pub struct RecordBuilder<T> {
+    target: PhantomData<T>,
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
     slot: Option<Box<dyn FnMut(Signal)>>,
 }
 
-impl<R> RecordBuilder<R> {
+impl<T> RecordBuilder<T> {
     /// Returns a builder for a record.
     #[inline]
-    pub fn new() -> RecordBuilder<R> {
+    pub fn new() -> RecordBuilder<T> {
         RecordBuilder {
-            receiver: PhantomData,
+            target: PhantomData,
             capacity: 0,
             limit: MAX_LIMIT,
             saved: true,
@@ -692,7 +692,7 @@ impl<R> RecordBuilder<R> {
 
     /// Sets the capacity for the record.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<R> {
+    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<T> {
         self.capacity = capacity;
         self
     }
@@ -702,15 +702,15 @@ impl<R> RecordBuilder<R> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> RecordBuilder<R> {
+    pub fn limit(mut self, limit: usize) -> RecordBuilder<T> {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
 
-    /// Sets if the receiver is initially in a saved state.
-    /// By default the receiver is in a saved state.
+    /// Sets if the target is initially in a saved state.
+    /// By default the target is in a saved state.
     #[inline]
-    pub fn saved(mut self, saved: bool) -> RecordBuilder<R> {
+    pub fn saved(mut self, saved: bool) -> RecordBuilder<T> {
         self.saved = saved;
         self
     }
@@ -718,17 +718,17 @@ impl<R> RecordBuilder<R> {
     /// Decides how the signal should be handled when the state changes.
     /// By default the record does not handle any signals.
     #[inline]
-    pub fn connect(mut self, slot: impl FnMut(Signal) + 'static) -> RecordBuilder<R> {
+    pub fn connect(mut self, slot: impl FnMut(Signal) + 'static) -> RecordBuilder<T> {
         self.slot = Some(Box::new(slot));
         self
     }
 
     /// Builds the record.
     #[inline]
-    pub fn build(self, receiver: impl Into<R>) -> Record<R> {
+    pub fn build(self, target: T) -> Record<T> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
-            receiver: receiver.into(),
+            target,
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
@@ -737,26 +737,26 @@ impl<R> RecordBuilder<R> {
     }
 }
 
-impl<R> Default for RecordBuilder<R> {
+impl<T> Default for RecordBuilder<T> {
     #[inline]
     fn default() -> Self {
         RecordBuilder::new()
     }
 }
 
-impl<R: Default> RecordBuilder<R> {
-    /// Creates the record with a default `receiver`.
+impl<T: Default> RecordBuilder<T> {
+    /// Creates the record with a default `target`.
     #[inline]
-    pub fn default(self) -> Record<R> {
-        self.build(R::default())
+    pub fn default(self) -> Record<T> {
+        self.build(T::default())
     }
 }
 
-impl<R: fmt::Debug> fmt::Debug for RecordBuilder<R> {
+impl<T: fmt::Debug> fmt::Debug for RecordBuilder<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("RecordBuilder")
-            .field("receiver", &self.receiver)
+            .field("target", &self.target)
             .field("capacity", &self.capacity)
             .field("limit", &self.limit)
             .field("saved", &self.saved)
@@ -860,22 +860,22 @@ mod tests {
 
         record.go_to(0).unwrap().unwrap();
         assert_eq!(record.current(), 0);
-        assert_eq!(record.as_receiver(), "");
+        assert_eq!(record.as_target(), "");
         record.go_to(5).unwrap().unwrap();
         assert_eq!(record.current(), 5);
-        assert_eq!(record.as_receiver(), "abcde");
+        assert_eq!(record.as_target(), "abcde");
         record.go_to(1).unwrap().unwrap();
         assert_eq!(record.current(), 1);
-        assert_eq!(record.as_receiver(), "a");
+        assert_eq!(record.as_target(), "a");
         record.go_to(4).unwrap().unwrap();
         assert_eq!(record.current(), 4);
-        assert_eq!(record.as_receiver(), "abcd");
+        assert_eq!(record.as_target(), "abcd");
         record.go_to(2).unwrap().unwrap();
         assert_eq!(record.current(), 2);
-        assert_eq!(record.as_receiver(), "ab");
+        assert_eq!(record.as_target(), "ab");
         record.go_to(3).unwrap().unwrap();
         assert_eq!(record.current(), 3);
-        assert_eq!(record.as_receiver(), "abc");
+        assert_eq!(record.as_target(), "abc");
         assert!(record.go_to(6).is_none());
         assert_eq!(record.current(), 3);
     }
@@ -889,8 +889,8 @@ mod tests {
         record.apply(Add('b')).unwrap();
         record.apply(Add('c')).unwrap();
         record.time_travel(&a).unwrap().unwrap();
-        assert_eq!(record.as_receiver(), "a");
+        assert_eq!(record.as_target(), "a");
         record.time_travel(&chrono::Utc::now()).unwrap().unwrap();
-        assert_eq!(record.as_receiver(), "abc");
+        assert_eq!(record.as_target(), "abc");
     }
 }

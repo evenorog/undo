@@ -26,21 +26,21 @@ use std::collections::VecDeque;
 /// cp.apply(Add('a'))?;
 /// cp.apply(Add('b'))?;
 /// cp.apply(Add('c'))?;
-/// assert_eq!(cp.as_receiver(), "abc");
+/// assert_eq!(cp.as_target(), "abc");
 /// cp.cancel()?;
-/// assert_eq!(record.as_receiver(), "");
+/// assert_eq!(record.as_target(), "");
 /// # Ok(())
 /// # }
 /// ```
 #[cfg_attr(feature = "display", derive(Debug))]
-pub struct Checkpoint<'a, T, R> {
-    inner: &'a mut T,
-    stack: Vec<Action<R>>,
+pub struct Checkpoint<'a, R, T> {
+    inner: &'a mut R,
+    stack: Vec<Action<T>>,
 }
 
-impl<'a, T, R> From<&'a mut T> for Checkpoint<'a, T, R> {
+impl<'a, R, T> From<&'a mut R> for Checkpoint<'a, R, T> {
     #[inline]
-    fn from(inner: &'a mut T) -> Self {
+    fn from(inner: &'a mut R) -> Self {
         Checkpoint {
             inner,
             stack: Vec::new(),
@@ -48,10 +48,10 @@ impl<'a, T, R> From<&'a mut T> for Checkpoint<'a, T, R> {
     }
 }
 
-impl<'a, T, R> Checkpoint<'a, T, R> {
+impl<'a, R, T> Checkpoint<'a, R, T> {
     /// Returns a checkpoint.
     #[inline]
-    pub fn new(inner: &'a mut T) -> Checkpoint<'a, T, R> {
+    pub fn new(inner: &'a mut R) -> Checkpoint<'a, R, T> {
         Checkpoint {
             inner,
             stack: Vec::new(),
@@ -96,14 +96,14 @@ impl<'a, T, R> Checkpoint<'a, T, R> {
     pub fn commit(self) {}
 }
 
-impl<R> Checkpoint<'_, Record<R>, R> {
+impl<T> Checkpoint<'_, Record<T>, T> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result
+    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result
     where
-        R: 'static,
+        T: 'static,
     {
         let (_, v) = self.inner.__apply(Entry::new(command))?;
         self.stack.push(Action::Apply(v));
@@ -157,12 +157,12 @@ impl<R> Checkpoint<'_, Record<R>, R> {
     ///
     /// [`extend`]: struct.Record.html#method.extend
     #[inline]
-    pub fn extend<C: Command<R> + 'static>(
+    pub fn extend<C: Command<T> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
     ) -> Result
     where
-        R: 'static,
+        T: 'static,
     {
         for command in commands {
             self.apply(command)?;
@@ -209,53 +209,53 @@ impl<R> Checkpoint<'_, Record<R>, R> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<R>, R> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>, T> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<R>, R> {
+    pub fn queue(&mut self) -> Queue<Record<T>, T> {
         self.inner.queue()
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
-        self.inner.as_receiver()
+    pub fn as_target(&self) -> &T {
+        self.inner.as_target()
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
-        self.inner.as_mut_receiver()
+    pub fn as_mut_target(&mut self) -> &mut T {
+        self.inner.as_mut_target()
     }
 }
 
-impl<R> AsRef<R> for Checkpoint<'_, Record<R>, R> {
+impl<T> AsRef<T> for Checkpoint<'_, Record<T>, T> {
     #[inline]
-    fn as_ref(&self) -> &R {
+    fn as_ref(&self) -> &T {
         self.inner.as_ref()
     }
 }
 
-impl<R> AsMut<R> for Checkpoint<'_, Record<R>, R> {
+impl<T> AsMut<T> for Checkpoint<'_, Record<T>, T> {
     #[inline]
-    fn as_mut(&mut self) -> &mut R {
+    fn as_mut(&mut self) -> &mut T {
         self.inner.as_mut()
     }
 }
 
-impl<R> Checkpoint<'_, History<R>, R> {
+impl<T> Checkpoint<'_, History<T>, T> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<R> + 'static) -> Result
+    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result
     where
-        R: 'static,
+        T: 'static,
     {
         let root = self.inner.branch();
         let old = self.inner.current();
@@ -298,7 +298,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result>
     where
-        R: 'static,
+        T: 'static,
     {
         let root = self.inner.branch();
         let old = self.inner.current();
@@ -315,12 +315,12 @@ impl<R> Checkpoint<'_, History<R>, R> {
     ///
     /// [`extend`]: struct.History.html#method.extend
     #[inline]
-    pub fn extend<C: Command<R> + 'static>(
+    pub fn extend<C: Command<T> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
     ) -> Result
     where
-        R: 'static,
+        T: 'static,
     {
         for command in commands {
             self.apply(command)?;
@@ -336,7 +336,7 @@ impl<R> Checkpoint<'_, History<R>, R> {
     #[inline]
     pub fn cancel(self) -> Result
     where
-        R: 'static,
+        T: 'static,
     {
         for action in self.stack.into_iter().rev() {
             match action {
@@ -363,49 +363,49 @@ impl<R> Checkpoint<'_, History<R>, R> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<R>, R> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<T>, T> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<R>, R> {
+    pub fn queue(&mut self) -> Queue<History<T>, T> {
         self.inner.queue()
     }
 
-    /// Returns a reference to the `receiver`.
+    /// Returns a reference to the `target`.
     #[inline]
-    pub fn as_receiver(&self) -> &R {
-        self.inner.as_receiver()
+    pub fn as_target(&self) -> &T {
+        self.inner.as_target()
     }
 
-    /// Returns a mutable reference to the `receiver`.
+    /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
     #[inline]
-    pub fn as_mut_receiver(&mut self) -> &mut R {
-        self.inner.as_mut_receiver()
+    pub fn as_mut_target(&mut self) -> &mut T {
+        self.inner.as_mut_target()
     }
 }
 
-impl<R> AsRef<R> for Checkpoint<'_, History<R>, R> {
+impl<T> AsRef<T> for Checkpoint<'_, History<T>, T> {
     #[inline]
-    fn as_ref(&self) -> &R {
+    fn as_ref(&self) -> &T {
         self.inner.as_ref()
     }
 }
 
-impl<R> AsMut<R> for Checkpoint<'_, History<R>, R> {
+impl<T> AsMut<T> for Checkpoint<'_, History<T>, T> {
     #[inline]
-    fn as_mut(&mut self) -> &mut R {
+    fn as_mut(&mut self) -> &mut T {
         self.inner.as_mut()
     }
 }
 
 /// An action that can be applied to a Record or History.
 #[cfg_attr(feature = "display", derive(Debug))]
-enum Action<R> {
-    Apply(VecDeque<Entry<R>>),
+enum Action<T> {
+    Apply(VecDeque<Entry<T>>),
     Undo,
     Redo,
     GoTo(usize, usize),
@@ -436,21 +436,21 @@ mod tests {
         cp1.apply(Add('a')).unwrap();
         cp1.apply(Add('b')).unwrap();
         cp1.apply(Add('c')).unwrap();
-        assert_eq!(cp1.as_receiver(), "abc");
+        assert_eq!(cp1.as_target(), "abc");
         let mut cp2 = cp1.checkpoint();
         cp2.apply(Add('d')).unwrap();
         cp2.apply(Add('e')).unwrap();
         cp2.apply(Add('f')).unwrap();
-        assert_eq!(cp2.as_receiver(), "abcdef");
+        assert_eq!(cp2.as_target(), "abcdef");
         let mut cp3 = cp2.checkpoint();
         cp3.apply(Add('g')).unwrap();
         cp3.apply(Add('h')).unwrap();
         cp3.apply(Add('i')).unwrap();
-        assert_eq!(cp3.as_receiver(), "abcdefghi");
+        assert_eq!(cp3.as_target(), "abcdefghi");
         cp3.commit();
         cp2.commit();
         cp1.commit();
-        assert_eq!(record.as_receiver(), "abcdefghi");
+        assert_eq!(record.as_target(), "abcdefghi");
     }
 
     #[test]
@@ -468,12 +468,12 @@ mod tests {
         cp3.apply(Add('g')).unwrap();
         cp3.apply(Add('h')).unwrap();
         cp3.apply(Add('i')).unwrap();
-        assert_eq!(cp3.as_receiver(), "abcdefghi");
+        assert_eq!(cp3.as_target(), "abcdefghi");
         cp3.cancel().unwrap();
-        assert_eq!(cp2.as_receiver(), "abcdef");
+        assert_eq!(cp2.as_target(), "abcdef");
         cp2.cancel().unwrap();
-        assert_eq!(cp1.as_receiver(), "abc");
+        assert_eq!(cp1.as_target(), "abc");
         cp1.cancel().unwrap();
-        assert_eq!(record.as_receiver(), "");
+        assert_eq!(record.as_target(), "");
     }
 }

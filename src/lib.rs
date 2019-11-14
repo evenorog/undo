@@ -3,7 +3,7 @@
 //! It is an implementation of the command pattern, where all modifications are done
 //! by creating objects of commands that applies the modifications. All commands knows
 //! how to undo the changes it applies, and by using the provided data structures
-//! it is easy to apply, undo, and redo changes made to a receiver.
+//! it is easy to apply, undo, and redo changes made to a target.
 //! Both linear and non-linear undo-redo functionality is provided through
 //! the [Record] and [History] data structures.
 //!
@@ -25,7 +25,7 @@
 //! * Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
 //!   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
 //!   in a single step.
-//! * The receiver can be marked as being saved to disk and the data-structures can track the saved state and tell the user
+//! * The target can be marked as being saved to disk and the data-structures can track the saved state and tell the user
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `n` most recent changes are stored.
 //!
@@ -62,15 +62,15 @@
 //!     record.apply(Add('a'))?;
 //!     record.apply(Add('b'))?;
 //!     record.apply(Add('c'))?;
-//!     assert_eq!(record.as_receiver(), "abc");
+//!     assert_eq!(record.as_target(), "abc");
 //!     record.undo().unwrap()?;
 //!     record.undo().unwrap()?;
 //!     record.undo().unwrap()?;
-//!     assert_eq!(record.as_receiver(), "");
+//!     assert_eq!(record.as_target(), "");
 //!     record.redo().unwrap()?;
 //!     record.redo().unwrap()?;
 //!     record.redo().unwrap()?;
-//!     assert_eq!(record.as_receiver(), "abc");
+//!     assert_eq!(record.as_target(), "abc");
 //!     Ok(())
 //! }
 //! ```
@@ -123,24 +123,24 @@ pub type Result = std::result::Result<(), Box<dyn Error>>;
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
-pub trait Command<R> {
-    /// Applies the command on the receiver and returns `Ok` if everything went fine,
+pub trait Command<T> {
+    /// Applies the command on the target and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, receiver: &mut R) -> Result;
+    fn apply(&mut self, target: &mut T) -> Result;
 
-    /// Restores the state of the receiver as it was before the command was applied
+    /// Restores the state of the target as it was before the command was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, receiver: &mut R) -> Result;
+    fn undo(&mut self, target: &mut T) -> Result;
 
-    /// Reapplies the command on the receiver and return `Ok` if everything went fine,
+    /// Reapplies the command on the target and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     ///
     /// The default implementation uses the [`apply`] implementation.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result {
-        self.apply(receiver)
+    fn redo(&mut self, target: &mut T) -> Result {
+        self.apply(target)
     }
 
     /// Used for automatic merging of commands.
@@ -174,13 +174,13 @@ pub trait Command<R> {
     ///     record.apply(Add('a'))?;
     ///     record.apply(Add('b'))?;
     ///     record.apply(Add('c'))?;
-    ///     assert_eq!(record.as_receiver(), "abc");
+    ///     assert_eq!(record.as_target(), "abc");
     ///     // Calling `undo` once will undo all merged commands.
     ///     record.undo().unwrap()?;
-    ///     assert_eq!(record.as_receiver(), "");
+    ///     assert_eq!(record.as_target(), "");
     ///     // Calling `redo` once will redo all merged commands.
     ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.as_receiver(), "abc");
+    ///     assert_eq!(record.as_target(), "abc");
     ///     Ok(())
     /// }
     /// ```
@@ -202,24 +202,24 @@ pub trait Command<R> {
 
 /// Base functionality for all commands.
 #[cfg(feature = "display")]
-pub trait Command<R>: fmt::Debug + fmt::Display {
-    /// Applies the command on the receiver and returns `Ok` if everything went fine,
+pub trait Command<T>: fmt::Debug + fmt::Display {
+    /// Applies the command on the target and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, receiver: &mut R) -> Result;
+    fn apply(&mut self, target: &mut T) -> Result;
 
-    /// Restores the state of the receiver as it was before the command was applied
+    /// Restores the state of the target as it was before the command was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, receiver: &mut R) -> Result;
+    fn undo(&mut self, target: &mut T) -> Result;
 
-    /// Reapplies the command on the receiver and return `Ok` if everything went fine,
+    /// Reapplies the command on the target and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     ///
     /// The default implementation uses the [`apply`] implementation.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result {
-        self.apply(receiver)
+    fn redo(&mut self, target: &mut T) -> Result {
+        self.apply(target)
     }
 
     /// Used for automatic merging of commands.
@@ -254,13 +254,13 @@ pub trait Command<R>: fmt::Debug + fmt::Display {
     ///     record.apply(Add('a'))?;
     ///     record.apply(Add('b'))?;
     ///     record.apply(Add('c'))?;
-    ///     assert_eq!(record.as_receiver(), "abc");
+    ///     assert_eq!(record.as_target(), "abc");
     ///     // Calling `undo` once will undo all merged commands.
     ///     record.undo().unwrap()?;
-    ///     assert_eq!(record.as_receiver(), "");
+    ///     assert_eq!(record.as_target(), "");
     ///     // Calling `redo` once will redo all merged commands.
     ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.as_receiver(), "abc");
+    ///     assert_eq!(record.as_target(), "abc");
     ///     Ok(())
     /// }
     /// ```
@@ -280,20 +280,20 @@ pub trait Command<R>: fmt::Debug + fmt::Display {
     }
 }
 
-impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
+impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
     #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result {
-        (**self).apply(receiver)
+    fn apply(&mut self, target: &mut T) -> Result {
+        (**self).apply(target)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result {
-        (**self).undo(receiver)
+    fn undo(&mut self, target: &mut T) -> Result {
+        (**self).undo(target)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result {
-        (**self).redo(receiver)
+    fn redo(&mut self, target: &mut T) -> Result {
+        (**self).redo(target)
     }
 
     #[inline]
@@ -307,7 +307,7 @@ impl<R, C: Command<R> + ?Sized> Command<R> for Box<C> {
     }
 }
 
-/// The signal sent when the record, the history, or the receiver changes.
+/// The signal sent when the record, the history, or the target changes.
 ///
 /// When one of these states changes, they will send a corresponding signal to the user.
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
@@ -322,9 +322,9 @@ pub enum Signal {
     ///
     /// This signal will be emitted when the records ability to redo changes.
     Redo(bool),
-    /// Says if the receiver is in a saved state.
+    /// Says if the target is in a saved state.
     ///
-    /// This signal will be emitted when the record enters or leaves its receivers saved state.
+    /// This signal will be emitted when the record enters or leaves its targets saved state.
     Saved(bool),
     /// Says if the current command has changed.
     ///
@@ -365,15 +365,15 @@ struct At {
     current: usize,
 }
 
-struct Entry<R> {
-    command: Box<dyn Command<R>>,
+struct Entry<T> {
+    command: Box<dyn Command<T>>,
     #[cfg(feature = "chrono")]
     timestamp: DateTime<Utc>,
 }
 
-impl<R> Entry<R> {
+impl<T> Entry<T> {
     #[inline]
-    fn new(command: impl Command<R> + 'static) -> Entry<R> {
+    fn new(command: impl Command<T> + 'static) -> Entry<T> {
         Entry {
             command: Box::new(command),
             #[cfg(feature = "chrono")]
@@ -382,31 +382,20 @@ impl<R> Entry<R> {
     }
 }
 
-impl<R> From<Box<dyn Command<R>>> for Entry<R> {
+impl<T> Command<T> for Entry<T> {
     #[inline]
-    fn from(command: Box<dyn Command<R>>) -> Self {
-        Entry {
-            command,
-            #[cfg(feature = "chrono")]
-            timestamp: Utc::now(),
-        }
-    }
-}
-
-impl<R> Command<R> for Entry<R> {
-    #[inline]
-    fn apply(&mut self, receiver: &mut R) -> Result {
-        self.command.apply(receiver)
+    fn apply(&mut self, target: &mut T) -> Result {
+        self.command.apply(target)
     }
 
     #[inline]
-    fn undo(&mut self, receiver: &mut R) -> Result {
-        self.command.undo(receiver)
+    fn undo(&mut self, target: &mut T) -> Result {
+        self.command.undo(target)
     }
 
     #[inline]
-    fn redo(&mut self, receiver: &mut R) -> Result {
-        self.command.redo(receiver)
+    fn redo(&mut self, target: &mut T) -> Result {
+        self.command.redo(target)
     }
 
     #[inline]
@@ -421,11 +410,11 @@ impl<R> Command<R> for Entry<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Debug for Entry<R> {
+impl<T> fmt::Debug for Entry<T> {
     #[inline]
     #[cfg(not(feature = "chrono"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Meta")
+        f.debug_struct("Entry")
             .field("command", &self.command)
             .finish()
     }
@@ -433,7 +422,7 @@ impl<R> fmt::Debug for Entry<R> {
     #[inline]
     #[cfg(feature = "chrono")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Meta")
+        f.debug_struct("Entry")
             .field("command", &self.command)
             .field("timestamp", &self.timestamp)
             .finish()
@@ -441,7 +430,7 @@ impl<R> fmt::Debug for Entry<R> {
 }
 
 #[cfg(feature = "display")]
-impl<R> fmt::Display for Entry<R> {
+impl<T> fmt::Display for Entry<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.command as &dyn fmt::Display).fmt(f)
