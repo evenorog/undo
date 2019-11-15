@@ -188,16 +188,6 @@ pub trait Command<T> {
     fn merge(&self) -> Merge {
         Merge::No
     }
-
-    /// Says if the command is dead.
-    ///
-    /// A dead command will be removed the next time it becomes the current command.
-    /// This can be used to remove command if for example executing it caused an error,
-    /// and it needs to be removed.
-    #[inline]
-    fn is_dead(&self) -> bool {
-        false
-    }
 }
 
 /// Base functionality for all commands.
@@ -268,16 +258,6 @@ pub trait Command<T>: fmt::Debug + fmt::Display {
     fn merge(&self) -> Merge {
         Merge::No
     }
-
-    /// Says if the command is dead.
-    ///
-    /// A dead command will be removed the next time it becomes the current command.
-    /// This can be used to remove command if for example executing it caused an error,
-    /// and it needs to be removed.
-    #[inline]
-    fn is_dead(&self) -> bool {
-        false
-    }
 }
 
 impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
@@ -299,11 +279,6 @@ impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
     #[inline]
     fn merge(&self) -> Merge {
         (**self).merge()
-    }
-
-    #[inline]
-    fn is_dead(&self) -> bool {
-        (**self).is_dead()
     }
 }
 
@@ -401,11 +376,6 @@ impl<T> Command<T> for Entry<T> {
     #[inline]
     fn merge(&self) -> Merge {
         self.command.merge()
-    }
-
-    #[inline]
-    fn is_dead(&self) -> bool {
-        self.command.is_dead()
     }
 }
 

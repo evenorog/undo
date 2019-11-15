@@ -177,11 +177,6 @@ impl<T> Command<T> for Chain<T> {
             .or_else(|| self.commands.first().map(Command::merge))
             .unwrap_or(Merge::Yes)
     }
-
-    #[inline]
-    fn is_dead(&self) -> bool {
-        self.commands.iter().any(Command::is_dead)
-    }
 }
 
 impl<T> Default for Chain<T> {
