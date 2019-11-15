@@ -233,6 +233,9 @@ impl<T> History<T> {
     where
         T: 'static,
     {
+        if command.is_dead() {
+            return Ok(());
+        }
         let current = self.current();
         let saved = self.record.saved.filter(|&saved| saved > current);
         let (merged, commands) = self.record.__apply(Entry::new(command))?;

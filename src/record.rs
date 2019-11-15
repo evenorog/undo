@@ -1,9 +1,7 @@
 #[cfg(feature = "display")]
 use crate::Display;
 use crate::{Chain, Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal};
-use std::{
-    collections::VecDeque, error::Error, fmt, marker::PhantomData, num::NonZeroUsize, result,
-};
+use std::{collections::VecDeque, error::Error, fmt, marker::PhantomData, num::NonZeroUsize};
 #[cfg(feature = "chrono")]
 use {
     chrono::{DateTime, TimeZone, Utc},
@@ -274,16 +272,14 @@ impl<T> Record<T> {
     pub(crate) fn __apply(
         &mut self,
         mut entry: Entry<T>,
-    ) -> result::Result<(bool, VecDeque<Entry<T>>), Box<dyn Error>>
+    ) -> std::result::Result<(bool, VecDeque<Entry<T>>), Box<dyn Error>>
     where
         T: 'static,
     {
         if entry.is_dead() {
             return Ok((false, VecDeque::new()));
         }
-        if let Err(error) = entry.apply(&mut self.target) {
-            return Err(error);
-        }
+        entry.apply(&mut self.target)?;
         let current = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
