@@ -121,6 +121,12 @@ pub use self::{
 /// A specialized Result type for undo-redo operations.
 pub type Result = std::result::Result<(), Box<dyn Error>>;
 
+/// Common trait for data structures that can use commands.
+pub trait Timeline {
+    /// The target type used.
+    type Target;
+}
+
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
 pub trait Command<T> {

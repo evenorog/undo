@@ -1,4 +1,4 @@
-use crate::{Chain, Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal};
+use crate::{Chain, Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal, Timeline};
 use std::{collections::VecDeque, error::Error, num::NonZeroUsize};
 #[cfg(feature = "display")]
 use {crate::Display, std::fmt};
@@ -180,6 +180,12 @@ impl<T> Record<T> {
         self.current() < self.len()
     }
 
+    /// Returns `true` if the target is in a saved state, `false` otherwise.
+    #[inline]
+    pub fn is_saved(&self) -> bool {
+        self.saved.map_or(false, |saved| saved == self.current())
+    }
+
     /// Marks the target as currently being in a saved or unsaved state.
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
@@ -199,12 +205,6 @@ impl<T> Record<T> {
                 }
             }
         }
-    }
-
-    /// Returns `true` if the target is in a saved state, `false` otherwise.
-    #[inline]
-    pub fn is_saved(&self) -> bool {
-        self.saved.map_or(false, |saved| saved == self.current())
     }
 
     /// Revert the changes done to the target since the saved state.
@@ -496,13 +496,13 @@ impl<T> Record<T> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>, T> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
         Checkpoint::from(self)
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<T>, T> {
+    pub fn queue(&mut self) -> Queue<Record<T>> {
         Queue::from(self)
     }
 
@@ -564,6 +564,10 @@ impl<T> Record<T> {
     pub fn into_target(self) -> T {
         self.target
     }
+}
+
+impl<T> Timeline for Record<T> {
+    type Target = T;
 }
 
 impl<T: Default> Default for Record<T> {

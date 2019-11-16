@@ -1,4 +1,6 @@
-use crate::{At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Result, Signal};
+use crate::{
+    At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Result, Signal, Timeline,
+};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
 use std::collections::{BTreeMap, VecDeque};
@@ -163,17 +165,17 @@ impl<T> History<T> {
         self.record.can_redo()
     }
 
+    /// Returns `true` if the target is in a saved state, `false` otherwise.
+    #[inline]
+    pub fn is_saved(&self) -> bool {
+        self.record.is_saved()
+    }
+
     /// Marks the target as currently being in a saved or unsaved state.
     #[inline]
     pub fn set_saved(&mut self, saved: bool) {
         self.record.set_saved(saved);
         self.saved = None;
-    }
-
-    /// Returns `true` if the target is in a saved state, `false` otherwise.
-    #[inline]
-    pub fn is_saved(&self) -> bool {
-        self.record.is_saved()
     }
 
     /// Revert the changes done to the target since the saved state.
@@ -398,13 +400,13 @@ impl<T> History<T> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<T>, T> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
         Checkpoint::from(self)
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<T>, T> {
+    pub fn queue(&mut self) -> Queue<History<T>> {
         Queue::from(self)
     }
 
@@ -539,6 +541,10 @@ impl<T> History<T> {
         }
         Some(path.into_iter().rev())
     }
+}
+
+impl<T> Timeline for History<T> {
+    type Target = T;
 }
 
 impl<T: Default> Default for History<T> {

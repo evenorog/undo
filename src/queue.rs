@@ -1,4 +1,4 @@
-use crate::{Checkpoint, Command, History, Record, Result};
+use crate::{Checkpoint, Command, History, Record, Result, Timeline};
 
 /// A command queue wrapper.
 ///
@@ -32,22 +32,22 @@ use crate::{Checkpoint, Command, History, Record, Result};
 /// # }
 /// ```
 #[cfg_attr(feature = "display", derive(Debug))]
-pub struct Queue<'a, R, T> {
-    inner: &'a mut R,
-    queue: Vec<Action<T>>,
+pub struct Queue<'a, T: Timeline> {
+    inner: &'a mut T,
+    queue: Vec<Action<T::Target>>,
 }
 
-impl<'a, R, T> From<&'a mut R> for Queue<'a, R, T> {
+impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
     #[inline]
-    fn from(inner: &'a mut R) -> Self {
+    fn from(inner: &'a mut T) -> Self {
         Queue::new(inner)
     }
 }
 
-impl<'a, R, T> Queue<'a, R, T> {
+impl<'a, T: Timeline> Queue<'a, T> {
     /// Returns a queue.
     #[inline]
-    pub fn new(inner: &'a mut R) -> Queue<'a, R, T> {
+    pub fn new(inner: &'a mut T) -> Queue<'a, T> {
         Queue {
             inner,
             queue: Vec::new(),
@@ -89,7 +89,7 @@ impl<'a, R, T> Queue<'a, R, T> {
 
     /// Queues an `apply` action.
     #[inline]
-    pub fn apply(&mut self, command: impl Command<T> + 'static) {
+    pub fn apply(&mut self, command: impl Command<T::Target> + 'static) {
         self.queue.push(Action::Apply(Box::new(command)));
     }
 
@@ -110,7 +110,7 @@ impl<'a, R, T> Queue<'a, R, T> {
     pub fn cancel(self) {}
 }
 
-impl<R, T: 'static, C: Command<T> + 'static> Extend<C> for Queue<'_, R, T> {
+impl<T: Timeline, C: Command<T::Target> + 'static> Extend<C> for Queue<'_, T> {
     #[inline]
     fn extend<I: IntoIterator<Item = C>>(&mut self, commands: I) {
         for command in commands {
@@ -119,7 +119,7 @@ impl<R, T: 'static, C: Command<T> + 'static> Extend<C> for Queue<'_, R, T> {
     }
 }
 
-impl<T> Queue<'_, Record<T>, T> {
+impl<T> Queue<'_, Record<T>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, current: usize) {
@@ -160,13 +160,13 @@ impl<T> Queue<'_, Record<T>, T> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>, T> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<T>, T> {
+    pub fn queue(&mut self) -> Queue<Record<T>> {
         self.inner.queue()
     }
 
@@ -185,21 +185,21 @@ impl<T> Queue<'_, Record<T>, T> {
     }
 }
 
-impl<T> AsRef<T> for Queue<'_, Record<T>, T> {
+impl<T> AsRef<T> for Queue<'_, Record<T>> {
     #[inline]
     fn as_ref(&self) -> &T {
         self.inner.as_ref()
     }
 }
 
-impl<T> AsMut<T> for Queue<'_, Record<T>, T> {
+impl<T> AsMut<T> for Queue<'_, Record<T>> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         self.inner.as_mut()
     }
 }
 
-impl<T> Queue<'_, History<T>, T> {
+impl<T> Queue<'_, History<T>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) {
@@ -240,13 +240,13 @@ impl<T> Queue<'_, History<T>, T> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<T>, T> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<T>, T> {
+    pub fn queue(&mut self) -> Queue<History<T>> {
         self.inner.queue()
     }
 
@@ -265,14 +265,14 @@ impl<T> Queue<'_, History<T>, T> {
     }
 }
 
-impl<T> AsRef<T> for Queue<'_, History<T>, T> {
+impl<T> AsRef<T> for Queue<'_, History<T>> {
     #[inline]
     fn as_ref(&self) -> &T {
         self.inner.as_ref()
     }
 }
 
-impl<T> AsMut<T> for Queue<'_, History<T>, T> {
+impl<T> AsMut<T> for Queue<'_, History<T>> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         self.inner.as_mut()

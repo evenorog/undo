@@ -1,4 +1,4 @@
-use crate::{Command, Entry, History, Queue, Record, Result};
+use crate::{Command, Entry, History, Queue, Record, Result, Timeline};
 use std::collections::VecDeque;
 
 /// A checkpoint wrapper.
@@ -33,22 +33,22 @@ use std::collections::VecDeque;
 /// # }
 /// ```
 #[cfg_attr(feature = "display", derive(Debug))]
-pub struct Checkpoint<'a, R, T> {
-    inner: &'a mut R,
-    stack: Vec<Action<T>>,
+pub struct Checkpoint<'a, T: Timeline> {
+    inner: &'a mut T,
+    stack: Vec<Action<T::Target>>,
 }
 
-impl<'a, R, T> From<&'a mut R> for Checkpoint<'a, R, T> {
+impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
     #[inline]
-    fn from(inner: &'a mut R) -> Self {
+    fn from(inner: &'a mut T) -> Self {
         Checkpoint::new(inner)
     }
 }
 
-impl<'a, R, T> Checkpoint<'a, R, T> {
+impl<'a, T: Timeline> Checkpoint<'a, T> {
     /// Returns a checkpoint.
     #[inline]
-    pub fn new(inner: &'a mut R) -> Checkpoint<'a, R, T> {
+    pub fn new(inner: &'a mut T) -> Checkpoint<'a, T> {
         Checkpoint {
             inner,
             stack: Vec::new(),
@@ -93,7 +93,7 @@ impl<'a, R, T> Checkpoint<'a, R, T> {
     pub fn commit(self) {}
 }
 
-impl<T> Checkpoint<'_, Record<T>, T> {
+impl<T> Checkpoint<'_, Record<T>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
@@ -206,13 +206,13 @@ impl<T> Checkpoint<'_, Record<T>, T> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>, T> {
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<Record<T>, T> {
+    pub fn queue(&mut self) -> Queue<Record<T>> {
         self.inner.queue()
     }
 
@@ -231,21 +231,21 @@ impl<T> Checkpoint<'_, Record<T>, T> {
     }
 }
 
-impl<T> AsRef<T> for Checkpoint<'_, Record<T>, T> {
+impl<T> AsRef<T> for Checkpoint<'_, Record<T>> {
     #[inline]
     fn as_ref(&self) -> &T {
         self.inner.as_ref()
     }
 }
 
-impl<T> AsMut<T> for Checkpoint<'_, Record<T>, T> {
+impl<T> AsMut<T> for Checkpoint<'_, Record<T>> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         self.inner.as_mut()
     }
 }
 
-impl<T> Checkpoint<'_, History<T>, T> {
+impl<T> Checkpoint<'_, History<T>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
@@ -360,13 +360,13 @@ impl<T> Checkpoint<'_, History<T>, T> {
 
     /// Returns a checkpoint.
     #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<T>, T> {
+    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
         self.inner.checkpoint()
     }
 
     /// Returns a queue.
     #[inline]
-    pub fn queue(&mut self) -> Queue<History<T>, T> {
+    pub fn queue(&mut self) -> Queue<History<T>> {
         self.inner.queue()
     }
 
@@ -385,14 +385,14 @@ impl<T> Checkpoint<'_, History<T>, T> {
     }
 }
 
-impl<T> AsRef<T> for Checkpoint<'_, History<T>, T> {
+impl<T> AsRef<T> for Checkpoint<'_, History<T>> {
     #[inline]
     fn as_ref(&self) -> &T {
         self.inner.as_ref()
     }
 }
 
-impl<T> AsMut<T> for Checkpoint<'_, History<T>, T> {
+impl<T> AsMut<T> for Checkpoint<'_, History<T>> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         self.inner.as_mut()
