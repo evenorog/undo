@@ -648,7 +648,6 @@ pub struct RecordBuilder<T> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
-    slot: Option<Box<dyn FnMut(Signal)>>,
 }
 
 impl<T> RecordBuilder<T> {
@@ -660,13 +659,12 @@ impl<T> RecordBuilder<T> {
             capacity: 0,
             limit: MAX_LIMIT,
             saved: true,
-            slot: None,
         }
     }
 
     /// Sets the capacity for the record.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> RecordBuilder<T> {
+    pub fn capacity(&mut self, capacity: usize) -> &mut RecordBuilder<T> {
         self.capacity = capacity;
         self
     }
@@ -676,7 +674,7 @@ impl<T> RecordBuilder<T> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> RecordBuilder<T> {
+    pub fn limit(&mut self, limit: usize) -> &mut RecordBuilder<T> {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
@@ -684,29 +682,30 @@ impl<T> RecordBuilder<T> {
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
     #[inline]
-    pub fn saved(mut self, saved: bool) -> RecordBuilder<T> {
+    pub fn saved(&mut self, saved: bool) -> &mut RecordBuilder<T> {
         self.saved = saved;
-        self
-    }
-
-    /// Decides how the signal should be handled when the state changes.
-    /// By default the record does not handle any signals.
-    #[inline]
-    pub fn connect(mut self, slot: impl FnMut(Signal) + 'static) -> RecordBuilder<T> {
-        self.slot = Some(Box::new(slot));
         self
     }
 
     /// Builds the record.
     #[inline]
-    pub fn build(self, target: T) -> Record<T> {
+    pub fn build(&self, target: T) -> Record<T> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             target,
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
-            slot: self.slot,
+            slot: None,
+        }
+    }
+
+    /// Builds the record with the slot.
+    #[inline]
+    pub fn build_with(&self, target: T, slot: impl FnMut(Signal) + 'static) -> Record<T> {
+        Record {
+            slot: Some(Box::new(slot)),
+            ..self.build(target)
         }
     }
 }
@@ -721,8 +720,14 @@ impl<T> Default for RecordBuilder<T> {
 impl<T: Default> RecordBuilder<T> {
     /// Creates the record with a default `target`.
     #[inline]
-    pub fn default(self) -> Record<T> {
+    pub fn default(&self) -> Record<T> {
         self.build(T::default())
+    }
+
+    /// Creates the record with a default `target` and with the slot.
+    #[inline]
+    pub fn default_with(&self, slot: impl FnMut(Signal) + 'static) -> Record<T> {
+        self.build_with(Default::default(), slot)
     }
 }
 

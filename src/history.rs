@@ -626,8 +626,8 @@ impl<T> HistoryBuilder<T> {
 
     /// Sets the specified capacity for the history.
     #[inline]
-    pub fn capacity(mut self, capacity: usize) -> HistoryBuilder<T> {
-        self.inner = self.inner.capacity(capacity);
+    pub fn capacity(&mut self, capacity: usize) -> &mut HistoryBuilder<T> {
+        self.inner.capacity(capacity);
         self
     }
 
@@ -636,31 +636,29 @@ impl<T> HistoryBuilder<T> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(mut self, limit: usize) -> HistoryBuilder<T> {
-        self.inner = self.inner.limit(limit);
+    pub fn limit(&mut self, limit: usize) -> &mut HistoryBuilder<T> {
+        self.inner.limit(limit);
         self
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
     #[inline]
-    pub fn saved(mut self, saved: bool) -> HistoryBuilder<T> {
-        self.inner = self.inner.saved(saved);
-        self
-    }
-
-    /// Decides how the signal should be handled when the state changes.
-    /// By default the history does not handle any signals.
-    #[inline]
-    pub fn connect(mut self, slot: impl FnMut(Signal) + 'static) -> HistoryBuilder<T> {
-        self.inner = self.inner.connect(slot);
+    pub fn saved(&mut self, saved: bool) -> &mut HistoryBuilder<T> {
+        self.inner.saved(saved);
         self
     }
 
     /// Builds the history.
     #[inline]
-    pub fn build(self, target: T) -> History<T> {
+    pub fn build(&self, target: T) -> History<T> {
         History::from(self.inner.build(target))
+    }
+
+    /// Builds the history with the slot.
+    #[inline]
+    pub fn build_with(&self, target: T, slot: impl FnMut(Signal) + 'static) -> History<T> {
+        History::from(self.inner.build_with(target, slot))
     }
 }
 
@@ -674,8 +672,14 @@ impl<T> Default for HistoryBuilder<T> {
 impl<T: Default> HistoryBuilder<T> {
     /// Creates the history with a default `target`.
     #[inline]
-    pub fn default(self) -> History<T> {
+    pub fn default(&self) -> History<T> {
         self.build(T::default())
+    }
+
+    /// Creates the history with a default `target` and with the slot.
+    #[inline]
+    pub fn default_with(&self, slot: impl FnMut(Signal) + 'static) -> History<T> {
+        self.build_with(Default::default(), slot)
     }
 }
 
