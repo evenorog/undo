@@ -58,12 +58,6 @@ impl<T> History<T> {
         History::from(Record::new(target))
     }
 
-    /// Returns a builder for a history.
-    #[inline]
-    pub fn builder() -> HistoryBuilder<T> {
-        HistoryBuilder::new()
-    }
-
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -607,9 +601,9 @@ pub(crate) struct Branch<T> {
 ///
 /// # Examples
 /// ```
-/// # use undo::History;
+/// # use undo::{History, HistoryBuilder};
 /// # fn foo() -> History<String> {
-/// History::builder()
+/// HistoryBuilder::new()
 ///     .capacity(100)
 ///     .limit(100)
 ///     .saved(false)
@@ -626,7 +620,7 @@ impl<T> HistoryBuilder<T> {
     #[inline]
     pub fn new() -> HistoryBuilder<T> {
         HistoryBuilder {
-            inner: Record::builder(),
+            inner: RecordBuilder::new(),
         }
     }
 

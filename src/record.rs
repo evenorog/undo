@@ -76,12 +76,6 @@ impl<T> Record<T> {
         }
     }
 
-    /// Returns a builder for a record.
-    #[inline]
-    pub fn builder() -> RecordBuilder<T> {
-        RecordBuilder::new()
-    }
-
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -640,9 +634,9 @@ impl<T> fmt::Display for Record<T> {
 ///
 /// # Examples
 /// ```
-/// # use undo::Record;
+/// # use undo::{Record, RecordBuilder};
 /// # fn foo() -> Record<String> {
-/// Record::builder()
+/// RecordBuilder::new()
 ///     .capacity(100)
 ///     .limit(100)
 ///     .saved(false)
