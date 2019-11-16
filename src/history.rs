@@ -610,15 +610,15 @@ pub(crate) struct Branch<T> {
 ///     .default()
 /// # }
 /// ```
-#[derive(Debug)]
-pub struct HistoryBuilder<T> {
-    inner: RecordBuilder<T>,
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub struct HistoryBuilder {
+    inner: RecordBuilder,
 }
 
-impl<T> HistoryBuilder<T> {
+impl HistoryBuilder {
     /// Returns a builder for a history.
     #[inline]
-    pub fn new() -> HistoryBuilder<T> {
+    pub fn new() -> HistoryBuilder {
         HistoryBuilder {
             inner: RecordBuilder::new(),
         }
@@ -626,7 +626,7 @@ impl<T> HistoryBuilder<T> {
 
     /// Sets the specified capacity for the history.
     #[inline]
-    pub fn capacity(&mut self, capacity: usize) -> &mut HistoryBuilder<T> {
+    pub fn capacity(&mut self, capacity: usize) -> &mut HistoryBuilder {
         self.inner.capacity(capacity);
         self
     }
@@ -636,7 +636,7 @@ impl<T> HistoryBuilder<T> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(&mut self, limit: usize) -> &mut HistoryBuilder<T> {
+    pub fn limit(&mut self, limit: usize) -> &mut HistoryBuilder {
         self.inner.limit(limit);
         self
     }
@@ -644,42 +644,40 @@ impl<T> HistoryBuilder<T> {
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
     #[inline]
-    pub fn saved(&mut self, saved: bool) -> &mut HistoryBuilder<T> {
+    pub fn saved(&mut self, saved: bool) -> &mut HistoryBuilder {
         self.inner.saved(saved);
         self
     }
 
     /// Builds the history.
     #[inline]
-    pub fn build(&self, target: T) -> History<T> {
+    pub fn build<T>(&self, target: T) -> History<T> {
         History::from(self.inner.build(target))
     }
 
     /// Builds the history with the slot.
     #[inline]
-    pub fn build_with(&self, target: T, slot: impl FnMut(Signal) + 'static) -> History<T> {
+    pub fn build_with<T>(&self, target: T, slot: impl FnMut(Signal) + 'static) -> History<T> {
         History::from(self.inner.build_with(target, slot))
     }
-}
 
-impl<T> Default for HistoryBuilder<T> {
-    #[inline]
-    fn default() -> Self {
-        HistoryBuilder::new()
-    }
-}
-
-impl<T: Default> HistoryBuilder<T> {
     /// Creates the history with a default `target`.
     #[inline]
-    pub fn default(&self) -> History<T> {
+    pub fn default<T: Default>(&self) -> History<T> {
         self.build(T::default())
     }
 
     /// Creates the history with a default `target` and with the slot.
     #[inline]
-    pub fn default_with(&self, slot: impl FnMut(Signal) + 'static) -> History<T> {
-        self.build_with(Default::default(), slot)
+    pub fn default_with<T: Default>(&self, slot: impl FnMut(Signal) + 'static) -> History<T> {
+        self.build_with(T::default(), slot)
+    }
+}
+
+impl Default for HistoryBuilder {
+    #[inline]
+    fn default() -> Self {
+        HistoryBuilder::new()
     }
 }
 

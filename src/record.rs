@@ -1,7 +1,7 @@
-#[cfg(feature = "display")]
-use crate::Display;
 use crate::{Chain, Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal};
-use std::{collections::VecDeque, error::Error, fmt, marker::PhantomData, num::NonZeroUsize};
+use std::{collections::VecDeque, error::Error, num::NonZeroUsize};
+#[cfg(feature = "display")]
+use {crate::Display, std::fmt};
 #[cfg(feature = "chrono")]
 use {
     chrono::{DateTime, TimeZone, Utc},
@@ -66,14 +66,7 @@ impl<T> Record<T> {
     /// Returns a new record.
     #[inline]
     pub fn new(target: T) -> Record<T> {
-        Record {
-            commands: VecDeque::new(),
-            target,
-            current: 0,
-            limit: MAX_LIMIT,
-            saved: Some(0),
-            slot: None,
-        }
+        RecordBuilder::new().build(target)
     }
 
     /// Reserves capacity for at least `additional` more commands.
@@ -643,19 +636,18 @@ impl<T> fmt::Display for Record<T> {
 ///     .default()
 /// # }
 /// ```
-pub struct RecordBuilder<T> {
-    target: PhantomData<T>,
+#[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub struct RecordBuilder {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
 }
 
-impl<T> RecordBuilder<T> {
+impl RecordBuilder {
     /// Returns a builder for a record.
     #[inline]
-    pub fn new() -> RecordBuilder<T> {
+    pub fn new() -> RecordBuilder {
         RecordBuilder {
-            target: PhantomData,
             capacity: 0,
             limit: MAX_LIMIT,
             saved: true,
@@ -664,7 +656,7 @@ impl<T> RecordBuilder<T> {
 
     /// Sets the capacity for the record.
     #[inline]
-    pub fn capacity(&mut self, capacity: usize) -> &mut RecordBuilder<T> {
+    pub fn capacity(&mut self, capacity: usize) -> &mut RecordBuilder {
         self.capacity = capacity;
         self
     }
@@ -674,7 +666,7 @@ impl<T> RecordBuilder<T> {
     /// # Panics
     /// Panics if `limit` is `0`.
     #[inline]
-    pub fn limit(&mut self, limit: usize) -> &mut RecordBuilder<T> {
+    pub fn limit(&mut self, limit: usize) -> &mut RecordBuilder {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
@@ -682,14 +674,14 @@ impl<T> RecordBuilder<T> {
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
     #[inline]
-    pub fn saved(&mut self, saved: bool) -> &mut RecordBuilder<T> {
+    pub fn saved(&mut self, saved: bool) -> &mut RecordBuilder {
         self.saved = saved;
         self
     }
 
     /// Builds the record.
     #[inline]
-    pub fn build(&self, target: T) -> Record<T> {
+    pub fn build<T>(&self, target: T) -> Record<T> {
         Record {
             commands: VecDeque::with_capacity(self.capacity),
             target,
@@ -702,44 +694,30 @@ impl<T> RecordBuilder<T> {
 
     /// Builds the record with the slot.
     #[inline]
-    pub fn build_with(&self, target: T, slot: impl FnMut(Signal) + 'static) -> Record<T> {
+    pub fn build_with<T>(&self, target: T, slot: impl FnMut(Signal) + 'static) -> Record<T> {
         Record {
             slot: Some(Box::new(slot)),
             ..self.build(target)
         }
     }
-}
 
-impl<T> Default for RecordBuilder<T> {
-    #[inline]
-    fn default() -> Self {
-        RecordBuilder::new()
-    }
-}
-
-impl<T: Default> RecordBuilder<T> {
     /// Creates the record with a default `target`.
     #[inline]
-    pub fn default(&self) -> Record<T> {
+    pub fn default<T: Default>(&self) -> Record<T> {
         self.build(T::default())
     }
 
     /// Creates the record with a default `target` and with the slot.
     #[inline]
-    pub fn default_with(&self, slot: impl FnMut(Signal) + 'static) -> Record<T> {
-        self.build_with(Default::default(), slot)
+    pub fn default_with<T: Default>(&self, slot: impl FnMut(Signal) + 'static) -> Record<T> {
+        self.build_with(T::default(), slot)
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for RecordBuilder<T> {
+impl Default for RecordBuilder {
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("RecordBuilder")
-            .field("target", &self.target)
-            .field("capacity", &self.capacity)
-            .field("limit", &self.limit)
-            .field("saved", &self.saved)
-            .finish()
+    fn default() -> Self {
+        RecordBuilder::new()
     }
 }
 
