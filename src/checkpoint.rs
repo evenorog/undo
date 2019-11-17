@@ -38,13 +38,6 @@ pub struct Checkpoint<'a, T: Timeline> {
     stack: Vec<Action<T::Target>>,
 }
 
-impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
-    #[inline]
-    fn from(inner: &'a mut T) -> Self {
-        Checkpoint::new(inner)
-    }
-}
-
 impl<'a, T: Timeline> Checkpoint<'a, T> {
     /// Returns a checkpoint.
     #[inline]
@@ -88,25 +81,6 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
         self.stack.is_empty()
     }
 
-    /// Commits the changes and consumes the checkpoint.
-    #[inline]
-    pub fn commit(self) {}
-}
-
-impl<T> Checkpoint<'_, Record<T>> {
-    /// Calls the [`apply`] method.
-    ///
-    /// [`apply`]: struct.Record.html#method.apply
-    #[inline]
-    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result
-    where
-        T: 'static,
-    {
-        let (_, v) = self.inner.__apply(Entry::new(command))?;
-        self.stack.push(Action::Apply(v));
-        Ok(())
-    }
-
     /// Calls the [`undo`] method.
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -135,6 +109,22 @@ impl<T> Checkpoint<'_, Record<T>> {
         }
     }
 
+    /// Commits the changes and consumes the checkpoint.
+    #[inline]
+    pub fn commit(self) {}
+}
+
+impl<T: 'static> Checkpoint<'_, Record<T>> {
+    /// Calls the [`apply`] method.
+    ///
+    /// [`apply`]: struct.Record.html#method.apply
+    #[inline]
+    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
+        let (_, v) = self.inner.__apply(Entry::new(command))?;
+        self.stack.push(Action::Apply(v));
+        Ok(())
+    }
+
     /// Calls the [`go_to`] method.
     ///
     /// [`go_to`]: struct.Record.html#method.go_to
@@ -157,10 +147,7 @@ impl<T> Checkpoint<'_, Record<T>> {
     pub fn extend<C: Command<T> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
-    ) -> Result
-    where
-        T: 'static,
-    {
+    ) -> Result {
         for command in commands {
             self.apply(command)?;
         }
@@ -231,29 +218,12 @@ impl<T> Checkpoint<'_, Record<T>> {
     }
 }
 
-impl<T> AsRef<T> for Checkpoint<'_, Record<T>> {
-    #[inline]
-    fn as_ref(&self) -> &T {
-        self.inner.as_ref()
-    }
-}
-
-impl<T> AsMut<T> for Checkpoint<'_, Record<T>> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut T {
-        self.inner.as_mut()
-    }
-}
-
-impl<T> Checkpoint<'_, History<T>> {
+impl<T: 'static> Checkpoint<'_, History<T>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result
-    where
-        T: 'static,
-    {
+    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
         let root = self.inner.branch();
         let old = self.inner.current();
         self.inner.apply(command)?;
@@ -261,42 +231,11 @@ impl<T> Checkpoint<'_, History<T>> {
         Ok(())
     }
 
-    /// Calls the [`undo`] method.
-    ///
-    /// [`undo`]: struct.History.html#method.undo
-    #[inline]
-    pub fn undo(&mut self) -> Option<Result> {
-        match self.inner.undo() {
-            Some(Ok(_)) => {
-                self.stack.push(Action::Undo);
-                Some(Ok(()))
-            }
-            undo => undo,
-        }
-    }
-
-    /// Calls the [`redo`] method.
-    ///
-    /// [`redo`]: struct.History.html#method.redo
-    #[inline]
-    pub fn redo(&mut self) -> Option<Result> {
-        match self.inner.redo() {
-            Some(Ok(_)) => {
-                self.stack.push(Action::Redo);
-                Some(Ok(()))
-            }
-            redo => redo,
-        }
-    }
-
     /// Calls the [`go_to`] method.
     ///
     /// [`go_to`]: struct.History.html#method.go_to
     #[inline]
-    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result>
-    where
-        T: 'static,
-    {
+    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result> {
         let root = self.inner.branch();
         let old = self.inner.current();
         match self.inner.go_to(branch, current) {
@@ -315,10 +254,7 @@ impl<T> Checkpoint<'_, History<T>> {
     pub fn extend<C: Command<T> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
-    ) -> Result
-    where
-        T: 'static,
-    {
+    ) -> Result {
         for command in commands {
             self.apply(command)?;
         }
@@ -331,10 +267,7 @@ impl<T> Checkpoint<'_, History<T>> {
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining commands are not canceled.
     #[inline]
-    pub fn cancel(self) -> Result
-    where
-        T: 'static,
-    {
+    pub fn cancel(self) -> Result {
         for action in self.stack.into_iter().rev() {
             match action {
                 Action::Apply(_) => unreachable!(),
@@ -385,16 +318,61 @@ impl<T> Checkpoint<'_, History<T>> {
     }
 }
 
-impl<T> AsRef<T> for Checkpoint<'_, History<T>> {
+impl<T: 'static> Timeline for Checkpoint<'_, Record<T>> {
+    type Target = T;
+
     #[inline]
-    fn as_ref(&self) -> &T {
+    fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
+        self.apply(command)
+    }
+
+    #[inline]
+    fn undo(&mut self) -> Option<Result> {
+        self.undo()
+    }
+
+    #[inline]
+    fn redo(&mut self) -> Option<Result> {
+        self.redo()
+    }
+}
+
+impl<T: 'static> Timeline for Checkpoint<'_, History<T>> {
+    type Target = T;
+
+    #[inline]
+    fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
+        self.apply(command)
+    }
+
+    #[inline]
+    fn undo(&mut self) -> Option<Result> {
+        self.undo()
+    }
+
+    #[inline]
+    fn redo(&mut self) -> Option<Result> {
+        self.redo()
+    }
+}
+
+impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
+    #[inline]
+    fn from(inner: &'a mut T) -> Self {
+        Checkpoint::new(inner)
+    }
+}
+
+impl<T: Timeline + AsRef<U>, U> AsRef<U> for Checkpoint<'_, T> {
+    #[inline]
+    fn as_ref(&self) -> &U {
         self.inner.as_ref()
     }
 }
 
-impl<T> AsMut<T> for Checkpoint<'_, History<T>> {
+impl<T: Timeline + AsMut<U>, U> AsMut<U> for Checkpoint<'_, T> {
     #[inline]
-    fn as_mut(&mut self) -> &mut T {
+    fn as_mut(&mut self) -> &mut U {
         self.inner.as_mut()
     }
 }

@@ -125,6 +125,15 @@ pub type Result = std::result::Result<(), Box<dyn Error>>;
 pub trait Timeline {
     /// The target type used.
     type Target;
+
+    /// Applies the command to the record.
+    fn apply(&mut self, command: impl Command<Self::Target> + 'static) -> Result;
+
+    /// Calls the undo method on the current command.
+    fn undo(&mut self) -> Option<Result>;
+
+    /// Calls the redo method on the current command.
+    fn redo(&mut self) -> Option<Result>;
 }
 
 /// Base functionality for all commands.

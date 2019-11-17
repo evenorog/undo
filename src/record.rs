@@ -62,7 +62,7 @@ pub struct Record<T> {
     pub(crate) slot: Option<Box<dyn FnMut(Signal)>>,
 }
 
-impl<T> Record<T> {
+impl<T: 'static> Record<T> {
     /// Returns a new record.
     #[inline]
     pub fn new(target: T) -> Record<T> {
@@ -248,10 +248,7 @@ impl<T> Record<T> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result
-    where
-        T: 'static,
-    {
+    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
         self.__apply(Entry::new(command)).map(|_| ())
     }
 
@@ -259,10 +256,7 @@ impl<T> Record<T> {
     pub(crate) fn __apply(
         &mut self,
         mut entry: Entry<T>,
-    ) -> std::result::Result<(bool, VecDeque<Entry<T>>), Box<dyn Error>>
-    where
-        T: 'static,
-    {
+    ) -> std::result::Result<(bool, VecDeque<Entry<T>>), Box<dyn Error>> {
         entry.apply(&mut self.target)?;
         let current = self.current();
         let could_undo = self.can_undo();
@@ -484,10 +478,7 @@ impl<T> Record<T> {
     pub fn extend<C: Command<T> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
-    ) -> Result
-    where
-        T: 'static,
-    {
+    ) -> Result {
         for command in commands {
             self.apply(command)?;
         }
@@ -566,32 +557,47 @@ impl<T> Record<T> {
     }
 }
 
-impl<T> Timeline for Record<T> {
+impl<T: 'static> Timeline for Record<T> {
     type Target = T;
+
+    #[inline]
+    fn apply(&mut self, command: impl Command<Self::Target> + 'static) -> Result {
+        self.apply(command)
+    }
+
+    #[inline]
+    fn undo(&mut self) -> Option<Result> {
+        self.undo()
+    }
+
+    #[inline]
+    fn redo(&mut self) -> Option<Result> {
+        self.redo()
+    }
 }
 
-impl<T: Default> Default for Record<T> {
+impl<T: Default + 'static> Default for Record<T> {
     #[inline]
     fn default() -> Record<T> {
         Record::new(T::default())
     }
 }
 
-impl<T> AsRef<T> for Record<T> {
+impl<T: 'static> AsRef<T> for Record<T> {
     #[inline]
     fn as_ref(&self) -> &T {
         self.as_target()
     }
 }
 
-impl<T> AsMut<T> for Record<T> {
+impl<T: 'static> AsMut<T> for Record<T> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         self.as_mut_target()
     }
 }
 
-impl<T> From<T> for Record<T> {
+impl<T: 'static> From<T> for Record<T> {
     #[inline]
     fn from(target: T) -> Record<T> {
         Record::new(target)
@@ -620,7 +626,7 @@ impl<T: fmt::Debug> fmt::Debug for Record<T> {
 }
 
 #[cfg(feature = "display")]
-impl<T> fmt::Display for Record<T> {
+impl<T: 'static> fmt::Display for Record<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)

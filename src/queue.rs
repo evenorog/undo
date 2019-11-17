@@ -37,13 +37,6 @@ pub struct Queue<'a, T: Timeline> {
     queue: Vec<Action<T::Target>>,
 }
 
-impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
-    #[inline]
-    fn from(inner: &'a mut T) -> Self {
-        Queue::new(inner)
-    }
-}
-
 impl<'a, T: Timeline> Queue<'a, T> {
     /// Returns a queue.
     #[inline]
@@ -105,21 +98,23 @@ impl<'a, T: Timeline> Queue<'a, T> {
         self.queue.push(Action::Redo);
     }
 
+    /// Queues an `apply` action for each command in the iterator.
+    #[inline]
+    pub fn extend(
+        &mut self,
+        commands: impl IntoIterator<Item = impl Command<T::Target> + 'static>,
+    ) {
+        for command in commands {
+            self.apply(command);
+        }
+    }
+
     /// Cancels the queued actions.
     #[inline]
     pub fn cancel(self) {}
 }
 
-impl<T: Timeline, C: Command<T::Target> + 'static> Extend<C> for Queue<'_, T> {
-    #[inline]
-    fn extend<I: IntoIterator<Item = C>>(&mut self, commands: I) {
-        for command in commands {
-            self.apply(command);
-        }
-    }
-}
-
-impl<T> Queue<'_, Record<T>> {
+impl<T: 'static> Queue<'_, Record<T>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, current: usize) {
@@ -131,10 +126,7 @@ impl<T> Queue<'_, Record<T>> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result
-    where
-        T: 'static,
-    {
+    pub fn commit(self) -> Result {
         for action in self.queue {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,
@@ -185,21 +177,7 @@ impl<T> Queue<'_, Record<T>> {
     }
 }
 
-impl<T> AsRef<T> for Queue<'_, Record<T>> {
-    #[inline]
-    fn as_ref(&self) -> &T {
-        self.inner.as_ref()
-    }
-}
-
-impl<T> AsMut<T> for Queue<'_, Record<T>> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut T {
-        self.inner.as_mut()
-    }
-}
-
-impl<T> Queue<'_, History<T>> {
+impl<T: 'static> Queue<'_, History<T>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) {
@@ -211,10 +189,7 @@ impl<T> Queue<'_, History<T>> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     #[inline]
-    pub fn commit(self) -> Result
-    where
-        T: 'static,
-    {
+    pub fn commit(self) -> Result {
         for action in self.queue {
             match action {
                 Action::Apply(command) => self.inner.apply(command)?,
@@ -265,16 +240,45 @@ impl<T> Queue<'_, History<T>> {
     }
 }
 
-impl<T> AsRef<T> for Queue<'_, History<T>> {
+impl<T: Timeline> Timeline for Queue<'_, T> {
+    type Target = T::Target;
+
     #[inline]
-    fn as_ref(&self) -> &T {
+    fn apply(&mut self, command: impl Command<T::Target> + 'static) -> Result {
+        self.apply(command);
+        Ok(())
+    }
+
+    #[inline]
+    fn undo(&mut self) -> Option<Result> {
+        self.undo();
+        Some(Ok(()))
+    }
+
+    #[inline]
+    fn redo(&mut self) -> Option<Result> {
+        self.redo();
+        Some(Ok(()))
+    }
+}
+
+impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
+    #[inline]
+    fn from(inner: &'a mut T) -> Self {
+        Queue::new(inner)
+    }
+}
+
+impl<T: Timeline + AsRef<U>, U> AsRef<U> for Queue<'_, T> {
+    #[inline]
+    fn as_ref(&self) -> &U {
         self.inner.as_ref()
     }
 }
 
-impl<T> AsMut<T> for Queue<'_, History<T>> {
+impl<T: Timeline + AsMut<U>, U> AsMut<U> for Queue<'_, T> {
     #[inline]
-    fn as_mut(&mut self) -> &mut T {
+    fn as_mut(&mut self) -> &mut U {
         self.inner.as_mut()
     }
 }

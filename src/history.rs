@@ -53,7 +53,7 @@ pub struct History<T> {
     pub(crate) branches: BTreeMap<usize, Branch<T>>,
 }
 
-impl<T> History<T> {
+impl<T: 'static> History<T> {
     /// Returns a new history.
     #[inline]
     pub fn new(target: T) -> History<T> {
@@ -137,19 +137,13 @@ impl<T> History<T> {
     pub fn connect(
         &mut self,
         slot: impl FnMut(Signal) + 'static,
-    ) -> Option<impl FnMut(Signal) + 'static>
-    where
-        T: 'static,
-    {
+    ) -> Option<impl FnMut(Signal) + 'static> {
         self.record.connect(slot)
     }
 
     /// Removes and returns the slot.
     #[inline]
-    pub fn disconnect(&mut self) -> Option<impl FnMut(Signal) + 'static>
-    where
-        T: 'static,
-    {
+    pub fn disconnect(&mut self) -> Option<impl FnMut(Signal) + 'static> {
         self.record.disconnect()
     }
 
@@ -180,10 +174,7 @@ impl<T> History<T> {
 
     /// Revert the changes done to the target since the saved state.
     #[inline]
-    pub fn revert(&mut self) -> Option<Result>
-    where
-        T: 'static,
-    {
+    pub fn revert(&mut self) -> Option<Result> {
         if self.record.saved.is_some() {
             self.record.revert()
         } else {
@@ -225,10 +216,7 @@ impl<T> History<T> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result
-    where
-        T: 'static,
-    {
+    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
         let current = self.current();
         let saved = self.record.saved.filter(|&saved| saved > current);
         let (merged, commands) = self.record.__apply(Entry::new(command))?;
@@ -308,10 +296,7 @@ impl<T> History<T> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result>
-    where
-        T: 'static,
-    {
+    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result> {
         let root = self.branch();
         if root == branch {
             return self.record.go_to(current);
@@ -388,10 +373,7 @@ impl<T> History<T> {
     pub fn extend<C: Command<T> + 'static>(
         &mut self,
         commands: impl IntoIterator<Item = C>,
-    ) -> Result
-    where
-        T: 'static,
-    {
+    ) -> Result {
         for command in commands {
             self.apply(command)?;
         }
@@ -543,32 +525,47 @@ impl<T> History<T> {
     }
 }
 
-impl<T> Timeline for History<T> {
+impl<T: 'static> Timeline for History<T> {
     type Target = T;
+
+    #[inline]
+    fn apply(&mut self, command: impl Command<Self::Target> + 'static) -> Result {
+        self.apply(command)
+    }
+
+    #[inline]
+    fn undo(&mut self) -> Option<Result> {
+        self.undo()
+    }
+
+    #[inline]
+    fn redo(&mut self) -> Option<Result> {
+        self.redo()
+    }
 }
 
-impl<T: Default> Default for History<T> {
+impl<T: Default + 'static> Default for History<T> {
     #[inline]
     fn default() -> History<T> {
         History::new(T::default())
     }
 }
 
-impl<T> AsRef<T> for History<T> {
+impl<T: 'static> AsRef<T> for History<T> {
     #[inline]
     fn as_ref(&self) -> &T {
         self.as_target()
     }
 }
 
-impl<T> AsMut<T> for History<T> {
+impl<T: 'static> AsMut<T> for History<T> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         self.as_mut_target()
     }
 }
 
-impl<T> From<T> for History<T> {
+impl<T: 'static> From<T> for History<T> {
     #[inline]
     fn from(target: T) -> History<T> {
         History::new(target)
@@ -589,7 +586,7 @@ impl<T> From<Record<T>> for History<T> {
 }
 
 #[cfg(feature = "display")]
-impl<T> fmt::Display for History<T> {
+impl<T: 'static> fmt::Display for History<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
