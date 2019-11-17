@@ -127,7 +127,7 @@ pub trait Timeline {
     type Target;
 
     /// Applies the command to the record.
-    fn apply(&mut self, command: impl Command<Self::Target> + 'static) -> Result;
+    fn apply(&mut self, command: impl Command<Self::Target>) -> Result;
 
     /// Calls the undo method on the current command.
     fn undo(&mut self) -> Option<Result>;
@@ -138,7 +138,7 @@ pub trait Timeline {
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
-pub trait Command<T> {
+pub trait Command<T>: 'static {
     /// Applies the command on the target and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     fn apply(&mut self, target: &mut T) -> Result;
@@ -207,7 +207,7 @@ pub trait Command<T> {
 
 /// Base functionality for all commands.
 #[cfg(feature = "display")]
-pub trait Command<T>: fmt::Debug + fmt::Display {
+pub trait Command<T>: 'static + fmt::Debug + fmt::Display {
     /// Applies the command on the target and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     fn apply(&mut self, target: &mut T) -> Result;
@@ -363,7 +363,7 @@ struct Entry<T> {
 
 impl<T> Entry<T> {
     #[inline]
-    fn new(command: impl Command<T> + 'static) -> Entry<T> {
+    fn new(command: impl Command<T>) -> Entry<T> {
         Entry {
             command: Box::new(command),
             #[cfg(feature = "chrono")]
@@ -372,7 +372,7 @@ impl<T> Entry<T> {
     }
 }
 
-impl<T> Command<T> for Entry<T> {
+impl<T: 'static> Command<T> for Entry<T> {
     #[inline]
     fn apply(&mut self, target: &mut T) -> Result {
         self.command.apply(target)

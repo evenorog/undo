@@ -81,9 +81,7 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
         self.stack.is_empty()
     }
 
-    /// Calls the [`undo`] method.
-    ///
-    /// [`undo`]: struct.Record.html#method.undo
+    /// Calls the `undo` method.
     #[inline]
     pub fn undo(&mut self) -> Option<Result> {
         match self.inner.undo() {
@@ -95,9 +93,7 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
         }
     }
 
-    /// Calls the [`redo`] method.
-    ///
-    /// [`redo`]: struct.Record.html#method.redo
+    /// Calls the `redo` method.
     #[inline]
     pub fn redo(&mut self) -> Option<Result> {
         match self.inner.redo() {
@@ -114,12 +110,12 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     pub fn commit(self) {}
 }
 
-impl<T: 'static> Checkpoint<'_, Record<T>> {
+impl<T> Checkpoint<'_, Record<T>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
+    pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let (_, v) = self.inner.__apply(Entry::new(command))?;
         self.stack.push(Action::Apply(v));
         Ok(())
@@ -144,10 +140,7 @@ impl<T: 'static> Checkpoint<'_, Record<T>> {
     ///
     /// [`extend`]: struct.Record.html#method.extend
     #[inline]
-    pub fn extend<C: Command<T> + 'static>(
-        &mut self,
-        commands: impl IntoIterator<Item = C>,
-    ) -> Result {
+    pub fn extend<C: Command<T>>(&mut self, commands: impl IntoIterator<Item = C>) -> Result {
         for command in commands {
             self.apply(command)?;
         }
@@ -218,12 +211,12 @@ impl<T: 'static> Checkpoint<'_, Record<T>> {
     }
 }
 
-impl<T: 'static> Checkpoint<'_, History<T>> {
+impl<T> Checkpoint<'_, History<T>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
+    pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let root = self.inner.branch();
         let old = self.inner.current();
         self.inner.apply(command)?;
@@ -251,10 +244,7 @@ impl<T: 'static> Checkpoint<'_, History<T>> {
     ///
     /// [`extend`]: struct.History.html#method.extend
     #[inline]
-    pub fn extend<C: Command<T> + 'static>(
-        &mut self,
-        commands: impl IntoIterator<Item = C>,
-    ) -> Result {
+    pub fn extend<C: Command<T>>(&mut self, commands: impl IntoIterator<Item = C>) -> Result {
         for command in commands {
             self.apply(command)?;
         }
@@ -318,11 +308,11 @@ impl<T: 'static> Checkpoint<'_, History<T>> {
     }
 }
 
-impl<T: 'static> Timeline for Checkpoint<'_, Record<T>> {
+impl<T> Timeline for Checkpoint<'_, Record<T>> {
     type Target = T;
 
     #[inline]
-    fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
+    fn apply(&mut self, command: impl Command<T>) -> Result {
         self.apply(command)
     }
 
@@ -337,11 +327,11 @@ impl<T: 'static> Timeline for Checkpoint<'_, Record<T>> {
     }
 }
 
-impl<T: 'static> Timeline for Checkpoint<'_, History<T>> {
+impl<T> Timeline for Checkpoint<'_, History<T>> {
     type Target = T;
 
     #[inline]
-    fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
+    fn apply(&mut self, command: impl Command<T>) -> Result {
         self.apply(command)
     }
 

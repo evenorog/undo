@@ -79,7 +79,7 @@ impl<T> Display<'_, History<T>> {
     }
 }
 
-impl<T: 'static> Display<'_, Record<T>> {
+impl<T> Display<'_, Record<T>> {
     #[inline]
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<T>) -> fmt::Result {
         self.view.mark(f, 0)?;
@@ -115,7 +115,7 @@ impl<T: 'static> Display<'_, Record<T>> {
     }
 }
 
-impl<T: 'static> Display<'_, History<T>> {
+impl<T> Display<'_, History<T>> {
     #[inline]
     fn fmt_list(
         &self,
@@ -206,7 +206,7 @@ impl<'a, T> From<&'a T> for Display<'a, T> {
     }
 }
 
-impl<T: 'static> fmt::Display for Display<'_, Record<T>> {
+impl<T> fmt::Display for Display<'_, Record<T>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.commands.iter().enumerate().rev() {
@@ -220,7 +220,7 @@ impl<T: 'static> fmt::Display for Display<'_, Record<T>> {
     }
 }
 
-impl<T: 'static> fmt::Display for Display<'_, History<T>> {
+impl<T> fmt::Display for Display<'_, History<T>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {

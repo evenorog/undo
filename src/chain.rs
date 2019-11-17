@@ -116,13 +116,13 @@ impl<T> Chain<T> {
 
     /// Merges the command with the chain.
     #[inline]
-    pub fn push(&mut self, command: impl Command<T> + 'static) {
+    pub fn push(&mut self, command: impl Command<T>) {
         self.commands.push(Box::new(command));
     }
 
     /// Merges the command with the chain and returns the chain.
     #[inline]
-    pub fn join(mut self, command: impl Command<T> + 'static) -> Chain<T> {
+    pub fn join(mut self, command: impl Command<T>) -> Chain<T> {
         self.push(command);
         self
     }
@@ -146,7 +146,7 @@ impl<T> Chain<T> {
     }
 }
 
-impl<T> Command<T> for Chain<T> {
+impl<T: 'static> Command<T> for Chain<T> {
     #[inline]
     fn apply(&mut self, target: &mut T) -> crate::Result {
         for command in &mut self.commands {
@@ -186,7 +186,7 @@ impl<T> Default for Chain<T> {
     }
 }
 
-impl<T, C: Command<T> + 'static> FromIterator<C> for Chain<T> {
+impl<T, C: Command<T>> FromIterator<C> for Chain<T> {
     #[inline]
     fn from_iter<I: IntoIterator<Item = C>>(commands: I) -> Self {
         Chain {
@@ -208,7 +208,7 @@ impl<T> IntoIterator for Chain<T> {
     }
 }
 
-impl<T, C: Command<T> + 'static> Extend<C> for Chain<T> {
+impl<T, C: Command<T>> Extend<C> for Chain<T> {
     #[inline]
     fn extend<I: IntoIterator<Item = C>>(&mut self, iter: I) {
         self.commands

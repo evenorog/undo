@@ -82,7 +82,7 @@ impl<'a, T: Timeline> Queue<'a, T> {
 
     /// Queues an `apply` action.
     #[inline]
-    pub fn apply(&mut self, command: impl Command<T::Target> + 'static) {
+    pub fn apply(&mut self, command: impl Command<T::Target>) {
         self.queue.push(Action::Apply(Box::new(command)));
     }
 
@@ -100,10 +100,7 @@ impl<'a, T: Timeline> Queue<'a, T> {
 
     /// Queues an `apply` action for each command in the iterator.
     #[inline]
-    pub fn extend(
-        &mut self,
-        commands: impl IntoIterator<Item = impl Command<T::Target> + 'static>,
-    ) {
+    pub fn extend(&mut self, commands: impl IntoIterator<Item = impl Command<T::Target>>) {
         for command in commands {
             self.apply(command);
         }
@@ -114,7 +111,7 @@ impl<'a, T: Timeline> Queue<'a, T> {
     pub fn cancel(self) {}
 }
 
-impl<T: 'static> Queue<'_, Record<T>> {
+impl<T> Queue<'_, Record<T>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, current: usize) {
@@ -177,7 +174,7 @@ impl<T: 'static> Queue<'_, Record<T>> {
     }
 }
 
-impl<T: 'static> Queue<'_, History<T>> {
+impl<T> Queue<'_, History<T>> {
     /// Queues a `go_to` action.
     #[inline]
     pub fn go_to(&mut self, branch: usize, current: usize) {
@@ -244,7 +241,7 @@ impl<T: Timeline> Timeline for Queue<'_, T> {
     type Target = T::Target;
 
     #[inline]
-    fn apply(&mut self, command: impl Command<T::Target> + 'static) -> Result {
+    fn apply(&mut self, command: impl Command<T::Target>) -> Result {
         self.apply(command);
         Ok(())
     }

@@ -45,7 +45,7 @@ use {crate::Display, std::fmt};
 ///
 /// [Record]: struct.Record.html
 #[cfg_attr(feature = "display", derive(Debug))]
-pub struct History<T> {
+pub struct History<T: 'static> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
@@ -53,7 +53,7 @@ pub struct History<T> {
     pub(crate) branches: BTreeMap<usize, Branch<T>>,
 }
 
-impl<T: 'static> History<T> {
+impl<T> History<T> {
     /// Returns a new history.
     #[inline]
     pub fn new(target: T) -> History<T> {
@@ -216,7 +216,7 @@ impl<T: 'static> History<T> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn apply(&mut self, command: impl Command<T> + 'static) -> Result {
+    pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let current = self.current();
         let saved = self.record.saved.filter(|&saved| saved > current);
         let (merged, commands) = self.record.__apply(Entry::new(command))?;
@@ -370,10 +370,7 @@ impl<T: 'static> History<T> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
-    pub fn extend<C: Command<T> + 'static>(
-        &mut self,
-        commands: impl IntoIterator<Item = C>,
-    ) -> Result {
+    pub fn extend<C: Command<T>>(&mut self, commands: impl IntoIterator<Item = C>) -> Result {
         for command in commands {
             self.apply(command)?;
         }
@@ -525,11 +522,11 @@ impl<T: 'static> History<T> {
     }
 }
 
-impl<T: 'static> Timeline for History<T> {
+impl<T> Timeline for History<T> {
     type Target = T;
 
     #[inline]
-    fn apply(&mut self, command: impl Command<Self::Target> + 'static) -> Result {
+    fn apply(&mut self, command: impl Command<Self::Target>) -> Result {
         self.apply(command)
     }
 
@@ -544,28 +541,28 @@ impl<T: 'static> Timeline for History<T> {
     }
 }
 
-impl<T: Default + 'static> Default for History<T> {
+impl<T: Default> Default for History<T> {
     #[inline]
     fn default() -> History<T> {
         History::new(T::default())
     }
 }
 
-impl<T: 'static> AsRef<T> for History<T> {
+impl<T> AsRef<T> for History<T> {
     #[inline]
     fn as_ref(&self) -> &T {
         self.as_target()
     }
 }
 
-impl<T: 'static> AsMut<T> for History<T> {
+impl<T> AsMut<T> for History<T> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         self.as_mut_target()
     }
 }
 
-impl<T: 'static> From<T> for History<T> {
+impl<T> From<T> for History<T> {
     #[inline]
     fn from(target: T) -> History<T> {
         History::new(target)
@@ -586,7 +583,7 @@ impl<T> From<Record<T>> for History<T> {
 }
 
 #[cfg(feature = "display")]
-impl<T: 'static> fmt::Display for History<T> {
+impl<T> fmt::Display for History<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
