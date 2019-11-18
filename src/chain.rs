@@ -31,11 +31,11 @@ use std::{
 ///     .join(Add('a'))
 ///     .join(Add('b'));
 /// record.apply(chain)?;
-/// assert_eq!(record.as_target(), "ab");
+/// assert_eq!(record.target(), "ab");
 /// record.undo().unwrap()?;
-/// assert_eq!(record.as_target(), "");
+/// assert_eq!(record.target(), "");
 /// record.redo().unwrap()?;
-/// assert_eq!(record.as_target(), "ab");
+/// assert_eq!(record.target(), "ab");
 /// # Ok(())
 /// # }
 /// ```

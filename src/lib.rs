@@ -62,15 +62,15 @@
 //!     record.apply(Add('a'))?;
 //!     record.apply(Add('b'))?;
 //!     record.apply(Add('c'))?;
-//!     assert_eq!(record.as_target(), "abc");
+//!     assert_eq!(record.target(), "abc");
 //!     record.undo().unwrap()?;
 //!     record.undo().unwrap()?;
 //!     record.undo().unwrap()?;
-//!     assert_eq!(record.as_target(), "");
+//!     assert_eq!(record.target(), "");
 //!     record.redo().unwrap()?;
 //!     record.redo().unwrap()?;
 //!     record.redo().unwrap()?;
-//!     assert_eq!(record.as_target(), "abc");
+//!     assert_eq!(record.target(), "abc");
 //!     Ok(())
 //! }
 //! ```
@@ -189,13 +189,13 @@ pub trait Command<T>: 'static {
     ///     record.apply(Add('a'))?;
     ///     record.apply(Add('b'))?;
     ///     record.apply(Add('c'))?;
-    ///     assert_eq!(record.as_target(), "abc");
+    ///     assert_eq!(record.target(), "abc");
     ///     // Calling `undo` once will undo all merged commands.
     ///     record.undo().unwrap()?;
-    ///     assert_eq!(record.as_target(), "");
+    ///     assert_eq!(record.target(), "");
     ///     // Calling `redo` once will redo all merged commands.
     ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.as_target(), "abc");
+    ///     assert_eq!(record.target(), "abc");
     ///     Ok(())
     /// }
     /// ```
@@ -259,13 +259,13 @@ pub trait Command<T>: 'static + fmt::Debug + fmt::Display {
     ///     record.apply(Add('a'))?;
     ///     record.apply(Add('b'))?;
     ///     record.apply(Add('c'))?;
-    ///     assert_eq!(record.as_target(), "abc");
+    ///     assert_eq!(record.target(), "abc");
     ///     // Calling `undo` once will undo all merged commands.
     ///     record.undo().unwrap()?;
-    ///     assert_eq!(record.as_target(), "");
+    ///     assert_eq!(record.target(), "");
     ///     // Calling `redo` once will redo all merged commands.
     ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.as_target(), "abc");
+    ///     assert_eq!(record.target(), "abc");
     ///     Ok(())
     /// }
     /// ```
