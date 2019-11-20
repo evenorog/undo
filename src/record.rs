@@ -482,16 +482,16 @@ impl<T> Record<T> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
-        Checkpoint::from(self)
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<Record<T>> {
         Queue::from(self)
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
+        Checkpoint::from(self)
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].

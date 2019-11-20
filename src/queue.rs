@@ -147,16 +147,16 @@ impl<T> Queue<'_, Record<T>> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
-        self.inner.checkpoint()
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<Record<T>> {
         self.inner.queue()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
@@ -210,16 +210,16 @@ impl<T> Queue<'_, History<T>> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
-        self.inner.checkpoint()
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<History<T>> {
         self.inner.queue()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.

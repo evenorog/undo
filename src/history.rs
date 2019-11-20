@@ -377,16 +377,16 @@ impl<T> History<T> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
-        Checkpoint::from(self)
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<History<T>> {
         Queue::from(self)
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
+        Checkpoint::from(self)
     }
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].

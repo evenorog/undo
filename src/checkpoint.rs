@@ -184,16 +184,16 @@ impl<T> Checkpoint<'_, Record<T>> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
-        self.inner.checkpoint()
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<Record<T>> {
         self.inner.queue()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
@@ -281,16 +281,16 @@ impl<T> Checkpoint<'_, History<T>> {
         Ok(())
     }
 
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
-        self.inner.checkpoint()
-    }
-
     /// Returns a queue.
     #[inline]
     pub fn queue(&mut self) -> Queue<History<T>> {
         self.inner.queue()
+    }
+
+    /// Returns a checkpoint.
+    #[inline]
+    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
+        self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
@@ -426,5 +426,27 @@ mod tests {
         assert_eq!(cp1.target(), "abc");
         cp1.cancel().unwrap();
         assert_eq!(record.target(), "");
+    }
+
+    #[test]
+    fn restore() {
+        let mut record = Record::default();
+        record.apply(Add('a')).unwrap();
+        record.apply(Add('b')).unwrap();
+        record.apply(Add('c')).unwrap();
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+        record.undo().unwrap().unwrap();
+        let mut cp = record.checkpoint();
+        cp.apply(Add('d')).unwrap();
+        cp.apply(Add('e')).unwrap();
+        cp.apply(Add('f')).unwrap();
+        assert_eq!(cp.target(), "def");
+        cp.cancel().unwrap();
+        assert_eq!(record.target(), "");
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
+        record.redo().unwrap().unwrap();
+        assert_eq!(record.target(), "abc");
     }
 }
