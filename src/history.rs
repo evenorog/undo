@@ -483,7 +483,7 @@ impl<T> History<T> {
 
     /// Remove all children of the command at the given position.
     #[inline]
-    fn rm_child(&mut self, branch: usize, current: usize) {
+    pub fn rm_child(&mut self, branch: usize, current: usize) {
         // We need to check if any of the branches had the removed node as root.
         let mut dead: Vec<_> = self
             .branches

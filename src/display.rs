@@ -7,14 +7,11 @@ use std::fmt::{self, Write};
 /// Configurable display formatting of structures.
 ///
 /// # Examples
-/// ```
+/// ```no_run
 /// # use undo::{Command, History};
 /// # fn foo() -> History<String> {
 /// let history = History::default();
-/// println!(
-///     "{}",
-///     history.display().graph(true).colored(true)
-/// );
+/// println!("{}", history.display().graph(true).colored(true));
 /// # history
 /// # }
 /// ```

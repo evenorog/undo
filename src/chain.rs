@@ -27,19 +27,20 @@ use std::{
 /// # }
 /// # fn main() -> undo::Result {
 /// let mut record = Record::default();
-/// let chain = Chain::with_capacity(2)
+/// let chain = Chain::with_capacity(3)
 ///     .join(Add('a'))
-///     .join(Add('b'));
+///     .join(Add('b'))
+///     .join(Add('c'));
 /// record.apply(chain)?;
-/// assert_eq!(record.target(), "ab");
+/// assert_eq!(record.target(), "abc");
 /// record.undo().unwrap()?;
 /// assert_eq!(record.target(), "");
 /// record.redo().unwrap()?;
-/// assert_eq!(record.target(), "ab");
+/// assert_eq!(record.target(), "abc");
 /// # Ok(())
 /// # }
 /// ```
-pub struct Chain<T> {
+pub struct Chain<T: 'static> {
     commands: Vec<Box<dyn Command<T>>>,
     merge: Option<Merge>,
     #[cfg(feature = "display")]
@@ -59,6 +60,8 @@ impl<T> Chain<T> {
     }
 
     /// Returns an empty command with the specified display text.
+    ///
+    /// Requires the `display` feature to be enabled.
     #[inline]
     #[cfg(feature = "display")]
     pub fn with_text(text: impl Into<String>) -> Chain<T> {
@@ -139,6 +142,8 @@ impl<T> Chain<T> {
     /// Sets the display text for the chain.
     ///
     /// By default the display text will be the display text for every command in the chain.
+    ///
+    /// Requires the `display` feature to be enabled.
     #[inline]
     #[cfg(feature = "display")]
     pub fn set_text(&mut self, text: impl Into<String>) {
@@ -146,7 +151,7 @@ impl<T> Chain<T> {
     }
 }
 
-impl<T: 'static> Command<T> for Chain<T> {
+impl<T> Command<T> for Chain<T> {
     #[inline]
     fn apply(&mut self, target: &mut T) -> crate::Result {
         for command in &mut self.commands {
