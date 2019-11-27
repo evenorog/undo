@@ -41,7 +41,7 @@ Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-undo = "0.39"
+undo = "0.40"
 ```
 
 And this to `main.rs`:
