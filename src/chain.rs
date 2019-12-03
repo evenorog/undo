@@ -1,10 +1,6 @@
 use crate::{Command, Merge};
 #[cfg(feature = "display")]
 use std::fmt;
-use std::{
-    iter::{FromIterator, IntoIterator},
-    vec::IntoIter,
-};
 
 /// A chain of merged commands.
 ///
@@ -27,10 +23,7 @@ use std::{
 /// # }
 /// # fn main() -> undo::Result {
 /// let mut record = Record::default();
-/// let chain = Chain::with_capacity(3)
-///     .join(Add('a'))
-///     .join(Add('b'))
-///     .join(Add('c'));
+/// let chain = Chain::new(Add('a'), Add('b')).join(Add('c'));
 /// record.apply(chain)?;
 /// assert_eq!(record.target(), "abc");
 /// record.undo().unwrap()?;
@@ -40,108 +33,68 @@ use std::{
 /// # Ok(())
 /// # }
 /// ```
-pub struct Chain<T: 'static> {
-    commands: Vec<Box<dyn Command<T>>>,
-    merge: Option<Merge>,
+#[derive(Debug)]
+pub struct Chain<A, B> {
+    join: Join<A, B>,
+    merge: Merge,
     #[cfg(feature = "display")]
     text: Option<String>,
 }
 
-impl<T> Chain<T> {
-    /// Returns an empty command.
+impl<A, B> Chain<A, B> {
+    /// Creates a chain from `a` and `b`.
     #[inline]
-    pub fn new() -> Chain<T> {
+    pub const fn new(a: A, b: B) -> Chain<A, B> {
+        Chain::with_merge(a, b, Merge::No)
+    }
+
+    /// Creates a chain from `a` and `b` with the specified merge behavior.
+    ///
+    /// By default the chain never merges.
+    #[inline]
+    pub const fn with_merge(a: A, b: B, merge: Merge) -> Chain<A, B> {
         Chain {
-            commands: vec![],
-            merge: None,
+            join: Join(a, b),
+            merge,
             #[cfg(feature = "display")]
             text: None,
         }
     }
 
-    /// Returns an empty command with the specified display text.
+    /// Creates a chain from `a` and `b` with the specified display text.
+    ///
+    /// By default the display text will be the display text for every command in the chain.
     ///
     /// Requires the `display` feature to be enabled.
     #[inline]
     #[cfg(feature = "display")]
-    pub fn with_text(text: impl Into<String>) -> Chain<T> {
+    pub fn with_text(a: A, b: B, text: impl Into<String>) -> Chain<A, B> {
         Chain {
-            commands: vec![],
-            merge: None,
+            join: Join(a, b),
+            merge: Merge::No,
             #[cfg(feature = "display")]
             text: Some(text.into()),
         }
     }
 
-    /// Returns an empty command with the specified capacity.
+    /// Joins the command with the chain and returns the chain.
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Chain<T> {
+    pub fn join<C>(self, c: C) -> Chain<A, Join<B, C>> {
         Chain {
-            commands: Vec::with_capacity(capacity),
-            merge: None,
+            join: Join(self.join.0, Join(self.join.1, c)),
+            merge: self.merge,
             #[cfg(feature = "display")]
-            text: None,
+            text: self.text,
         }
     }
 
-    /// Reserves capacity for at least `additional` more commands in the chain.
-    ///
-    /// # Panics
-    /// Panics if the new capacity overflows usize.
-    #[inline]
-    pub fn reserve(&mut self, additional: usize) {
-        self.commands.reserve(additional);
-    }
-
-    /// Returns the capacity of the chain.
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.commands.capacity()
-    }
-
-    /// Shrinks the capacity of the chain as much as possible.
-    #[inline]
-    pub fn shrink_to_fit(&mut self) {
-        self.commands.shrink_to_fit();
-    }
-
-    /// Returns the amount of commands in the chain.
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.commands.len()
-    }
-
-    /// Returns `true` if no commands have been merged.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.commands.is_empty()
-    }
-
-    /// Merges the command with the chain.
-    #[inline]
-    pub fn push(&mut self, command: impl Command<T>) {
-        self.commands.push(Box::new(command));
-    }
-
-    /// Merges the command with the chain and returns the chain.
-    #[inline]
-    pub fn join(mut self, command: impl Command<T>) -> Chain<T> {
-        self.push(command);
-        self
-    }
-
     /// Sets the merge behavior of the chain.
-    ///
-    /// By default the merge behavior of the first command in the chain is used,
-    /// and it merges if the chain is empty.
     #[inline]
     pub fn set_merge(&mut self, merge: Merge) {
-        self.merge = Some(merge);
+        self.merge = merge;
     }
 
     /// Sets the display text for the chain.
-    ///
-    /// By default the display text will be the display text for every command in the chain.
     ///
     /// Requires the `display` feature to be enabled.
     #[inline]
@@ -151,100 +104,66 @@ impl<T> Chain<T> {
     }
 }
 
-impl<T> Command<T> for Chain<T> {
+impl<T, A: Command<T>, B: Command<T>> Command<T> for Chain<A, B> {
     #[inline]
     fn apply(&mut self, target: &mut T) -> crate::Result {
-        for command in &mut self.commands {
-            command.apply(target)?;
-        }
-        Ok(())
+        self.join.apply(target)
     }
 
     #[inline]
     fn undo(&mut self, target: &mut T) -> crate::Result {
-        for command in self.commands.iter_mut().rev() {
-            command.undo(target)?;
-        }
-        Ok(())
+        self.join.undo(target)
     }
 
     #[inline]
     fn redo(&mut self, target: &mut T) -> crate::Result {
-        for command in &mut self.commands {
-            command.redo(target)?;
-        }
-        Ok(())
+        self.join.redo(target)
     }
 
     #[inline]
     fn merge(&self) -> Merge {
         self.merge
-            .or_else(|| self.commands.first().map(Command::merge))
-            .unwrap_or(Merge::Yes)
-    }
-}
-
-impl<T> Default for Chain<T> {
-    #[inline]
-    fn default() -> Self {
-        Chain::new()
-    }
-}
-
-impl<T, C: Command<T>> FromIterator<C> for Chain<T> {
-    #[inline]
-    fn from_iter<I: IntoIterator<Item = C>>(commands: I) -> Self {
-        Chain {
-            commands: commands.into_iter().map(|c| Box::new(c) as _).collect(),
-            merge: None,
-            #[cfg(feature = "display")]
-            text: None,
-        }
-    }
-}
-
-impl<T> IntoIterator for Chain<T> {
-    type Item = Box<dyn Command<T>>;
-    type IntoIter = IntoIter<Self::Item>;
-
-    #[inline]
-    fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
-        self.commands.into_iter()
-    }
-}
-
-impl<T, C: Command<T>> Extend<C> for Chain<T> {
-    #[inline]
-    fn extend<I: IntoIterator<Item = C>>(&mut self, iter: I) {
-        self.commands
-            .extend(iter.into_iter().map(|c| Box::new(c) as _));
     }
 }
 
 #[cfg(feature = "display")]
-impl<T> fmt::Debug for Chain<T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Chain")
-            .field("commands", &self.commands)
-            .field("merge", &self.merge)
-            .field("text", &self.text)
-            .finish()
-    }
-}
-
-#[cfg(feature = "display")]
-impl<T> fmt::Display for Chain<T> {
+impl<A: fmt::Display, B: fmt::Display> fmt::Display for Chain<A, B> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.text {
             Some(text) => f.write_str(text),
-            None => {
-                for command in &self.commands {
-                    writeln!(f, "- {}", command)?;
-                }
-                Ok(())
-            }
+            None => (&self.join as &dyn fmt::Display).fmt(f),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct Join<A, B>(pub A, pub B);
+
+impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
+    #[inline]
+    fn apply(&mut self, target: &mut T) -> crate::Result {
+        self.0.apply(target)?;
+        self.1.apply(target)
+    }
+
+    #[inline]
+    fn undo(&mut self, target: &mut T) -> crate::Result {
+        self.1.undo(target)?;
+        self.0.undo(target)
+    }
+
+    #[inline]
+    fn redo(&mut self, target: &mut T) -> crate::Result {
+        self.0.redo(target)?;
+        self.1.redo(target)
+    }
+}
+
+#[cfg(feature = "display")]
+impl<A: fmt::Display, B: fmt::Display> fmt::Display for Join<A, B> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "{} + {}", self.0, self.1)
     }
 }
