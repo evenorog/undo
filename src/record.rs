@@ -109,49 +109,6 @@ impl<T> Record<T> {
         self.limit.get()
     }
 
-    /// Sets the limit of the record and returns the new limit.
-    ///
-    /// If this limit is reached it will start popping of commands at the beginning
-    /// of the record when new commands are applied. No limit is set by
-    /// default which means it may grow indefinitely.
-    ///
-    /// If `limit < len` the first commands will be removed until `len == limit`.
-    /// However, if the current active command is going to be removed, the limit is instead
-    /// adjusted to `len - active` so the active command is not removed.
-    ///
-    /// # Panics
-    /// Panics if `limit` is `0`.
-    #[inline]
-    pub fn set_limit(&mut self, limit: usize) -> usize {
-        self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
-        if limit < self.len() {
-            let old = self.current();
-            let could_undo = self.can_undo();
-            let was_saved = self.is_saved();
-            let begin = old.min(self.len() - limit);
-            self.commands = self.commands.split_off(begin);
-            self.limit = NonZeroUsize::new(self.len()).unwrap();
-            self.current -= begin;
-            // Check if the saved state has been removed.
-            self.saved = self.saved.and_then(|saved| saved.checked_sub(begin));
-            let new = self.current();
-            let can_undo = self.can_undo();
-            let is_saved = self.is_saved();
-            if let Some(ref mut slot) = self.slot {
-                if old != new {
-                    slot(Signal::Current { old, new });
-                }
-                if could_undo != can_undo {
-                    slot(Signal::Undo(can_undo));
-                }
-                if was_saved != is_saved {
-                    slot(Signal::Saved(is_saved));
-                }
-            }
-        }
-        self.limit()
-    }
-
     /// Sets how the signal should be handled when the state changes.
     ///
     /// The previous slot is returned if it exists.
@@ -729,73 +686,6 @@ mod tests {
             self.0 = s.pop().ok_or("`s` is empty")?;
             Ok(())
         }
-    }
-
-    #[test]
-    fn set_limit() {
-        let mut record = Record::default();
-        record.apply(Add('a')).unwrap();
-        record.apply(Add('b')).unwrap();
-        record.apply(Add('c')).unwrap();
-        record.apply(Add('d')).unwrap();
-        record.apply(Add('e')).unwrap();
-
-        record.set_limit(3);
-        assert_eq!(record.current(), 3);
-        assert_eq!(record.limit(), 3);
-        assert_eq!(record.len(), 3);
-        assert!(record.can_undo());
-        assert!(!record.can_redo());
-
-        record.clear();
-        assert_eq!(record.set_limit(5), 5);
-        record.apply(Add('a')).unwrap();
-        record.apply(Add('b')).unwrap();
-        record.apply(Add('c')).unwrap();
-        record.apply(Add('d')).unwrap();
-        record.apply(Add('e')).unwrap();
-
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
-
-        record.set_limit(2);
-        assert_eq!(record.current(), 0);
-        assert_eq!(record.limit(), 3);
-        assert_eq!(record.len(), 3);
-        assert!(!record.can_undo());
-        assert!(record.can_redo());
-
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
-
-        record.clear();
-        assert_eq!(record.set_limit(5), 5);
-        record.apply(Add('a')).unwrap();
-        record.apply(Add('b')).unwrap();
-        record.apply(Add('c')).unwrap();
-        record.apply(Add('d')).unwrap();
-        record.apply(Add('e')).unwrap();
-
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
-
-        record.set_limit(2);
-        assert_eq!(record.current(), 0);
-        assert_eq!(record.limit(), 5);
-        assert_eq!(record.len(), 5);
-        assert!(!record.can_undo());
-        assert!(record.can_redo());
-
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
     }
 
     #[test]
