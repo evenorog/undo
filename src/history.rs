@@ -48,6 +48,7 @@ use {crate::Display, std::fmt};
 pub struct History<T: 'static> {
     root: usize,
     next: usize,
+    actions: Actions,
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<T>,
     pub(crate) branches: BTreeMap<usize, Branch<T>>,
@@ -212,6 +213,7 @@ impl<T> History<T> {
                 })
             }
         }
+        self.actions.apply(Action::Apply(self.at()));
         Ok(())
     }
 
@@ -224,7 +226,12 @@ impl<T> History<T> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result> {
-        self.record.undo()
+        let at = self.actions.undo()?;
+        if at.branch == self.branch() {
+            self.record.undo()
+        } else {
+            self.go_to(at.branch, at.current)
+        }
     }
 
     /// Calls the [`redo`] method for the active command
@@ -236,7 +243,12 @@ impl<T> History<T> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result> {
-        self.record.redo()
+        let at = self.actions.redo()?;
+        if at.branch == self.branch() {
+            self.record.redo()
+        } else {
+            self.go_to(at.branch, at.current)
+        }
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `current` is reached.
@@ -497,6 +509,7 @@ impl<T> From<Record<T>> for History<T> {
         History {
             root: 0,
             next: 1,
+            actions: Actions::default(),
             saved: None,
             record,
             branches: BTreeMap::default(),
@@ -524,6 +537,57 @@ impl<T> Branch<T> {
         Branch {
             parent: At { branch, current },
             commands,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+enum Action {
+    Apply(At),
+    Undo(At),
+    Redo(At),
+}
+
+#[derive(Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
+struct Actions {
+    current: usize,
+    actions: Vec<Action>,
+}
+
+impl Actions {
+    fn apply(&mut self, action: Action) {
+        self.actions.push(action);
+        self.current = self.actions.len();
+    }
+
+    fn undo(&mut self) -> Option<At> {
+        let index = self.current.checked_sub(1)?;
+        match *self.actions.get(index)? {
+            Action::Apply(at) | Action::Redo(at) => {
+                self.actions.push(Action::Undo(at));
+                self.current -= 1;
+                Some(at)
+            }
+            Action::Undo(at) => {
+                self.actions.push(Action::Redo(at));
+                self.current -= 1;
+                Some(at)
+            }
+        }
+    }
+
+    fn redo(&mut self) -> Option<At> {
+        match *self.actions.get(self.current + 1)? {
+            Action::Apply(at) | Action::Redo(at) => {
+                self.actions.push(Action::Undo(at));
+                self.current += 1;
+                Some(at)
+            }
+            Action::Undo(at) => {
+                self.actions.push(Action::Redo(at));
+                self.current += 1;
+                Some(at)
+            }
         }
     }
 }
@@ -631,77 +695,23 @@ mod tests {
     }
 
     #[test]
-    fn go_to() {
-        //          m
-        //          |
-        //    j  k  l
-        //     \ | /
-        //       i
-        //       |
-        // e  g  h
-        // |  | /
-        // d  f  p - q *
-        // | /  /
-        // c  n - o
-        // | /
-        // b
-        // |
-        // a
+    fn history() {
         let mut history = History::default();
         history.apply(Add('a')).unwrap();
         history.apply(Add('b')).unwrap();
+        history.undo().unwrap().unwrap();
         history.apply(Add('c')).unwrap();
-        history.apply(Add('d')).unwrap();
-        history.apply(Add('e')).unwrap();
-        assert_eq!(history.target(), "abcde");
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
-        assert_eq!(history.target(), "abc");
-        let abcde = history.branch();
-        history.apply(Add('f')).unwrap();
-        history.apply(Add('g')).unwrap();
-        assert_eq!(history.target(), "abcfg");
+        assert_eq!(history.target(), "ab");
+        history.redo().unwrap().unwrap();
+        assert_eq!(history.target(), "a");
+        history.redo().unwrap().unwrap();
+        assert_eq!(history.target(), "ac");
         history.undo().unwrap().unwrap();
-        let abcfg = history.branch();
-        history.apply(Add('h')).unwrap();
-        history.apply(Add('i')).unwrap();
-        history.apply(Add('j')).unwrap();
-        assert_eq!(history.target(), "abcfhij");
         history.undo().unwrap().unwrap();
-        let abcfhij = history.branch();
-        history.apply(Add('k')).unwrap();
-        assert_eq!(history.target(), "abcfhik");
         history.undo().unwrap().unwrap();
-        let abcfhik = history.branch();
-        history.apply(Add('l')).unwrap();
-        assert_eq!(history.target(), "abcfhil");
-        history.apply(Add('m')).unwrap();
-        assert_eq!(history.target(), "abcfhilm");
-        let abcfhilm = history.branch();
-        history.go_to(abcde, 2).unwrap().unwrap();
-        history.apply(Add('n')).unwrap();
-        history.apply(Add('o')).unwrap();
-        assert_eq!(history.target(), "abno");
         history.undo().unwrap().unwrap();
-        let abno = history.branch();
-        history.apply(Add('p')).unwrap();
-        history.apply(Add('q')).unwrap();
-        assert_eq!(history.target(), "abnpq");
-
-        let abnpq = history.branch();
-        history.go_to(abcde, 5).unwrap().unwrap();
-        assert_eq!(history.target(), "abcde");
-        history.go_to(abcfg, 5).unwrap().unwrap();
-        assert_eq!(history.target(), "abcfg");
-        history.go_to(abcfhij, 7).unwrap().unwrap();
-        assert_eq!(history.target(), "abcfhij");
-        history.go_to(abcfhik, 7).unwrap().unwrap();
-        assert_eq!(history.target(), "abcfhik");
-        history.go_to(abcfhilm, 8).unwrap().unwrap();
-        assert_eq!(history.target(), "abcfhilm");
-        history.go_to(abno, 4).unwrap().unwrap();
-        assert_eq!(history.target(), "abno");
-        history.go_to(abnpq, 5).unwrap().unwrap();
-        assert_eq!(history.target(), "abnpq");
+        assert_eq!(history.target(), "");
     }
 }
