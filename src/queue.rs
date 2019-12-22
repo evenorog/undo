@@ -89,26 +89,12 @@ impl<'a, T: Timeline> Queue<'a, T> {
         self.actions.push(Action::Redo);
     }
 
-    /// Queues an `apply` action for each command in the iterator.
-    #[inline]
-    pub fn extend(&mut self, commands: impl IntoIterator<Item = impl Command<T::Target>>) {
-        for command in commands {
-            self.apply(command);
-        }
-    }
-
     /// Cancels the queued actions.
     #[inline]
     pub fn cancel(self) {}
 }
 
 impl<T> Queue<'_, Record<T>> {
-    /// Queues a `go_to` action.
-    #[inline]
-    pub fn go_to(&mut self, current: usize) {
-        self.actions.push(Action::GoTo(0, current));
-    }
-
     /// Applies the actions that is queued.
     ///
     /// # Errors
@@ -125,11 +111,6 @@ impl<T> Queue<'_, Record<T>> {
                 }
                 Action::Redo => {
                     if let Some(Err(error)) = self.inner.redo() {
-                        return Err(error);
-                    }
-                }
-                Action::GoTo(_, current) => {
-                    if let Some(Err(error)) = self.inner.go_to(current) {
                         return Err(error);
                     }
                 }
@@ -155,23 +136,9 @@ impl<T> Queue<'_, Record<T>> {
     pub fn target(&self) -> &T {
         self.inner.target()
     }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
-    pub fn target_mut(&mut self) -> &mut T {
-        self.inner.target_mut()
-    }
 }
 
 impl<T> Queue<'_, History<T>> {
-    /// Queues a `go_to` action.
-    #[inline]
-    pub fn go_to(&mut self, branch: usize, current: usize) {
-        self.actions.push(Action::GoTo(branch, current));
-    }
-
     /// Applies the actions that is queued.
     ///
     /// # Errors
@@ -188,11 +155,6 @@ impl<T> Queue<'_, History<T>> {
                 }
                 Action::Redo => {
                     if let Some(Err(error)) = self.inner.redo() {
-                        return Err(error);
-                    }
-                }
-                Action::GoTo(branch, current) => {
-                    if let Some(Err(error)) = self.inner.go_to(branch, current) {
                         return Err(error);
                     }
                 }
@@ -217,14 +179,6 @@ impl<T> Queue<'_, History<T>> {
     #[inline]
     pub fn target(&self) -> &T {
         self.inner.target()
-    }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
-    pub fn target_mut(&mut self) -> &mut T {
-        self.inner.target_mut()
     }
 }
 
@@ -266,7 +220,6 @@ enum Action<T> {
     Apply(Box<dyn Command<T>>),
     Undo,
     Redo,
-    GoTo(usize, usize),
 }
 
 #[cfg(all(test, not(feature = "display")))]

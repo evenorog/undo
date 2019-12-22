@@ -44,7 +44,7 @@ pub struct Chain<A, B> {
 impl<A, B> Chain<A, B> {
     /// Creates a chain from `a` and `b`.
     #[inline]
-    pub const fn new(a: A, b: B) -> Chain<A, B> {
+    pub fn new(a: A, b: B) -> Chain<A, B> {
         Chain::with_merge(a, b, Merge::No)
     }
 
@@ -52,7 +52,7 @@ impl<A, B> Chain<A, B> {
     ///
     /// By default the chain never merges.
     #[inline]
-    pub const fn with_merge(a: A, b: B, merge: Merge) -> Chain<A, B> {
+    pub fn with_merge(a: A, b: B, merge: Merge) -> Chain<A, B> {
         Chain {
             join: Join(a, b),
             merge,

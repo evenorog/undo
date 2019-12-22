@@ -11,7 +11,7 @@ use std::fmt::{self, Write};
 /// # use undo::{Command, History};
 /// # fn foo() -> History<String> {
 /// let history = History::default();
-/// println!("{}", history.display().graph(true).colored(true));
+/// println!("{}", history.display().colored(true).detailed(false));
 /// # history
 /// # }
 /// ```
@@ -54,15 +54,6 @@ impl<T> Display<'_, T> {
     #[inline]
     pub fn saved(&mut self, on: bool) -> &mut Self {
         self.config.saved = on;
-        self
-    }
-}
-
-impl<T> Display<'_, History<T>> {
-    /// Show the history as a graph (off by default).
-    #[inline]
-    pub fn graph(&mut self, on: bool) -> &mut Self {
-        self.config.graph = on;
         self
     }
 }
@@ -185,11 +176,7 @@ impl<T> fmt::Display for Display<'_, History<T>> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, cmd) in self.data.record.entries.iter().enumerate().rev() {
             let at = At::new(self.data.branch(), i + 1);
-            if self.config.graph {
-                self.fmt_graph(f, at, cmd, 0)?;
-            } else {
-                self.fmt_list(f, at, cmd, 0)?;
-            }
+            self.fmt_graph(f, at, cmd, 0)?;
         }
         Ok(())
     }
@@ -200,7 +187,6 @@ struct Config {
     colored: bool,
     current: bool,
     detailed: bool,
-    graph: bool,
     position: bool,
     saved: bool,
 }
@@ -212,7 +198,6 @@ impl Default for Config {
             colored: false,
             current: true,
             detailed: true,
-            graph: false,
             position: true,
             saved: true,
         }
