@@ -189,7 +189,7 @@ impl<T> History<T> {
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let old = self.at();
         let saved = self.record.saved.filter(|&saved| saved > old.current);
-        let (merged, commands) = self.record.__apply(Entry::new(command))?;
+        let (merged, tail) = self.record.__apply(Entry::new(command))?;
         // Check if the limit has been reached.
         if !merged && old.current == self.current() {
             let root = self.branch();
@@ -200,11 +200,11 @@ impl<T> History<T> {
                 .for_each(|branch| branch.parent.current -= 1);
         }
         // Handle new branch.
-        if !commands.is_empty() {
+        if !tail.is_empty() {
             let new = self.next;
             self.next += 1;
             self.branches
-                .insert(old.branch, Branch::new(new, old.current, commands));
+                .insert(old.branch, Branch::new(new, old.current, tail));
             self.set_root(new, old.current, saved);
             if let Some(ref mut slot) = self.record.slot {
                 slot(Signal::Branch {
@@ -270,17 +270,17 @@ impl<T> History<T> {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
-            for entry in branch.commands {
+            for entry in branch.entries {
                 let current = self.current();
                 let saved = self.record.saved.filter(|&saved| saved > current);
-                let commands = match self.record.__apply(entry) {
-                    Ok((_, commands)) => commands,
+                let tail = match self.record.__apply(entry) {
+                    Ok((_, tail)) => tail,
                     Err(err) => return Some(Err(err)),
                 };
                 // Handle new branch.
-                if !commands.is_empty() {
+                if !tail.is_empty() {
                     self.branches
-                        .insert(self.root, Branch::new(new, current, commands));
+                        .insert(self.root, Branch::new(new, current, tail));
                     self.set_root(new, current, saved);
                 }
             }
@@ -384,10 +384,7 @@ impl<T> History<T> {
     }
 
     fn at(&self) -> At {
-        At {
-            branch: self.branch(),
-            current: self.current(),
-        }
+        At::new(self.branch(), self.current())
     }
 
     fn set_root(&mut self, root: usize, current: usize, saved: Option<usize>) {
@@ -422,10 +419,7 @@ impl<T> History<T> {
                 slot(Signal::Saved(true));
             }
         } else if let Some(saved) = self.record.saved {
-            self.saved = Some(At {
-                branch: old,
-                current: saved,
-            });
+            self.saved = Some(At::new(old, saved));
             self.record.saved = None;
             if let Some(ref mut slot) = self.record.slot {
                 slot(Signal::Saved(false));
@@ -438,7 +432,7 @@ impl<T> History<T> {
         let mut dead: Vec<_> = self
             .branches
             .iter()
-            .filter(|&(_, child)| child.parent == At { branch, current })
+            .filter(|&(_, child)| child.parent == At::new(branch, current))
             .map(|(&id, _)| id)
             .collect();
         while let Some(parent) = dead.pop() {
@@ -529,14 +523,14 @@ impl<T> fmt::Display for History<T> {
 #[cfg_attr(feature = "display", derive(Debug))]
 pub(crate) struct Branch<T> {
     pub(crate) parent: At,
-    pub(crate) commands: VecDeque<Entry<T>>,
+    pub(crate) entries: VecDeque<Entry<T>>,
 }
 
 impl<T> Branch<T> {
-    fn new(branch: usize, current: usize, commands: VecDeque<Entry<T>>) -> Branch<T> {
+    fn new(branch: usize, current: usize, entries: VecDeque<Entry<T>>) -> Branch<T> {
         Branch {
-            parent: At { branch, current },
-            commands,
+            parent: At::new(branch, current),
+            entries,
         }
     }
 }

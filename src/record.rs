@@ -55,7 +55,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// [`builder`]: struct.RecordBuilder.html
 /// [signal]: enum.Signal.html
 pub struct Record<T: 'static> {
-    pub(crate) commands: VecDeque<Entry<T>>,
+    pub(crate) entries: VecDeque<Entry<T>>,
     target: T,
     current: usize,
     limit: NonZeroUsize,
@@ -76,31 +76,31 @@ impl<T> Record<T> {
     /// Panics if the new capacity overflows usize.
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.commands.reserve(additional);
+        self.entries.reserve(additional);
     }
 
     /// Returns the capacity of the record.
     #[inline]
     pub fn capacity(&self) -> usize {
-        self.commands.capacity()
+        self.entries.capacity()
     }
 
     /// Shrinks the capacity of the record as much as possible.
     #[inline]
     pub fn shrink_to_fit(&mut self) {
-        self.commands.shrink_to_fit();
+        self.entries.shrink_to_fit();
     }
 
     /// Returns the number of commands in the record.
     #[inline]
     pub fn len(&self) -> usize {
-        self.commands.len()
+        self.entries.len()
     }
 
     /// Returns `true` if the record is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.commands.is_empty()
+        self.entries.is_empty()
     }
 
     /// Returns the limit of the record.
@@ -183,7 +183,7 @@ impl<T> Record<T> {
         let old = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
-        self.commands.clear();
+        self.entries.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.current = 0;
         if let Some(ref mut slot) = self.slot {
@@ -221,30 +221,30 @@ impl<T> Record<T> {
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Pop off all elements after current from record.
-        let v = self.commands.split_off(current);
+        let tail = self.entries.split_off(current);
         debug_assert_eq!(current, self.len());
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the target is in a saved state.
-        let merges = match (entry.merge(), self.commands.back().map(Command::merge)) {
+        let merges = match (entry.merge(), self.entries.back().map(Command::merge)) {
             (Merge::Yes, Some(_)) => !self.is_saved(),
             (Merge::If(id1), Some(Merge::If(id2))) => id1 == id2 && !self.is_saved(),
             _ => false,
         };
         if merges {
             // Merge the command with the one on the top of the stack.
-            let command = Join(self.commands.pop_back().unwrap(), entry);
-            self.commands.push_back(Entry::new(command));
+            let command = Join(self.entries.pop_back().unwrap(), entry);
+            self.entries.push_back(Entry::new(command));
         } else {
             // If commands are not merged push it onto the record.
             if self.limit() == self.current() {
                 // If limit is reached, pop off the first command.
-                self.commands.pop_front();
+                self.entries.pop_front();
                 self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
             } else {
                 self.current += 1;
             }
-            self.commands.push_back(entry);
+            self.entries.push_back(entry);
         }
         debug_assert_eq!(self.current(), self.len());
         if let Some(ref mut slot) = self.slot {
@@ -263,7 +263,7 @@ impl<T> Record<T> {
                 slot(Signal::Saved(false));
             }
         }
-        Ok((merges, v))
+        Ok((merges, tail))
     }
 
     /// Calls the [`undo`] method for the active command and sets
@@ -280,7 +280,7 @@ impl<T> Record<T> {
         }
         let was_saved = self.is_saved();
         let old = self.current();
-        if let Err(error) = self.commands[self.current - 1].undo(&mut self.target) {
+        if let Err(error) = self.entries[self.current - 1].undo(&mut self.target) {
             return Some(Err(error));
         }
         self.current -= 1;
@@ -318,7 +318,7 @@ impl<T> Record<T> {
         }
         let was_saved = self.is_saved();
         let old = self.current();
-        if let Err(error) = self.commands[self.current].redo(&mut self.target) {
+        if let Err(error) = self.entries[self.current].redo(&mut self.target) {
             return Some(Err(error));
         }
         self.current += 1;
@@ -372,7 +372,6 @@ impl<T> Record<T> {
                 return Some(Err(error));
             }
         }
-        // Add slot back.
         self.slot = slot;
         let can_undo = self.can_undo();
         let can_redo = self.can_redo();
@@ -402,7 +401,7 @@ impl<T> Record<T> {
     #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result> {
         let to = to.with_timezone(&Utc);
-        let current = match self.commands.as_slices() {
+        let current = match self.entries.as_slices() {
             ([], []) => return None,
             (start, []) => match start.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
                 Ok(current) | Err(current) => current,
@@ -459,7 +458,7 @@ impl<T> Record<T> {
     #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
-            Some(self.commands[self.current - 1].to_string())
+            Some(self.entries[self.current - 1].to_string())
         } else {
             None
         }
@@ -474,7 +473,7 @@ impl<T> Record<T> {
     #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
-            Some(self.commands[self.current].to_string())
+            Some(self.entries[self.current].to_string())
         } else {
             None
         }
@@ -555,7 +554,7 @@ impl<T: fmt::Debug> fmt::Debug for Record<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
-            .field("commands", &self.commands)
+            .field("entries", &self.entries)
             .field("target", &self.target)
             .field("current", &self.current)
             .field("limit", &self.limit)
@@ -632,7 +631,7 @@ impl RecordBuilder {
     #[inline]
     pub fn build<T>(&self, target: T) -> Record<T> {
         Record {
-            commands: VecDeque::with_capacity(self.capacity),
+            entries: VecDeque::with_capacity(self.capacity),
             target,
             current: 0,
             limit: self.limit,

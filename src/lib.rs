@@ -355,6 +355,12 @@ struct At {
     current: usize,
 }
 
+impl At {
+    pub fn new(branch: usize, current: usize) -> At {
+        At { branch, current }
+    }
+}
+
 struct Entry<T> {
     command: Box<dyn Command<T>>,
     #[cfg(feature = "chrono")]

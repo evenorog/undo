@@ -76,22 +76,10 @@ impl<T> Display<'_, Record<T>> {
             #[cfg(feature = "chrono")]
             self.config.timestamp(f, &entry.timestamp)?;
         }
-        self.config.current(
-            f,
-            at,
-            At {
-                branch: 0,
-                current: self.data.current(),
-            },
-        )?;
-        self.config.saved(
-            f,
-            at,
-            self.data.saved.map(|saved| At {
-                branch: 0,
-                current: saved,
-            }),
-        )?;
+        self.config
+            .current(f, at, At::new(0, self.data.current()))?;
+        self.config
+            .saved(f, at, self.data.saved.map(|saved| At::new(0, saved)))?;
         if self.config.detailed {
             writeln!(f)?;
             self.config.message(f, entry, 0)
@@ -118,24 +106,15 @@ impl<T> Display<'_, History<T>> {
             #[cfg(feature = "chrono")]
             self.config.timestamp(f, &entry.timestamp)?;
         }
-        self.config.current(
-            f,
-            at,
-            At {
-                branch: self.data.branch(),
-                current: self.data.current(),
-            },
-        )?;
+        self.config
+            .current(f, at, At::new(self.data.branch(), self.data.current()))?;
         self.config.saved(
             f,
             at,
             self.data
                 .record
                 .saved
-                .map(|saved| At {
-                    branch: self.data.branch(),
-                    current: saved,
-                })
+                .map(|saved| At::new(self.data.branch(), saved))
                 .or(self.data.saved),
         )?;
         if self.config.detailed {
@@ -162,11 +141,8 @@ impl<T> Display<'_, History<T>> {
             .iter()
             .filter(|(_, branch)| branch.parent == at)
         {
-            for (j, cmd) in branch.commands.iter().enumerate().rev() {
-                let at = At {
-                    branch: i,
-                    current: j + branch.parent.current + 1,
-                };
+            for (j, cmd) in branch.entries.iter().enumerate().rev() {
+                let at = At::new(i, j + branch.parent.current + 1);
                 self.fmt_graph(f, at, cmd, level + 1)?;
             }
             for j in 0..level {
@@ -197,12 +173,8 @@ impl<'a, T> From<&'a T> for Display<'a, T> {
 impl<T> fmt::Display for Display<'_, Record<T>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, cmd) in self.data.commands.iter().enumerate().rev() {
-            let at = At {
-                branch: 0,
-                current: i + 1,
-            };
-            self.fmt_list(f, at, cmd)?;
+        for (i, entry) in self.data.entries.iter().enumerate().rev() {
+            self.fmt_list(f, At::new(0, i + 1), entry)?;
         }
         Ok(())
     }
@@ -211,11 +183,8 @@ impl<T> fmt::Display for Display<'_, Record<T>> {
 impl<T> fmt::Display for Display<'_, History<T>> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, cmd) in self.data.record.commands.iter().enumerate().rev() {
-            let at = At {
-                branch: self.data.branch(),
-                current: i + 1,
-            };
+        for (i, cmd) in self.data.record.entries.iter().enumerate().rev() {
+            let at = At::new(self.data.branch(), i + 1);
             if self.config.graph {
                 self.fmt_graph(f, at, cmd, 0)?;
             } else {
