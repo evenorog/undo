@@ -39,15 +39,6 @@ pub struct Checkpoint<'a, T: Timeline> {
 }
 
 impl<'a, T: Timeline> Checkpoint<'a, T> {
-    /// Returns a checkpoint.
-    #[inline]
-    pub fn new(inner: &'a mut T) -> Checkpoint<'a, T> {
-        Checkpoint {
-            inner,
-            actions: Vec::new(),
-        }
-    }
-
     /// Reserves capacity for at least `additional` more commands in the checkpoint.
     ///
     /// # Panics
@@ -113,8 +104,8 @@ impl<T> Checkpoint<'_, Record<T>> {
     #[inline]
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let saved = self.inner.saved;
-        let (_, commands) = self.inner.__apply(Entry::new(command))?;
-        self.actions.push(Action::Apply(saved, commands));
+        let (_, tail) = self.inner.__apply(Entry::new(command))?;
+        self.actions.push(Action::Apply(saved, tail));
         Ok(())
     }
 
@@ -151,10 +142,10 @@ impl<T> Checkpoint<'_, Record<T>> {
     pub fn cancel(self) -> Result {
         for action in self.actions.into_iter().rev() {
             match action {
-                Action::Apply(saved, mut commands) => {
+                Action::Apply(saved, mut entries) => {
                     self.inner.undo().unwrap()?;
-                    self.inner.commands.pop_back();
-                    self.inner.commands.append(&mut commands);
+                    self.inner.entries.pop_back();
+                    self.inner.entries.append(&mut entries);
                     self.inner.saved = saved;
                 }
                 Action::Branch(_, _) => unreachable!(),
@@ -245,7 +236,7 @@ impl<T> Checkpoint<'_, History<T>> {
                     let root = self.inner.branch();
                     self.inner.go_to(branch, current).unwrap()?;
                     if root == branch {
-                        self.inner.record.commands.pop_back();
+                        self.inner.record.entries.pop_back();
                     } else {
                         self.inner.branches.remove(&root).unwrap();
                     }
@@ -326,7 +317,10 @@ impl<T> Timeline for Checkpoint<'_, History<T>> {
 impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
     #[inline]
     fn from(inner: &'a mut T) -> Self {
-        Checkpoint::new(inner)
+        Checkpoint {
+            inner,
+            actions: Vec::new(),
+        }
     }
 }
 

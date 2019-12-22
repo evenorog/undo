@@ -38,15 +38,6 @@ pub struct Queue<'a, T: Timeline> {
 }
 
 impl<'a, T: Timeline> Queue<'a, T> {
-    /// Returns a queue.
-    #[inline]
-    pub fn new(inner: &'a mut T) -> Queue<'a, T> {
-        Queue {
-            inner,
-            actions: Vec::new(),
-        }
-    }
-
     /// Reserves capacity for at least `additional` more commands in the queue.
     ///
     /// # Panics
@@ -262,7 +253,10 @@ impl<T: Timeline> Timeline for Queue<'_, T> {
 impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
     #[inline]
     fn from(inner: &'a mut T) -> Self {
-        Queue::new(inner)
+        Queue {
+            inner,
+            actions: Vec::new(),
+        }
     }
 }
 
