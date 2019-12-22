@@ -1,8 +1,6 @@
 use crate::{
     At, Checkpoint, Command, Entry, Queue, Record, RecordBuilder, Result, Signal, Timeline,
 };
-#[cfg(feature = "chrono")]
-use chrono::{DateTime, TimeZone};
 use std::collections::{BTreeMap, VecDeque};
 #[cfg(feature = "display")]
 use {crate::Display, std::fmt};
@@ -31,14 +29,13 @@ use {crate::Display, std::fmt};
 /// let mut history = History::default();
 /// history.apply(Add('a'))?;
 /// history.apply(Add('b'))?;
+/// assert_eq!(history.target(), "ab");
+/// history.undo().unwrap()?;
 /// history.apply(Add('c'))?;
-/// let abc = history.branch();
-/// history.go_to(abc, 1).unwrap()?;
-/// history.apply(Add('f'))?;
-/// history.apply(Add('g'))?;
-/// assert_eq!(history.target(), "afg");
-/// history.go_to(abc, 3).unwrap()?;
-/// assert_eq!(history.target(), "abc");
+/// assert_eq!(history.target(), "ac");
+/// history.undo().unwrap()?;
+/// history.undo().unwrap()?;
+/// assert_eq!(history.target(), "ab");
 /// # Ok(())
 /// # }
 /// ```
@@ -168,15 +165,12 @@ impl<T> History<T> {
     /// Removes all commands from the history without undoing them.
     #[inline]
     pub fn clear(&mut self) {
-        let old = self.branch();
         self.root = 0;
         self.next = 1;
         self.saved = None;
+        self.actions.clear();
         self.record.clear();
         self.branches.clear();
-        if let Some(ref mut slot) = self.record.slot {
-            slot(Signal::Branch { old, new: 0 });
-        }
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -206,12 +200,6 @@ impl<T> History<T> {
             self.branches
                 .insert(old.branch, Branch::new(new, old.current, tail));
             self.set_root(new, old.current, saved);
-            if let Some(ref mut slot) = self.record.slot {
-                slot(Signal::Branch {
-                    old: old.branch,
-                    new,
-                })
-            }
         }
         self.actions.apply(Action::Apply(self.at()));
         Ok(())
@@ -247,7 +235,7 @@ impl<T> History<T> {
         if at.branch == self.branch() {
             self.record.redo()
         } else {
-            self.go_to(at.branch, at.current)
+            self.go_to(at.branch, at.current - 1)
         }
     }
 
@@ -259,7 +247,7 @@ impl<T> History<T> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
-    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result> {
+    pub(crate) fn go_to(&mut self, branch: usize, current: usize) -> Option<Result> {
         let root = self.branch();
         if root == branch {
             return self.record.go_to(current);
@@ -285,24 +273,7 @@ impl<T> History<T> {
                 }
             }
         }
-        if let Err(err) = self.record.go_to(current)? {
-            return Some(Err(err));
-        } else if let Some(ref mut slot) = self.record.slot {
-            slot(Signal::Branch {
-                old: root,
-                new: self.root,
-            });
-        }
-        Some(Ok(()))
-    }
-
-    /// Go back or forward in the history to the command that was made closest to the datetime provided.
-    ///
-    /// This method does not jump across branches.
-    #[inline]
-    #[cfg(feature = "chrono")]
-    pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result> {
-        self.record.time_travel(to)
+        self.record.go_to(current)
     }
 
     /// Applies each command in the iterator.
@@ -584,6 +555,11 @@ impl Actions {
             }
         }
     }
+
+    fn clear(&mut self) {
+        self.current = 0;
+        self.actions.clear();
+    }
 }
 
 /// Builder for a History.
@@ -689,7 +665,7 @@ mod tests {
     }
 
     #[test]
-    fn history() {
+    fn actions() {
         let mut history = History::default();
         history.apply(Add('a')).unwrap();
         history.apply(Add('b')).unwrap();
@@ -699,13 +675,19 @@ mod tests {
         history.undo().unwrap().unwrap();
         assert_eq!(history.target(), "ab");
         history.redo().unwrap().unwrap();
-        assert_eq!(history.target(), "a");
         history.redo().unwrap().unwrap();
         assert_eq!(history.target(), "ac");
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
+        assert_eq!(history.target(), "ab");
         history.undo().unwrap().unwrap();
         history.undo().unwrap().unwrap();
         assert_eq!(history.target(), "");
+        history.redo().unwrap().unwrap();
+        history.redo().unwrap().unwrap();
+        assert_eq!(history.target(), "ab");
+        history.redo().unwrap().unwrap();
+        history.redo().unwrap().unwrap();
+        assert_eq!(history.target(), "ac");
     }
 }

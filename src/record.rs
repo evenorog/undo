@@ -180,16 +180,12 @@ impl<T> Record<T> {
     /// Removes all commands from the record without undoing them.
     #[inline]
     pub fn clear(&mut self) {
-        let old = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         self.entries.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.current = 0;
         if let Some(ref mut slot) = self.slot {
-            if old != 0 {
-                slot(Signal::Current { old, new: 0 });
-            }
             if could_undo {
                 slot(Signal::Undo(false));
             }
@@ -248,11 +244,6 @@ impl<T> Record<T> {
         }
         debug_assert_eq!(self.current(), self.len());
         if let Some(ref mut slot) = self.slot {
-            // We emit this signal even if the commands might have been merged.
-            slot(Signal::Current {
-                old: current,
-                new: self.current,
-            });
             if could_redo {
                 slot(Signal::Redo(false));
             }
@@ -287,10 +278,6 @@ impl<T> Record<T> {
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut slot) = self.slot {
-            slot(Signal::Current {
-                old,
-                new: self.current,
-            });
             if old == len {
                 slot(Signal::Redo(true));
             }
@@ -325,10 +312,6 @@ impl<T> Record<T> {
         let len = self.len();
         let is_saved = self.is_saved();
         if let Some(ref mut slot) = self.slot {
-            slot(Signal::Current {
-                old,
-                new: self.current,
-            });
             if old == len - 1 {
                 slot(Signal::Redo(false));
             }
@@ -357,7 +340,6 @@ impl<T> Record<T> {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
-        let old = self.current();
         // Temporarily remove slot so they are not called each iteration.
         let slot = self.slot.take();
         while self.current() != current {
@@ -377,12 +359,6 @@ impl<T> Record<T> {
         let can_redo = self.can_redo();
         let is_saved = self.is_saved();
         if let Some(ref mut slot) = self.slot {
-            if old != self.current {
-                slot(Signal::Current {
-                    old,
-                    new: self.current,
-                });
-            }
             if could_undo != can_undo {
                 slot(Signal::Undo(can_undo));
             }

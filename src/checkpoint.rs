@@ -109,30 +109,6 @@ impl<T> Checkpoint<'_, Record<T>> {
         Ok(())
     }
 
-    /// Calls the [`go_to`] method.
-    ///
-    /// [`go_to`]: struct.Record.html#method.go_to
-    #[inline]
-    pub fn go_to(&mut self, current: usize) -> Option<Result> {
-        let old = self.inner.current();
-        let go_to = self.inner.go_to(current);
-        if let Some(Ok(_)) = go_to {
-            self.actions.push(Action::GoTo(0, old));
-        }
-        go_to
-    }
-
-    /// Calls the [`extend`] method.
-    ///
-    /// [`extend`]: struct.Record.html#method.extend
-    #[inline]
-    pub fn extend<C: Command<T>>(&mut self, commands: impl IntoIterator<Item = C>) -> Result {
-        for command in commands {
-            self.apply(command)?;
-        }
-        Ok(())
-    }
-
     /// Cancels the changes and consumes the checkpoint.
     ///
     /// # Errors
@@ -151,7 +127,6 @@ impl<T> Checkpoint<'_, Record<T>> {
                 Action::Branch(_, _) => unreachable!(),
                 Action::Undo => self.inner.redo().unwrap()?,
                 Action::Redo => self.inner.undo().unwrap()?,
-                Action::GoTo(_, current) => self.inner.go_to(current).unwrap()?,
             }
         }
         Ok(())
@@ -174,14 +149,6 @@ impl<T> Checkpoint<'_, Record<T>> {
     pub fn target(&self) -> &T {
         self.inner.target()
     }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
-    pub fn target_mut(&mut self) -> &mut T {
-        self.inner.target_mut()
-    }
 }
 
 impl<T> Checkpoint<'_, History<T>> {
@@ -194,31 +161,6 @@ impl<T> Checkpoint<'_, History<T>> {
         let current = self.inner.current();
         self.inner.apply(command)?;
         self.actions.push(Action::Branch(branch, current));
-        Ok(())
-    }
-
-    /// Calls the [`go_to`] method.
-    ///
-    /// [`go_to`]: struct.History.html#method.go_to
-    #[inline]
-    pub fn go_to(&mut self, branch: usize, current: usize) -> Option<Result> {
-        let root = self.inner.branch();
-        let old = self.inner.current();
-        let go_to = self.inner.go_to(branch, current);
-        if let Some(Ok(_)) = go_to {
-            self.actions.push(Action::GoTo(root, old));
-        }
-        go_to
-    }
-
-    /// Calls the [`extend`] method.
-    ///
-    /// [`extend`]: struct.History.html#method.extend
-    #[inline]
-    pub fn extend<C: Command<T>>(&mut self, commands: impl IntoIterator<Item = C>) -> Result {
-        for command in commands {
-            self.apply(command)?;
-        }
         Ok(())
     }
 
@@ -243,7 +185,6 @@ impl<T> Checkpoint<'_, History<T>> {
                 }
                 Action::Undo => self.inner.redo().unwrap()?,
                 Action::Redo => self.inner.undo().unwrap()?,
-                Action::GoTo(branch, current) => self.inner.go_to(branch, current).unwrap()?,
             }
         }
         Ok(())
@@ -265,14 +206,6 @@ impl<T> Checkpoint<'_, History<T>> {
     #[inline]
     pub fn target(&self) -> &T {
         self.inner.target()
-    }
-
-    /// Returns a mutable reference to the `target`.
-    ///
-    /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
-    pub fn target_mut(&mut self) -> &mut T {
-        self.inner.target_mut()
     }
 }
 
@@ -331,7 +264,6 @@ enum Action<T> {
     Branch(usize, usize),
     Undo,
     Redo,
-    GoTo(usize, usize),
 }
 
 #[cfg(all(test, not(feature = "display")))]

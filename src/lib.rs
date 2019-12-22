@@ -316,25 +316,6 @@ pub enum Signal {
     ///
     /// This signal will be emitted when the record enters or leaves its targets saved state.
     Saved(bool),
-    /// Says if the current command has changed.
-    ///
-    /// This signal will be emitted when the current command has changed. This includes
-    /// when two commands have been merged, in which case `old == new`.
-    Current {
-        /// The old current command.
-        old: usize,
-        /// The new current command.
-        new: usize,
-    },
-    /// Says if the current branch has changed.
-    ///
-    /// This is currently only emitted from `History`.
-    Branch {
-        /// The old branch.
-        old: usize,
-        /// The new branch.
-        new: usize,
-    },
 }
 
 /// Says if the command should merge with another command.
