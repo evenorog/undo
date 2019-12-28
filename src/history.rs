@@ -45,7 +45,7 @@ use {crate::Display, std::fmt};
 pub struct History<T: 'static> {
     root: usize,
     next: usize,
-    actions: Actions,
+    ctrl: Ctrl,
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<T>,
     pub(crate) branches: BTreeMap<usize, Branch<T>>,
@@ -139,17 +139,6 @@ impl<T> History<T> {
         self.record.set_saved(saved);
     }
 
-    /// Revert the changes done to the target since the saved state.
-    #[inline]
-    pub fn revert(&mut self) -> Option<Result> {
-        if self.record.saved.is_some() {
-            self.record.revert()
-        } else {
-            self.saved
-                .and_then(|saved| self.go_to(saved.branch, saved.current))
-        }
-    }
-
     /// Returns the current branch.
     #[inline]
     pub fn branch(&self) -> usize {
@@ -168,7 +157,7 @@ impl<T> History<T> {
         self.root = 0;
         self.next = 1;
         self.saved = None;
-        self.actions.clear();
+        self.ctrl.clear();
         self.record.clear();
         self.branches.clear();
     }
@@ -181,11 +170,11 @@ impl<T> History<T> {
     /// [`apply`]: trait.Command.html#tymethod.apply
     #[inline]
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
-        let old = self.at();
-        let saved = self.record.saved.filter(|&saved| saved > old.current);
+        let at = self.at();
+        let saved = self.record.saved.filter(|&saved| saved > at.current);
         let (merged, tail) = self.record.__apply(Entry::new(command))?;
         // Check if the limit has been reached.
-        if !merged && old.current == self.current() {
+        if !merged && at.current == self.current() {
             let root = self.branch();
             self.rm_child(root, 0);
             self.branches
@@ -198,10 +187,10 @@ impl<T> History<T> {
             let new = self.next;
             self.next += 1;
             self.branches
-                .insert(old.branch, Branch::new(new, old.current, tail));
-            self.set_root(new, old.current, saved);
+                .insert(at.branch, Branch::new(new, at.current, tail));
+            self.set_root(new, at.current, saved);
         }
-        self.actions.apply(Action::Apply(self.at()));
+        self.ctrl.apply(self.branch());
         Ok(())
     }
 
@@ -214,11 +203,12 @@ impl<T> History<T> {
     /// [`undo`]: trait.Command.html#tymethod.undo
     #[inline]
     pub fn undo(&mut self) -> Option<Result> {
-        let at = self.actions.undo()?;
-        if at.branch == self.branch() {
+        let root = self.ctrl.undo()?;
+        if root == self.branch() {
             self.record.undo()
         } else {
-            self.go_to(at.branch, at.current)
+            self.jump_to(root);
+            self.record.redo()
         }
     }
 
@@ -231,49 +221,28 @@ impl<T> History<T> {
     /// [`redo`]: trait.Command.html#method.redo
     #[inline]
     pub fn redo(&mut self) -> Option<Result> {
-        let at = self.actions.redo()?;
-        if at.branch == self.branch() {
+        let root = self.ctrl.redo()?;
+        if root == self.branch() {
             self.record.redo()
         } else {
-            self.go_to(at.branch, at.current - 1)
+            let ok = self.record.undo();
+            if let Some(Ok(_)) = ok {
+                self.jump_to(root);
+            }
+            ok
         }
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `current` is reached.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
-    ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
-    /// [`redo`]: trait.Command.html#method.redo
-    #[inline]
-    pub(crate) fn go_to(&mut self, branch: usize, current: usize) -> Option<Result> {
-        let root = self.branch();
-        if root == branch {
-            return self.record.go_to(current);
-        }
-        // Walk the path from `root` to `branch`.
-        for (new, branch) in self.mk_path(branch)? {
-            if let Err(err) = self.record.go_to(branch.parent.current).unwrap() {
-                return Some(Err(err));
-            }
-            // Apply the commands in the branch and move older commands into their own branch.
-            for entry in branch.entries {
-                let current = self.current();
-                let saved = self.record.saved.filter(|&saved| saved > current);
-                let tail = match self.record.__apply(entry) {
-                    Ok((_, tail)) => tail,
-                    Err(err) => return Some(Err(err)),
-                };
-                // Handle new branch.
-                if !tail.is_empty() {
-                    self.branches
-                        .insert(self.root, Branch::new(new, current, tail));
-                    self.set_root(new, current, saved);
-                }
-            }
-        }
-        self.record.go_to(current)
+    pub(crate) fn jump_to(&mut self, root: usize) {
+        let mut branch = self.branches.remove(&root).unwrap();
+        debug_assert_eq!(branch.parent, self.at());
+        let current = self.current();
+        let saved = self.record.saved.filter(|&saved| saved > current);
+        let tail = self.record.entries.split_off(current);
+        self.record.entries.append(&mut branch.entries);
+        self.branches
+            .insert(self.root, Branch::new(root, current, tail));
+        self.set_root(root, current, saved);
     }
 
     /// Applies each command in the iterator.
@@ -419,20 +388,6 @@ impl<T> History<T> {
             )
         }
     }
-
-    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<T>)>> {
-        debug_assert_ne!(self.branch(), to);
-        let mut dest = self.branches.remove(&to)?;
-        let mut i = dest.parent.branch;
-        let mut path = vec![(to, dest)];
-        while i != self.branch() {
-            dest = self.branches.remove(&i).unwrap();
-            to = i;
-            i = dest.parent.branch;
-            path.push((to, dest));
-        }
-        Some(path.into_iter().rev())
-    }
 }
 
 impl<T> Timeline for History<T> {
@@ -474,7 +429,7 @@ impl<T> From<Record<T>> for History<T> {
         History {
             root: 0,
             next: 1,
-            actions: Actions::default(),
+            ctrl: Ctrl::default(),
             saved: None,
             record,
             branches: BTreeMap::default(),
@@ -506,59 +461,36 @@ impl<T> Branch<T> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-enum Action {
-    Apply(At),
-    Undo(At),
-    Redo(At),
-}
-
 #[derive(Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct Actions {
+struct Ctrl {
     current: usize,
-    actions: Vec<Action>,
+    buf: Vec<usize>,
 }
 
-impl Actions {
-    fn apply(&mut self, action: Action) {
-        self.actions.push(action);
-        self.current = self.actions.len();
+impl Ctrl {
+    fn apply(&mut self, root: usize) {
+        self.buf.push(root);
+        self.current = self.buf.len();
     }
 
-    fn undo(&mut self) -> Option<At> {
+    fn undo(&mut self) -> Option<usize> {
         let index = self.current.checked_sub(1)?;
-        match *self.actions.get(index)? {
-            Action::Apply(at) | Action::Redo(at) => {
-                self.actions.push(Action::Undo(at));
-                self.current -= 1;
-                Some(at)
-            }
-            Action::Undo(at) => {
-                self.actions.push(Action::Redo(at));
-                self.current -= 1;
-                Some(at)
-            }
-        }
+        let root = *self.buf.get(index)?;
+        self.buf.push(root);
+        self.current -= 1;
+        Some(root)
     }
 
-    fn redo(&mut self) -> Option<At> {
-        match *self.actions.get(self.current + 1)? {
-            Action::Apply(at) | Action::Redo(at) => {
-                self.actions.push(Action::Undo(at));
-                self.current += 1;
-                Some(at)
-            }
-            Action::Undo(at) => {
-                self.actions.push(Action::Redo(at));
-                self.current += 1;
-                Some(at)
-            }
-        }
+    fn redo(&mut self) -> Option<usize> {
+        let root = *self.buf.get(self.current + 1)?;
+        self.buf.push(root);
+        self.current += 1;
+        Some(root)
     }
 
     fn clear(&mut self) {
         self.current = 0;
-        self.actions.clear();
+        self.buf.clear();
     }
 }
 

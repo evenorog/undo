@@ -124,7 +124,7 @@ impl<T> Checkpoint<'_, Record<T>> {
                     self.inner.entries.append(&mut entries);
                     self.inner.saved = saved;
                 }
-                Action::Branch(_, _) => unreachable!(),
+                Action::Branch(_) => unreachable!(),
                 Action::Undo => self.inner.redo().unwrap()?,
                 Action::Redo => self.inner.undo().unwrap()?,
             }
@@ -158,9 +158,8 @@ impl<T> Checkpoint<'_, History<T>> {
     #[inline]
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let branch = self.inner.branch();
-        let current = self.inner.current();
         self.inner.apply(command)?;
-        self.actions.push(Action::Branch(branch, current));
+        self.actions.push(Action::Branch(branch));
         Ok(())
     }
 
@@ -174,9 +173,9 @@ impl<T> Checkpoint<'_, History<T>> {
         for action in self.actions.into_iter().rev() {
             match action {
                 Action::Apply(_, _) => unreachable!(),
-                Action::Branch(branch, current) => {
+                Action::Branch(branch) => {
                     let root = self.inner.branch();
-                    self.inner.go_to(branch, current).unwrap()?;
+                    self.inner.jump_to(branch);
                     if root == branch {
                         self.inner.record.entries.pop_back();
                     } else {
@@ -261,7 +260,7 @@ impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
 #[cfg_attr(feature = "display", derive(Debug))]
 enum Action<T> {
     Apply(Option<usize>, VecDeque<Entry<T>>),
-    Branch(usize, usize),
+    Branch(usize),
     Undo,
     Redo,
 }
