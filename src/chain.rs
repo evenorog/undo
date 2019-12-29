@@ -23,8 +23,7 @@ use std::fmt;
 /// # }
 /// # fn main() -> undo::Result {
 /// let mut record = Record::default();
-/// let chain = Chain::new(Add('a'), Add('b')).join(Add('c'));
-/// record.apply(chain)?;
+/// record.apply(Chain::new(Add('a'), Add('b')).join(Add('c')))?;
 /// assert_eq!(record.target(), "abc");
 /// record.undo().unwrap()?;
 /// assert_eq!(record.target(), "");
@@ -43,7 +42,6 @@ pub struct Chain<A, B> {
 
 impl<A, B> Chain<A, B> {
     /// Creates a chain from `a` and `b`.
-    #[inline]
     pub fn new(a: A, b: B) -> Chain<A, B> {
         Chain::with_merge(a, b, Merge::No)
     }
@@ -51,7 +49,6 @@ impl<A, B> Chain<A, B> {
     /// Creates a chain from `a` and `b` with the specified merge behavior.
     ///
     /// By default the chain never merges.
-    #[inline]
     pub fn with_merge(a: A, b: B, merge: Merge) -> Chain<A, B> {
         Chain {
             join: Join(a, b),
@@ -66,7 +63,6 @@ impl<A, B> Chain<A, B> {
     /// By default the display text will be the display text for every command in the chain.
     ///
     /// Requires the `display` feature to be enabled.
-    #[inline]
     #[cfg(feature = "display")]
     pub fn with_text(a: A, b: B, text: impl Into<String>) -> Chain<A, B> {
         Chain {
@@ -78,7 +74,6 @@ impl<A, B> Chain<A, B> {
     }
 
     /// Joins the command with the chain and returns the chain.
-    #[inline]
     pub fn join<C>(self, c: C) -> Chain<A, Join<B, C>> {
         Chain {
             join: Join(self.join.0, Join(self.join.1, c)),
@@ -89,7 +84,6 @@ impl<A, B> Chain<A, B> {
     }
 
     /// Sets the merge behavior of the chain.
-    #[inline]
     pub fn set_merge(&mut self, merge: Merge) {
         self.merge = merge;
     }
@@ -97,7 +91,6 @@ impl<A, B> Chain<A, B> {
     /// Sets the display text for the chain.
     ///
     /// Requires the `display` feature to be enabled.
-    #[inline]
     #[cfg(feature = "display")]
     pub fn set_text(&mut self, text: impl Into<String>) {
         self.text = Some(text.into());
@@ -105,22 +98,18 @@ impl<A, B> Chain<A, B> {
 }
 
 impl<T, A: Command<T>, B: Command<T>> Command<T> for Chain<A, B> {
-    #[inline]
     fn apply(&mut self, target: &mut T) -> crate::Result {
         self.join.apply(target)
     }
 
-    #[inline]
     fn undo(&mut self, target: &mut T) -> crate::Result {
         self.join.undo(target)
     }
 
-    #[inline]
     fn redo(&mut self, target: &mut T) -> crate::Result {
         self.join.redo(target)
     }
 
-    #[inline]
     fn merge(&self) -> Merge {
         self.merge
     }
@@ -128,7 +117,6 @@ impl<T, A: Command<T>, B: Command<T>> Command<T> for Chain<A, B> {
 
 #[cfg(feature = "display")]
 impl<A: fmt::Display, B: fmt::Display> fmt::Display for Chain<A, B> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.text {
             Some(text) => f.write_str(text),
@@ -141,19 +129,16 @@ impl<A: fmt::Display, B: fmt::Display> fmt::Display for Chain<A, B> {
 pub struct Join<A, B>(pub A, pub B);
 
 impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
-    #[inline]
     fn apply(&mut self, target: &mut T) -> crate::Result {
         self.0.apply(target)?;
         self.1.apply(target)
     }
 
-    #[inline]
     fn undo(&mut self, target: &mut T) -> crate::Result {
         self.1.undo(target)?;
         self.0.undo(target)
     }
 
-    #[inline]
     fn redo(&mut self, target: &mut T) -> crate::Result {
         self.0.redo(target)?;
         self.1.redo(target)
@@ -162,7 +147,6 @@ impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
 
 #[cfg(feature = "display")]
 impl<A: fmt::Display, B: fmt::Display> fmt::Display for Join<A, B> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "{} + {}", self.0, self.1)
     }

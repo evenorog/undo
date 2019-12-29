@@ -23,35 +23,30 @@ pub struct Display<'a, T> {
 
 impl<T> Display<'_, T> {
     /// Show colored output (off by default).
-    #[inline]
     pub fn colored(&mut self, on: bool) -> &mut Self {
         self.config.colored = on;
         self
     }
 
     /// Show the current position in the output (on by default).
-    #[inline]
     pub fn current(&mut self, on: bool) -> &mut Self {
         self.config.current = on;
         self
     }
 
     /// Show detailed output (on by default).
-    #[inline]
     pub fn detailed(&mut self, on: bool) -> &mut Self {
         self.config.detailed = on;
         self
     }
 
     /// Show the position of the command (on by default).
-    #[inline]
     pub fn position(&mut self, on: bool) -> &mut Self {
         self.config.position = on;
         self
     }
 
     /// Show the saved command (on by default).
-    #[inline]
     pub fn saved(&mut self, on: bool) -> &mut Self {
         self.config.saved = on;
         self
@@ -59,7 +54,6 @@ impl<T> Display<'_, T> {
 }
 
 impl<T> Display<'_, Record<T>> {
-    #[inline]
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<T>) -> fmt::Result {
         self.config.mark(f, 0)?;
         self.config.position(f, at, false)?;
@@ -83,7 +77,6 @@ impl<T> Display<'_, Record<T>> {
 }
 
 impl<T> Display<'_, History<T>> {
-    #[inline]
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
@@ -118,7 +111,6 @@ impl<T> Display<'_, History<T>> {
         }
     }
 
-    #[inline]
     fn fmt_graph(
         &self,
         f: &mut fmt::Formatter,
@@ -132,9 +124,9 @@ impl<T> Display<'_, History<T>> {
             .iter()
             .filter(|(_, branch)| branch.parent == at)
         {
-            for (j, cmd) in branch.entries.iter().enumerate().rev() {
+            for (j, entry) in branch.entries.iter().enumerate().rev() {
                 let at = At::new(i, j + branch.parent.current + 1);
-                self.fmt_graph(f, at, cmd, level + 1)?;
+                self.fmt_graph(f, at, entry, level + 1)?;
             }
             for j in 0..level {
                 self.config.edge(f, j)?;
@@ -152,7 +144,6 @@ impl<T> Display<'_, History<T>> {
 }
 
 impl<'a, T> From<&'a T> for Display<'a, T> {
-    #[inline]
     fn from(data: &'a T) -> Self {
         Display {
             data,
@@ -162,7 +153,6 @@ impl<'a, T> From<&'a T> for Display<'a, T> {
 }
 
 impl<T> fmt::Display for Display<'_, Record<T>> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.data.entries.iter().enumerate().rev() {
             self.fmt_list(f, At::new(0, i + 1), entry)?;
@@ -172,11 +162,10 @@ impl<T> fmt::Display for Display<'_, Record<T>> {
 }
 
 impl<T> fmt::Display for Display<'_, History<T>> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, cmd) in self.data.record.entries.iter().enumerate().rev() {
+        for (i, entry) in self.data.record.entries.iter().enumerate().rev() {
             let at = At::new(self.data.branch(), i + 1);
-            self.fmt_graph(f, at, cmd, 0)?;
+            self.fmt_graph(f, at, entry, 0)?;
         }
         Ok(())
     }
@@ -192,7 +181,6 @@ struct Config {
 }
 
 impl Default for Config {
-    #[inline]
     fn default() -> Self {
         Config {
             colored: false,
@@ -205,7 +193,6 @@ impl Default for Config {
 }
 
 impl Config {
-    #[inline]
     fn message(self, f: &mut fmt::Formatter, msg: &impl ToString, level: usize) -> fmt::Result {
         let msg = msg.to_string();
         let lines = msg.lines();
@@ -223,7 +210,6 @@ impl Config {
         Ok(())
     }
 
-    #[inline]
     fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         if self.colored {
             write!(f, "{}", "*".color(to_color(level)))
@@ -232,7 +218,6 @@ impl Config {
         }
     }
 
-    #[inline]
     fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         if self.colored {
             write!(f, "{}", "|".color(to_color(level)))
@@ -241,7 +226,6 @@ impl Config {
         }
     }
 
-    #[inline]
     fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         if self.colored {
             write!(
@@ -255,7 +239,6 @@ impl Config {
         }
     }
 
-    #[inline]
     fn position(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
         if self.position {
             if self.colored {
@@ -275,7 +258,6 @@ impl Config {
         }
     }
 
-    #[inline]
     fn current(self, f: &mut fmt::Formatter, at: At, current: At) -> fmt::Result {
         if self.current && at == current {
             if self.colored {
@@ -288,7 +270,6 @@ impl Config {
         }
     }
 
-    #[inline]
     fn saved(self, f: &mut fmt::Formatter, at: At, saved: Option<At>) -> fmt::Result {
         if self.saved && saved.map_or(false, |saved| saved == at) {
             if self.colored {
@@ -307,7 +288,6 @@ impl Config {
         }
     }
 
-    #[inline]
     #[cfg(feature = "chrono")]
     fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Utc>) -> fmt::Result {
         let rfc2822 = timestamp.with_timezone(&Local).to_rfc2822();
@@ -319,7 +299,6 @@ impl Config {
     }
 }
 
-#[inline]
 fn to_color(i: usize) -> Color {
     match i % 6 {
         0 => Color::Cyan,

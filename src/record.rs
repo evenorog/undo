@@ -65,7 +65,6 @@ pub struct Record<T: 'static> {
 
 impl<T> Record<T> {
     /// Returns a new record.
-    #[inline]
     pub fn new(target: T) -> Record<T> {
         RecordBuilder::new().build(target)
     }
@@ -74,37 +73,31 @@ impl<T> Record<T> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
-    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.entries.reserve(additional);
     }
 
     /// Returns the capacity of the record.
-    #[inline]
     pub fn capacity(&self) -> usize {
         self.entries.capacity()
     }
 
     /// Shrinks the capacity of the record as much as possible.
-    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.entries.shrink_to_fit();
     }
 
     /// Returns the number of commands in the record.
-    #[inline]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Returns `true` if the record is empty.
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// Returns the limit of the record.
-    #[inline]
     pub fn limit(&self) -> usize {
         self.limit.get()
     }
@@ -112,7 +105,6 @@ impl<T> Record<T> {
     /// Sets how the signal should be handled when the state changes.
     ///
     /// The previous slot is returned if it exists.
-    #[inline]
     pub fn connect(
         &mut self,
         slot: impl FnMut(Signal) + 'static,
@@ -121,31 +113,26 @@ impl<T> Record<T> {
     }
 
     /// Removes and returns the slot.
-    #[inline]
     pub fn disconnect(&mut self) -> Option<impl FnMut(Signal) + 'static> {
         self.slot.take()
     }
 
     /// Returns `true` if the record can undo.
-    #[inline]
     pub fn can_undo(&self) -> bool {
         self.current() > 0
     }
 
     /// Returns `true` if the record can redo.
-    #[inline]
     pub fn can_redo(&self) -> bool {
         self.current() < self.len()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
-    #[inline]
     pub fn is_saved(&self) -> bool {
         self.saved.map_or(false, |saved| saved == self.current())
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
-    #[inline]
     pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
         if saved {
@@ -166,19 +153,16 @@ impl<T> Record<T> {
     }
 
     /// Revert the changes done to the target since the saved state.
-    #[inline]
     pub fn revert(&mut self) -> Option<Result> {
         self.saved.and_then(|saved| self.go_to(saved))
     }
 
     /// Returns the position of the current command.
-    #[inline]
     pub fn current(&self) -> usize {
         self.current
     }
 
     /// Removes all commands from the record without undoing them.
-    #[inline]
     pub fn clear(&mut self) {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -201,12 +185,10 @@ impl<T> Record<T> {
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    #[inline]
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
         self.__apply(Entry::new(command)).map(|_| ())
     }
 
-    #[inline]
     pub(crate) fn __apply(
         &mut self,
         mut entry: Entry<T>,
@@ -264,7 +246,6 @@ impl<T> Record<T> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
-    #[inline]
     pub fn undo(&mut self) -> Option<Result> {
         if !self.can_undo() {
             return None;
@@ -298,7 +279,6 @@ impl<T> Record<T> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    #[inline]
     pub fn redo(&mut self) -> Option<Result> {
         if !self.can_redo() {
             return None;
@@ -332,7 +312,6 @@ impl<T> Record<T> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
-    #[inline]
     pub fn go_to(&mut self, current: usize) -> Option<Result> {
         if current > self.len() {
             return None;
@@ -373,7 +352,6 @@ impl<T> Record<T> {
     }
 
     /// Go back or forward in the record to the command that was made closest to the datetime provided.
-    #[inline]
     #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result> {
         let to = to.with_timezone(&Utc);
@@ -405,7 +383,6 @@ impl<T> Record<T> {
     /// and the remaining commands in the iterator are discarded.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    #[inline]
     pub fn extend<C: Command<T>>(&mut self, commands: impl IntoIterator<Item = C>) -> Result {
         for command in commands {
             self.apply(command)?;
@@ -414,13 +391,11 @@ impl<T> Record<T> {
     }
 
     /// Returns a queue.
-    #[inline]
     pub fn queue(&mut self) -> Queue<Record<T>> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
         Checkpoint::from(self)
     }
@@ -430,7 +405,6 @@ impl<T> Record<T> {
     /// Requires the `display` feature to be enabled.
     ///
     /// [`undo`]: struct.Record.html#method.undo
-    #[inline]
     #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
@@ -445,7 +419,6 @@ impl<T> Record<T> {
     /// Requires the `display` feature to be enabled.
     ///
     /// [`redo`]: struct.Record.html#method.redo
-    #[inline]
     #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
@@ -458,14 +431,12 @@ impl<T> Record<T> {
     /// Returns a structure for configurable formatting of the record.
     ///
     /// Requires the `display` feature to be enabled.
-    #[inline]
     #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
         Display::from(self)
     }
 
     /// Returns a reference to the `target`.
-    #[inline]
     pub fn target(&self) -> &T {
         &self.target
     }
@@ -473,13 +444,11 @@ impl<T> Record<T> {
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
     pub fn target_mut(&mut self) -> &mut T {
         &mut self.target
     }
 
     /// Consumes the record, returning the `target`.
-    #[inline]
     pub fn into_target(self) -> T {
         self.target
     }
@@ -488,38 +457,32 @@ impl<T> Record<T> {
 impl<T> Timeline for Record<T> {
     type Target = T;
 
-    #[inline]
     fn apply(&mut self, command: impl Command<T>) -> Result {
         self.apply(command)
     }
 
-    #[inline]
     fn undo(&mut self) -> Option<Result> {
         self.undo()
     }
 
-    #[inline]
     fn redo(&mut self) -> Option<Result> {
         self.redo()
     }
 }
 
 impl<T: Default> Default for Record<T> {
-    #[inline]
     fn default() -> Record<T> {
         Record::new(T::default())
     }
 }
 
 impl<T> From<T> for Record<T> {
-    #[inline]
     fn from(target: T) -> Record<T> {
         Record::new(target)
     }
 }
 
 impl<T> From<History<T>> for Record<T> {
-    #[inline]
     fn from(history: History<T>) -> Record<T> {
         history.record
     }
@@ -527,7 +490,6 @@ impl<T> From<History<T>> for Record<T> {
 
 #[cfg(feature = "display")]
 impl<T: fmt::Debug> fmt::Debug for Record<T> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
             .field("entries", &self.entries)
@@ -541,7 +503,6 @@ impl<T: fmt::Debug> fmt::Debug for Record<T> {
 
 #[cfg(feature = "display")]
 impl<T> fmt::Display for Record<T> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
     }
@@ -569,7 +530,6 @@ pub struct RecordBuilder {
 
 impl RecordBuilder {
     /// Returns a builder for a record.
-    #[inline]
     pub fn new() -> RecordBuilder {
         RecordBuilder {
             capacity: 0,
@@ -579,7 +539,6 @@ impl RecordBuilder {
     }
 
     /// Sets the capacity for the record.
-    #[inline]
     pub fn capacity(&mut self, capacity: usize) -> &mut RecordBuilder {
         self.capacity = capacity;
         self
@@ -589,7 +548,6 @@ impl RecordBuilder {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    #[inline]
     pub fn limit(&mut self, limit: usize) -> &mut RecordBuilder {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
@@ -597,14 +555,12 @@ impl RecordBuilder {
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    #[inline]
     pub fn saved(&mut self, saved: bool) -> &mut RecordBuilder {
         self.saved = saved;
         self
     }
 
     /// Builds the record.
-    #[inline]
     pub fn build<T>(&self, target: T) -> Record<T> {
         Record {
             entries: VecDeque::with_capacity(self.capacity),
@@ -617,7 +573,6 @@ impl RecordBuilder {
     }
 
     /// Builds the record with the slot.
-    #[inline]
     pub fn build_with<T>(&self, target: T, slot: impl FnMut(Signal) + 'static) -> Record<T> {
         Record {
             slot: Some(Box::new(slot)),
@@ -626,20 +581,17 @@ impl RecordBuilder {
     }
 
     /// Creates the record with a default `target`.
-    #[inline]
     pub fn default<T: Default>(&self) -> Record<T> {
         self.build(T::default())
     }
 
     /// Creates the record with a default `target` and with the slot.
-    #[inline]
     pub fn default_with<T: Default>(&self, slot: impl FnMut(Signal) + 'static) -> Record<T> {
         self.build_with(T::default(), slot)
     }
 }
 
 impl Default for RecordBuilder {
-    #[inline]
     fn default() -> Self {
         RecordBuilder::new()
     }

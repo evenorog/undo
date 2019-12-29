@@ -42,55 +42,46 @@ impl<'a, T: Timeline> Queue<'a, T> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
-    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.actions.reserve(additional);
     }
 
     /// Returns the capacity of the queue.
-    #[inline]
     pub fn capacity(&self) -> usize {
         self.actions.capacity()
     }
 
     /// Shrinks the capacity of the queue as much as possible.
-    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.actions.shrink_to_fit();
     }
 
     /// Returns the number of commands in the queue.
-    #[inline]
     pub fn len(&self) -> usize {
         self.actions.len()
     }
 
     /// Returns `true` if the queue is empty.
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.actions.is_empty()
     }
 
     /// Queues an `apply` action.
-    #[inline]
     pub fn apply(&mut self, command: impl Command<T::Target>) {
         self.actions.push(Action::Apply(Box::new(command)));
     }
 
     /// Queues an `undo` action.
-    #[inline]
     pub fn undo(&mut self) {
         self.actions.push(Action::Undo);
     }
 
     /// Queues a `redo` action.
-    #[inline]
     pub fn redo(&mut self) {
         self.actions.push(Action::Redo);
     }
 
     /// Cancels the queued actions.
-    #[inline]
     pub fn cancel(self) {}
 }
 
@@ -99,7 +90,6 @@ impl<T> Queue<'_, Record<T>> {
     ///
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
-    #[inline]
     pub fn commit(self) -> Result {
         for action in self.actions {
             match action {
@@ -120,19 +110,16 @@ impl<T> Queue<'_, Record<T>> {
     }
 
     /// Returns a queue.
-    #[inline]
     pub fn queue(&mut self) -> Queue<Record<T>> {
         self.inner.queue()
     }
 
     /// Returns a checkpoint.
-    #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
         self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
-    #[inline]
     pub fn target(&self) -> &T {
         self.inner.target()
     }
@@ -143,7 +130,6 @@ impl<T> Queue<'_, History<T>> {
     ///
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
-    #[inline]
     pub fn commit(self) -> Result {
         for action in self.actions {
             match action {
@@ -164,19 +150,16 @@ impl<T> Queue<'_, History<T>> {
     }
 
     /// Returns a queue.
-    #[inline]
     pub fn queue(&mut self) -> Queue<History<T>> {
         self.inner.queue()
     }
 
     /// Returns a checkpoint.
-    #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
         self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
-    #[inline]
     pub fn target(&self) -> &T {
         self.inner.target()
     }
@@ -185,19 +168,16 @@ impl<T> Queue<'_, History<T>> {
 impl<T: Timeline> Timeline for Queue<'_, T> {
     type Target = T::Target;
 
-    #[inline]
     fn apply(&mut self, command: impl Command<T::Target>) -> Result {
         self.apply(command);
         Ok(())
     }
 
-    #[inline]
     fn undo(&mut self) -> Option<Result> {
         self.undo();
         Some(Ok(()))
     }
 
-    #[inline]
     fn redo(&mut self) -> Option<Result> {
         self.redo();
         Some(Ok(()))
@@ -205,7 +185,6 @@ impl<T: Timeline> Timeline for Queue<'_, T> {
 }
 
 impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
-    #[inline]
     fn from(inner: &'a mut T) -> Self {
         Queue {
             inner,

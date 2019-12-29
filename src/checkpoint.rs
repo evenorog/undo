@@ -43,37 +43,31 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
-    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.actions.reserve(additional);
     }
 
     /// Returns the capacity of the checkpoint.
-    #[inline]
     pub fn capacity(&self) -> usize {
         self.actions.capacity()
     }
 
     /// Shrinks the capacity of the checkpoint as much as possible.
-    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.actions.shrink_to_fit();
     }
 
     /// Returns the number of commands in the checkpoint.
-    #[inline]
     pub fn len(&self) -> usize {
         self.actions.len()
     }
 
     /// Returns `true` if the checkpoint is empty.
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.actions.is_empty()
     }
 
     /// Calls the `undo` method.
-    #[inline]
     pub fn undo(&mut self) -> Option<Result> {
         let undo = self.inner.undo();
         if let Some(Ok(_)) = undo {
@@ -83,7 +77,6 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     }
 
     /// Calls the `redo` method.
-    #[inline]
     pub fn redo(&mut self) -> Option<Result> {
         let redo = self.inner.redo();
         if let Some(Ok(_)) = redo {
@@ -93,7 +86,6 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
     }
 
     /// Commits the changes and consumes the checkpoint.
-    #[inline]
     pub fn commit(self) {}
 }
 
@@ -101,7 +93,6 @@ impl<T> Checkpoint<'_, Record<T>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
-    #[inline]
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let saved = self.inner.saved;
         let (_, tail) = self.inner.__apply(Entry::new(command))?;
@@ -114,7 +105,6 @@ impl<T> Checkpoint<'_, Record<T>> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining commands are not canceled.
-    #[inline]
     pub fn cancel(self) -> Result {
         for action in self.actions.into_iter().rev() {
             match action {
@@ -133,19 +123,16 @@ impl<T> Checkpoint<'_, Record<T>> {
     }
 
     /// Returns a queue.
-    #[inline]
     pub fn queue(&mut self) -> Queue<Record<T>> {
         self.inner.queue()
     }
 
     /// Returns a checkpoint.
-    #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
         self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
-    #[inline]
     pub fn target(&self) -> &T {
         self.inner.target()
     }
@@ -155,7 +142,6 @@ impl<T> Checkpoint<'_, History<T>> {
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.History.html#method.apply
-    #[inline]
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let branch = self.inner.branch();
         self.inner.apply(command)?;
@@ -168,7 +154,6 @@ impl<T> Checkpoint<'_, History<T>> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining commands are not canceled.
-    #[inline]
     pub fn cancel(self) -> Result {
         for action in self.actions.into_iter().rev() {
             match action {
@@ -190,19 +175,16 @@ impl<T> Checkpoint<'_, History<T>> {
     }
 
     /// Returns a queue.
-    #[inline]
     pub fn queue(&mut self) -> Queue<History<T>> {
         self.inner.queue()
     }
 
     /// Returns a checkpoint.
-    #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
         self.inner.checkpoint()
     }
 
     /// Returns a reference to the `target`.
-    #[inline]
     pub fn target(&self) -> &T {
         self.inner.target()
     }
@@ -211,17 +193,14 @@ impl<T> Checkpoint<'_, History<T>> {
 impl<T> Timeline for Checkpoint<'_, Record<T>> {
     type Target = T;
 
-    #[inline]
     fn apply(&mut self, command: impl Command<T>) -> Result {
         self.apply(command)
     }
 
-    #[inline]
     fn undo(&mut self) -> Option<Result> {
         self.undo()
     }
 
-    #[inline]
     fn redo(&mut self) -> Option<Result> {
         self.redo()
     }
@@ -230,24 +209,20 @@ impl<T> Timeline for Checkpoint<'_, Record<T>> {
 impl<T> Timeline for Checkpoint<'_, History<T>> {
     type Target = T;
 
-    #[inline]
     fn apply(&mut self, command: impl Command<T>) -> Result {
         self.apply(command)
     }
 
-    #[inline]
     fn undo(&mut self) -> Option<Result> {
         self.undo()
     }
 
-    #[inline]
     fn redo(&mut self) -> Option<Result> {
         self.redo()
     }
 }
 
 impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
-    #[inline]
     fn from(inner: &'a mut T) -> Self {
         Checkpoint {
             inner,

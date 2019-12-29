@@ -153,7 +153,6 @@ pub trait Command<T>: 'static {
     /// The default implementation uses the [`apply`] implementation.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    #[inline]
     fn redo(&mut self, target: &mut T) -> Result {
         self.apply(target)
     }
@@ -199,7 +198,6 @@ pub trait Command<T>: 'static {
     ///     Ok(())
     /// }
     /// ```
-    #[inline]
     fn merge(&self) -> Merge {
         Merge::No
     }
@@ -222,7 +220,6 @@ pub trait Command<T>: 'static + fmt::Debug + fmt::Display {
     /// The default implementation uses the [`apply`] implementation.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    #[inline]
     fn redo(&mut self, target: &mut T) -> Result {
         self.apply(target)
     }
@@ -269,29 +266,24 @@ pub trait Command<T>: 'static + fmt::Debug + fmt::Display {
     ///     Ok(())
     /// }
     /// ```
-    #[inline]
     fn merge(&self) -> Merge {
         Merge::No
     }
 }
 
 impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
-    #[inline]
     fn apply(&mut self, target: &mut T) -> Result {
         (**self).apply(target)
     }
 
-    #[inline]
     fn undo(&mut self, target: &mut T) -> Result {
         (**self).undo(target)
     }
 
-    #[inline]
     fn redo(&mut self, target: &mut T) -> Result {
         (**self).redo(target)
     }
 
-    #[inline]
     fn merge(&self) -> Merge {
         (**self).merge()
     }
@@ -337,7 +329,7 @@ struct At {
 }
 
 impl At {
-    pub fn new(branch: usize, current: usize) -> At {
+    fn new(branch: usize, current: usize) -> At {
         At { branch, current }
     }
 }
@@ -349,7 +341,6 @@ struct Entry<T> {
 }
 
 impl<T> Entry<T> {
-    #[inline]
     fn new(command: impl Command<T>) -> Entry<T> {
         Entry {
             command: Box::new(command),
@@ -360,22 +351,18 @@ impl<T> Entry<T> {
 }
 
 impl<T: 'static> Command<T> for Entry<T> {
-    #[inline]
     fn apply(&mut self, target: &mut T) -> Result {
         self.command.apply(target)
     }
 
-    #[inline]
     fn undo(&mut self, target: &mut T) -> Result {
         self.command.undo(target)
     }
 
-    #[inline]
     fn redo(&mut self, target: &mut T) -> Result {
         self.command.redo(target)
     }
 
-    #[inline]
     fn merge(&self) -> Merge {
         self.command.merge()
     }
@@ -383,7 +370,6 @@ impl<T: 'static> Command<T> for Entry<T> {
 
 #[cfg(feature = "display")]
 impl<T> fmt::Debug for Entry<T> {
-    #[inline]
     #[cfg(not(feature = "chrono"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Entry")
@@ -391,7 +377,6 @@ impl<T> fmt::Debug for Entry<T> {
             .finish()
     }
 
-    #[inline]
     #[cfg(feature = "chrono")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Entry")
@@ -403,7 +388,6 @@ impl<T> fmt::Debug for Entry<T> {
 
 #[cfg(feature = "display")]
 impl<T> fmt::Display for Entry<T> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.command as &dyn fmt::Display).fmt(f)
     }

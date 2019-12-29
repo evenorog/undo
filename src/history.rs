@@ -8,8 +8,7 @@ use {crate::Display, std::fmt};
 /// A history of commands.
 ///
 /// Unlike [Record] which maintains a linear undo history, History maintains an undo tree
-/// containing every edit made to the target. By switching between different branches in the
-/// tree, the user can get to any previous state of the target.
+/// containing every edit made to the target.
 ///
 /// # Examples
 /// ```
@@ -45,15 +44,14 @@ use {crate::Display, std::fmt};
 pub struct History<T: 'static> {
     root: usize,
     next: usize,
-    ctrl: Ctrl,
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<T>,
     pub(crate) branches: BTreeMap<usize, Branch<T>>,
+    archive: Archive,
 }
 
 impl<T> History<T> {
     /// Returns a new history.
-    #[inline]
     pub fn new(target: T) -> History<T> {
         History::from(Record::new(target))
     }
@@ -62,37 +60,31 @@ impl<T> History<T> {
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
-    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.record.reserve(additional);
     }
 
     /// Returns the capacity of the history.
-    #[inline]
     pub fn capacity(&self) -> usize {
         self.record.capacity()
     }
 
     /// Shrinks the capacity of the history as much as possible.
-    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.record.shrink_to_fit();
     }
 
     /// Returns the number of commands in the current branch of the history.
-    #[inline]
     pub fn len(&self) -> usize {
         self.record.len()
     }
 
     /// Returns `true` if the current branch of the history is empty.
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.record.is_empty()
     }
 
     /// Returns the limit of the history.
-    #[inline]
     pub fn limit(&self) -> usize {
         self.record.limit()
     }
@@ -100,7 +92,6 @@ impl<T> History<T> {
     /// Sets how the signal should be handled when the state changes.
     ///
     /// The previous slot is returned if it exists.
-    #[inline]
     pub fn connect(
         &mut self,
         slot: impl FnMut(Signal) + 'static,
@@ -109,57 +100,49 @@ impl<T> History<T> {
     }
 
     /// Removes and returns the slot.
-    #[inline]
     pub fn disconnect(&mut self) -> Option<impl FnMut(Signal) + 'static> {
         self.record.disconnect()
     }
 
     /// Returns `true` if the history can undo.
-    #[inline]
     pub fn can_undo(&self) -> bool {
         self.record.can_undo()
     }
 
     /// Returns `true` if the history can redo.
-    #[inline]
     pub fn can_redo(&self) -> bool {
         self.record.can_redo()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
-    #[inline]
     pub fn is_saved(&self) -> bool {
         self.record.is_saved()
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
-    #[inline]
     pub fn set_saved(&mut self, saved: bool) {
         self.saved = None;
         self.record.set_saved(saved);
     }
 
     /// Returns the current branch.
-    #[inline]
     pub fn branch(&self) -> usize {
         self.root
     }
 
     /// Returns the position of the current command.
-    #[inline]
     pub fn current(&self) -> usize {
         self.record.current()
     }
 
     /// Removes all commands from the history without undoing them.
-    #[inline]
     pub fn clear(&mut self) {
         self.root = 0;
         self.next = 1;
         self.saved = None;
-        self.ctrl.clear();
         self.record.clear();
         self.branches.clear();
+        self.archive.clear();
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -168,7 +151,6 @@ impl<T> History<T> {
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    #[inline]
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let at = self.at();
         let saved = self.record.saved.filter(|&saved| saved > at.current);
@@ -190,7 +172,7 @@ impl<T> History<T> {
                 .insert(at.branch, Branch::new(new, at.current, tail));
             self.set_root(new, at.current, saved);
         }
-        self.ctrl.apply(self.branch());
+        self.archive.apply(self.branch());
         Ok(())
     }
 
@@ -201,9 +183,8 @@ impl<T> History<T> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
-    #[inline]
     pub fn undo(&mut self) -> Option<Result> {
-        let root = self.ctrl.undo()?;
+        let root = self.archive.undo()?;
         if root == self.branch() {
             self.record.undo()
         } else {
@@ -219,9 +200,8 @@ impl<T> History<T> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    #[inline]
     pub fn redo(&mut self) -> Option<Result> {
-        let root = self.ctrl.redo()?;
+        let root = self.archive.redo()?;
         if root == self.branch() {
             self.record.redo()
         } else {
@@ -252,7 +232,6 @@ impl<T> History<T> {
     /// and the remaining commands in the iterator are discarded.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    #[inline]
     pub fn extend<C: Command<T>>(&mut self, commands: impl IntoIterator<Item = C>) -> Result {
         for command in commands {
             self.apply(command)?;
@@ -261,13 +240,11 @@ impl<T> History<T> {
     }
 
     /// Returns a queue.
-    #[inline]
     pub fn queue(&mut self) -> Queue<History<T>> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    #[inline]
     pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
         Checkpoint::from(self)
     }
@@ -277,10 +254,11 @@ impl<T> History<T> {
     /// Requires the `display` feature to be enabled.
     ///
     /// [`undo`]: struct.History.html#method.undo
-    #[inline]
     #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
-        self.record.to_undo_string()
+        let current = self.archive.current.checked_sub(1)?;
+        let branch = self.archive.branches[current];
+        Some(self.entry(At::new(branch, current)).to_string())
     }
 
     /// Returns the string of the command which will be redone in the next call to [`redo`].
@@ -288,23 +266,22 @@ impl<T> History<T> {
     /// Requires the `display` feature to be enabled.
     ///
     /// [`redo`]: struct.History.html#method.redo
-    #[inline]
     #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
-        self.record.to_redo_string()
+        let current = self.archive.current;
+        let branch = self.archive.branches[current];
+        Some(self.entry(At::new(branch, current)).to_string())
     }
 
     /// Returns a structure for configurable formatting of the history.
     ///
     /// Requires the `display` feature to be enabled.
-    #[inline]
     #[cfg(feature = "display")]
     pub fn display(&self) -> Display<Self> {
         Display::from(self)
     }
 
     /// Returns a reference to the `target`.
-    #[inline]
     pub fn target(&self) -> &T {
         self.record.target()
     }
@@ -312,13 +289,11 @@ impl<T> History<T> {
     /// Returns a mutable reference to the `target`.
     ///
     /// This method should **only** be used when doing changes that should not be able to be undone.
-    #[inline]
     pub fn target_mut(&mut self) -> &mut T {
         self.record.target_mut()
     }
 
     /// Consumes the history, returning the `target`.
-    #[inline]
     pub fn into_target(self) -> T {
         self.record.into_target()
     }
@@ -388,58 +363,61 @@ impl<T> History<T> {
             )
         }
     }
+
+    #[cfg(feature = "display")]
+    fn entry(&self, at: At) -> &Entry<T> {
+        if at.branch == self.root {
+            &self.record.entries[at.current]
+        } else {
+            let branch = &self.branches[&at.branch];
+            &branch.entries[self.current() - at.current]
+        }
+    }
 }
 
 impl<T> Timeline for History<T> {
     type Target = T;
 
-    #[inline]
     fn apply(&mut self, command: impl Command<T>) -> Result {
         self.apply(command)
     }
 
-    #[inline]
     fn undo(&mut self) -> Option<Result> {
         self.undo()
     }
 
-    #[inline]
     fn redo(&mut self) -> Option<Result> {
         self.redo()
     }
 }
 
 impl<T: Default> Default for History<T> {
-    #[inline]
     fn default() -> History<T> {
         History::new(T::default())
     }
 }
 
 impl<T> From<T> for History<T> {
-    #[inline]
     fn from(target: T) -> History<T> {
         History::new(target)
     }
 }
 
 impl<T> From<Record<T>> for History<T> {
-    #[inline]
     fn from(record: Record<T>) -> History<T> {
         History {
             root: 0,
             next: 1,
-            ctrl: Ctrl::default(),
             saved: None,
             record,
             branches: BTreeMap::default(),
+            archive: Archive::default(),
         }
     }
 }
 
 #[cfg(feature = "display")]
 impl<T> fmt::Display for History<T> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
     }
@@ -462,35 +440,35 @@ impl<T> Branch<T> {
 }
 
 #[derive(Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct Ctrl {
+struct Archive {
     current: usize,
-    buf: Vec<usize>,
+    branches: Vec<usize>,
 }
 
-impl Ctrl {
+impl Archive {
     fn apply(&mut self, root: usize) {
-        self.buf.push(root);
-        self.current = self.buf.len();
+        self.branches.push(root);
+        self.current = self.branches.len();
     }
 
     fn undo(&mut self) -> Option<usize> {
         let index = self.current.checked_sub(1)?;
-        let root = *self.buf.get(index)?;
-        self.buf.push(root);
+        let root = *self.branches.get(index)?;
+        self.branches.push(root);
         self.current -= 1;
         Some(root)
     }
 
     fn redo(&mut self) -> Option<usize> {
-        let root = *self.buf.get(self.current + 1)?;
-        self.buf.push(root);
+        let root = *self.branches.get(self.current + 1)?;
+        self.branches.push(root);
         self.current += 1;
         Some(root)
     }
 
     fn clear(&mut self) {
         self.current = 0;
-        self.buf.clear();
+        self.branches.clear();
     }
 }
 
@@ -514,7 +492,6 @@ pub struct HistoryBuilder {
 
 impl HistoryBuilder {
     /// Returns a builder for a history.
-    #[inline]
     pub fn new() -> HistoryBuilder {
         HistoryBuilder {
             inner: RecordBuilder::new(),
@@ -522,7 +499,6 @@ impl HistoryBuilder {
     }
 
     /// Sets the specified capacity for the history.
-    #[inline]
     pub fn capacity(&mut self, capacity: usize) -> &mut HistoryBuilder {
         self.inner.capacity(capacity);
         self
@@ -532,7 +508,6 @@ impl HistoryBuilder {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    #[inline]
     pub fn limit(&mut self, limit: usize) -> &mut HistoryBuilder {
         self.inner.limit(limit);
         self
@@ -540,39 +515,33 @@ impl HistoryBuilder {
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    #[inline]
     pub fn saved(&mut self, saved: bool) -> &mut HistoryBuilder {
         self.inner.saved(saved);
         self
     }
 
     /// Builds the history.
-    #[inline]
     pub fn build<T>(&self, target: T) -> History<T> {
         History::from(self.inner.build(target))
     }
 
     /// Builds the history with the slot.
-    #[inline]
     pub fn build_with<T>(&self, target: T, slot: impl FnMut(Signal) + 'static) -> History<T> {
         History::from(self.inner.build_with(target, slot))
     }
 
     /// Creates the history with a default `target`.
-    #[inline]
     pub fn default<T: Default>(&self) -> History<T> {
         self.build(T::default())
     }
 
     /// Creates the history with a default `target` and with the slot.
-    #[inline]
     pub fn default_with<T: Default>(&self, slot: impl FnMut(Signal) + 'static) -> History<T> {
         self.build_with(T::default(), slot)
     }
 }
 
 impl Default for HistoryBuilder {
-    #[inline]
     fn default() -> Self {
         HistoryBuilder::new()
     }
