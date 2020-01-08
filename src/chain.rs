@@ -74,9 +74,9 @@ impl<A, B> Chain<A, B> {
     }
 
     /// Joins the command with the chain and returns the chain.
-    pub fn join<C>(self, c: C) -> Chain<A, Join<B, C>> {
+    pub fn join<C>(self, c: C) -> Chain<Join<A, B>, C> {
         Chain {
-            join: Join(self.join.0, Join(self.join.1, c)),
+            join: self.join.join(c),
             merge: self.merge,
             #[cfg(feature = "display")]
             text: self.text,
@@ -127,6 +127,12 @@ impl<A: fmt::Display, B: fmt::Display> fmt::Display for Chain<A, B> {
 
 #[derive(Debug)]
 pub struct Join<A, B>(pub A, pub B);
+
+impl<A, B> Join<A, B> {
+    pub const fn join<C>(self, c: C) -> Join<Join<A, B>, C> {
+        Join(self, c)
+    }
+}
 
 impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
     fn apply(&mut self, target: &mut T) -> crate::Result {

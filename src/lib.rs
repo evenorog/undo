@@ -83,16 +83,8 @@
 //! [Chain]: struct.Chain.html
 //! [merge]: trait.Command.html#method.merge
 
-#![doc(html_root_url = "https://docs.rs/undo/latest")]
-#![deny(
-    bad_style,
-    bare_trait_objects,
-    missing_docs,
-    unused_import_braces,
-    unused_qualifications,
-    unsafe_code,
-    unstable_features
-)]
+#![doc(html_root_url = "https://docs.rs/undo")]
+#![deny(missing_docs)]
 
 mod chain;
 mod checkpoint;
@@ -227,45 +219,6 @@ pub trait Command<T>: 'static + fmt::Debug + fmt::Display {
     /// Used for automatic merging of commands.
     ///
     /// When commands are merged together, undoing and redoing them are done in one step.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::*;
-    /// #[derive(Debug)]
-    /// struct Add(char);
-    ///
-    /// impl Command<String> for Add {
-    ///     fn apply(&mut self, s: &mut String) -> undo::Result {
-    ///         s.push(self.0);
-    ///         Ok(())
-    ///     }
-    ///
-    ///     fn undo(&mut self, s: &mut String) -> undo::Result {
-    ///         self.0 = s.pop().ok_or("`s` is empty")?;
-    ///         Ok(())
-    ///     }
-    ///
-    ///     fn merge(&self) -> Merge {
-    ///         Merge::Yes
-    ///     }
-    /// }
-    ///
-    /// fn main() -> undo::Result {
-    ///     let mut record = Record::default();
-    ///     // The `a`, `b`, and `c` commands are merged.
-    ///     record.apply(Add('a'))?;
-    ///     record.apply(Add('b'))?;
-    ///     record.apply(Add('c'))?;
-    ///     assert_eq!(record.target(), "abc");
-    ///     // Calling `undo` once will undo all merged commands.
-    ///     record.undo().unwrap()?;
-    ///     assert_eq!(record.target(), "");
-    ///     // Calling `redo` once will redo all merged commands.
-    ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.target(), "abc");
-    ///     Ok(())
-    /// }
-    /// ```
     fn merge(&self) -> Merge {
         Merge::No
     }
@@ -289,9 +242,8 @@ impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
     }
 }
 
-/// The signal sent when the record, the history, or the target changes.
+/// The signal used for communicating state changes.
 ///
-/// When one of these states changes, they will send a corresponding signal to the user.
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
 /// signal to tell the user.
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]

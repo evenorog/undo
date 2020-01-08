@@ -1,4 +1,4 @@
-![undo](https://raw.githubusercontent.com/evenorog/undo/master/undo.svg?sanitize=true)
+# undo
 
 [![Travis](https://travis-ci.com/evenorog/undo.svg?branch=master)](https://travis-ci.com/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
@@ -13,7 +13,7 @@ it is easy to apply, undo, and redo changes made to a target.
 Both linear and non-linear undo-redo functionality is provided through
 the [Record] and [History] data structures.
 
-# Contents
+## Contents
 
 * [Command] provides the base functionality for all commands.
 * [Record] provides linear undo-redo functionality.
@@ -23,7 +23,7 @@ the [Record] and [History] data structures.
 * Configurable display formatting is provided when the `display` feature is enabled.
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
 
-# Concepts
+## Concepts
 
 * Commands can be chained before they are applied using the [Chain] structure.
   This makes it easy to build complex operations from smaller ones by combining them into a single command
@@ -35,7 +35,7 @@ the [Record] and [History] data structures.
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `n` most recent changes are stored.
 
-# Examples
+## Examples
 
 Add this to `Cargo.toml`:
 

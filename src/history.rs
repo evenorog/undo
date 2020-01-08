@@ -47,7 +47,7 @@ pub struct History<T: 'static> {
     pub(crate) saved: Option<At>,
     pub(crate) record: Record<T>,
     pub(crate) branches: BTreeMap<usize, Branch<T>>,
-    archive: Archive,
+    trunk: Trunk,
 }
 
 impl<T> History<T> {
@@ -142,7 +142,7 @@ impl<T> History<T> {
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-        self.archive.clear();
+        self.trunk.clear();
     }
 
     /// Pushes the command to the top of the history and executes its [`apply`] method.
@@ -172,7 +172,7 @@ impl<T> History<T> {
                 .insert(at.branch, Branch::new(new, at.current, tail));
             self.set_root(new, at.current, saved);
         }
-        self.archive.apply(self.branch());
+        self.trunk.apply(self.branch());
         Ok(())
     }
 
@@ -184,7 +184,7 @@ impl<T> History<T> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     pub fn undo(&mut self) -> Option<Result> {
-        let root = self.archive.undo()?;
+        let root = self.trunk.undo()?;
         if root == self.branch() {
             self.record.undo()
         } else {
@@ -201,7 +201,7 @@ impl<T> History<T> {
     ///
     /// [`redo`]: trait.Command.html#method.redo
     pub fn redo(&mut self) -> Option<Result> {
-        let root = self.archive.redo()?;
+        let root = self.trunk.redo()?;
         if root == self.branch() {
             self.record.redo()
         } else {
@@ -225,20 +225,6 @@ impl<T> History<T> {
         self.set_root(root, current, saved);
     }
 
-    /// Applies each command in the iterator.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned
-    /// and the remaining commands in the iterator are discarded.
-    ///
-    /// [`apply`]: trait.Command.html#tymethod.apply
-    pub fn extend<C: Command<T>>(&mut self, commands: impl IntoIterator<Item = C>) -> Result {
-        for command in commands {
-            self.apply(command)?;
-        }
-        Ok(())
-    }
-
     /// Returns a queue.
     pub fn queue(&mut self) -> Queue<History<T>> {
         Queue::from(self)
@@ -256,8 +242,8 @@ impl<T> History<T> {
     /// [`undo`]: struct.History.html#method.undo
     #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
-        let current = self.archive.current.checked_sub(1)?;
-        let branch = self.archive.branches[current];
+        let current = self.trunk.current.checked_sub(1)?;
+        let branch = self.trunk.branches[current];
         Some(self.entry(At::new(branch, current)).to_string())
     }
 
@@ -268,8 +254,8 @@ impl<T> History<T> {
     /// [`redo`]: struct.History.html#method.redo
     #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
-        let current = self.archive.current;
-        let branch = self.archive.branches[current];
+        let current = self.trunk.current;
+        let branch = self.trunk.branches[current];
         Some(self.entry(At::new(branch, current)).to_string())
     }
 
@@ -411,7 +397,7 @@ impl<T> From<Record<T>> for History<T> {
             saved: None,
             record,
             branches: BTreeMap::default(),
-            archive: Archive::default(),
+            trunk: Trunk::default(),
         }
     }
 }
@@ -440,29 +426,29 @@ impl<T> Branch<T> {
 }
 
 #[derive(Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct Archive {
+struct Trunk {
     current: usize,
     branches: Vec<usize>,
 }
 
-impl Archive {
+impl Trunk {
     fn apply(&mut self, root: usize) {
         self.branches.push(root);
         self.current = self.branches.len();
     }
 
     fn undo(&mut self) -> Option<usize> {
-        let index = self.current.checked_sub(1)?;
-        let root = *self.branches.get(index)?;
+        self.current = self.current.checked_sub(1)?;
+        let root = self.branches[self.current];
         self.branches.push(root);
-        self.current -= 1;
         Some(root)
     }
 
     fn redo(&mut self) -> Option<usize> {
-        let root = *self.branches.get(self.current + 1)?;
+        let current = self.current + 1;
+        let &root = self.branches.get(current)?;
+        self.current = current;
         self.branches.push(root);
-        self.current += 1;
         Some(root)
     }
 
@@ -566,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    fn actions() {
+    fn jump_to() {
         let mut history = History::default();
         history.apply(Add('a')).unwrap();
         history.apply(Add('b')).unwrap();
