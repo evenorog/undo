@@ -14,20 +14,14 @@
 //! * [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
 //! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
 //! * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
-//! * Configurable display formatting is provided when the `display` feature is enabled.
-//! * Time stamps and time travel is provided when the `chrono` feature is enabled.
-//!
-//! # Concepts
-//!
-//! * Commands can be chained before they are applied using the [Chain] structure.
-//!   This makes it easy to build complex operations from smaller ones by combining them into a single command
-//!   that can be applied, undone, and redone in a single step.
 //! * Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
 //!   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
 //!   in a single step.
-//! * The target can be marked as being saved to disk and the data-structures can track the saved state and tell the user
+//! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
 //!   when it changes.
-//! * The amount of changes being tracked can be configured by the user so only the `n` most recent changes are stored.
+//! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
+//! * Configurable display formatting is provided when the `display` feature is enabled.
+//! * Time stamps and time travel is provided when the `chrono` feature is enabled.
 //!
 //! # Examples
 //!
@@ -86,8 +80,8 @@
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
 
-mod chain;
 mod checkpoint;
+mod command;
 #[cfg(feature = "display")]
 mod display;
 mod history;
@@ -100,15 +94,15 @@ use std::error::Error;
 #[cfg(feature = "display")]
 use std::fmt;
 
-#[cfg(feature = "display")]
-pub use self::display::Display;
 pub use self::{
-    chain::Chain,
     checkpoint::Checkpoint,
+    command::{Join, Merger},
     history::{History, HistoryBuilder},
     queue::Queue,
     record::{Record, RecordBuilder},
 };
+#[cfg(feature = "display")]
+pub use self::{command::Text, display::Display};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result = std::result::Result<(), Box<dyn Error>>;
@@ -249,16 +243,10 @@ impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the record can undo.
-    ///
-    /// This signal will be emitted when the records ability to undo changes.
     Undo(bool),
     /// Says if the record can redo.
-    ///
-    /// This signal will be emitted when the records ability to redo changes.
     Redo(bool),
     /// Says if the target is in a saved state.
-    ///
-    /// This signal will be emitted when the record enters or leaves its targets saved state.
     Saved(bool),
 }
 

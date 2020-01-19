@@ -1,5 +1,4 @@
-use crate::chain::Join;
-use crate::{Checkpoint, Command, Entry, History, Merge, Queue, Result, Signal, Timeline};
+use crate::{Checkpoint, Command, Entry, History, Join, Merge, Queue, Result, Signal, Timeline};
 use std::{collections::VecDeque, error::Error, num::NonZeroUsize};
 #[cfg(feature = "display")]
 use {crate::Display, std::fmt};
@@ -210,7 +209,7 @@ impl<T> Record<T> {
         };
         if merges {
             // Merge the command with the one on the top of the stack.
-            let command = Join(self.entries.pop_back().unwrap(), entry);
+            let command = Join::new(self.entries.pop_back().unwrap(), entry);
             self.entries.push_back(Entry::new(command));
         } else {
             // If commands are not merged push it onto the record.

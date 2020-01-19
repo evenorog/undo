@@ -212,7 +212,7 @@ impl Config {
 
     fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         if self.colored {
-            write!(f, "{}", "*".color(to_color(level)))
+            write!(f, "{}", "*".color(color_of_level(level)))
         } else {
             f.write_char('*')
         }
@@ -220,7 +220,7 @@ impl Config {
 
     fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         if self.colored {
-            write!(f, "{}", "|".color(to_color(level)))
+            write!(f, "{}", "|".color(color_of_level(level)))
         } else {
             f.write_char('|')
         }
@@ -231,8 +231,8 @@ impl Config {
             write!(
                 f,
                 "{}{}",
-                "|".color(to_color(level)),
-                "/".color(to_color(level + 1))
+                "|".color(color_of_level(level)),
+                "/".color(color_of_level(level + 1))
             )
         } else {
             f.write_str("|/")
@@ -299,7 +299,7 @@ impl Config {
     }
 }
 
-fn to_color(i: usize) -> Color {
+fn color_of_level(i: usize) -> Color {
     match i % 6 {
         0 => Color::Cyan,
         1 => Color::Red,
