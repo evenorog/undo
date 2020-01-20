@@ -33,7 +33,7 @@ use std::collections::VecDeque;
 /// # }
 /// ```
 #[cfg_attr(feature = "display", derive(Debug))]
-pub struct Checkpoint<'a, T: Timeline> {
+pub struct Checkpoint<'a, T: Timeline + ?Sized> {
     inner: &'a mut T,
     actions: Vec<Action<T::Target>>,
 }

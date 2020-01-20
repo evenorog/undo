@@ -13,7 +13,7 @@ it is easy to apply, undo, and redo changes made to a target.
 Both linear and non-linear undo-redo functionality is provided through
 the [Record] and [History] data structures.
 
-## Contents
+## Features
 
 * [Command] provides the base functionality for all commands.
 * [Record] provides linear undo-redo functionality.

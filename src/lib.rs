@@ -7,7 +7,7 @@
 //! Both linear and non-linear undo-redo functionality is provided through
 //! the [Record] and [History] data structures.
 //!
-//! # Contents
+//! # Features
 //!
 //! * [Command] provides the base functionality for all commands.
 //! * [Record] provides linear undo-redo functionality.
@@ -146,44 +146,6 @@ pub trait Command<T>: 'static {
     /// Used for automatic merging of commands.
     ///
     /// When commands are merged together, undoing and redoing them are done in one step.
-    ///
-    /// # Examples
-    /// ```
-    /// # use undo::*;
-    /// struct Add(char);
-    ///
-    /// impl Command<String> for Add {
-    ///     fn apply(&mut self, s: &mut String) -> undo::Result {
-    ///         s.push(self.0);
-    ///         Ok(())
-    ///     }
-    ///
-    ///     fn undo(&mut self, s: &mut String) -> undo::Result {
-    ///         self.0 = s.pop().ok_or("`s` is empty")?;
-    ///         Ok(())
-    ///     }
-    ///
-    ///     fn merge(&self) -> Merge {
-    ///         Merge::Yes
-    ///     }
-    /// }
-    ///
-    /// fn main() -> undo::Result {
-    ///     let mut record = Record::default();
-    ///     // The `a`, `b`, and `c` commands are merged.
-    ///     record.apply(Add('a'))?;
-    ///     record.apply(Add('b'))?;
-    ///     record.apply(Add('c'))?;
-    ///     assert_eq!(record.target(), "abc");
-    ///     // Calling `undo` once will undo all merged commands.
-    ///     record.undo().unwrap()?;
-    ///     assert_eq!(record.target(), "");
-    ///     // Calling `redo` once will redo all merged commands.
-    ///     record.redo().unwrap()?;
-    ///     assert_eq!(record.target(), "abc");
-    ///     Ok(())
-    /// }
-    /// ```
     fn merge(&self) -> Merge {
         Merge::No
     }

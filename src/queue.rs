@@ -32,7 +32,7 @@ use crate::{Checkpoint, Command, History, Record, Result, Timeline};
 /// # }
 /// ```
 #[cfg_attr(feature = "display", derive(Debug))]
-pub struct Queue<'a, T: Timeline> {
+pub struct Queue<'a, T: Timeline + ?Sized> {
     inner: &'a mut T,
     actions: Vec<Action<T::Target>>,
 }
@@ -81,11 +81,6 @@ impl<'a, T: Timeline> Queue<'a, T> {
         self.actions.push(Action::Redo);
     }
 
-    /// Cancels the queued actions.
-    pub fn cancel(self) {}
-}
-
-impl<T> Queue<'_, Record<T>> {
     /// Applies the actions that is queued.
     ///
     /// # Errors
@@ -109,6 +104,11 @@ impl<T> Queue<'_, Record<T>> {
         Ok(())
     }
 
+    /// Cancels the queued actions.
+    pub fn cancel(self) {}
+}
+
+impl<T> Queue<'_, Record<T>> {
     /// Returns a queue.
     pub fn queue(&mut self) -> Queue<Record<T>> {
         self.inner.queue()
@@ -126,29 +126,6 @@ impl<T> Queue<'_, Record<T>> {
 }
 
 impl<T> Queue<'_, History<T>> {
-    /// Applies the actions that is queued.
-    ///
-    /// # Errors
-    /// If an error occurs, it stops applying the actions and returns the error.
-    pub fn commit(self) -> Result {
-        for action in self.actions {
-            match action {
-                Action::Apply(command) => self.inner.apply(command)?,
-                Action::Undo => {
-                    if let Some(Err(error)) = self.inner.undo() {
-                        return Err(error);
-                    }
-                }
-                Action::Redo => {
-                    if let Some(Err(error)) = self.inner.redo() {
-                        return Err(error);
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Returns a queue.
     pub fn queue(&mut self) -> Queue<History<T>> {
         self.inner.queue()
