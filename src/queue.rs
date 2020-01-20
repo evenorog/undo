@@ -142,25 +142,6 @@ impl<T> Queue<'_, History<T>> {
     }
 }
 
-impl<T: Timeline> Timeline for Queue<'_, T> {
-    type Target = T::Target;
-
-    fn apply(&mut self, command: impl Command<T::Target>) -> Result {
-        self.apply(command);
-        Ok(())
-    }
-
-    fn undo(&mut self) -> Option<Result> {
-        self.undo();
-        Some(Ok(()))
-    }
-
-    fn redo(&mut self) -> Option<Result> {
-        self.redo();
-        Some(Ok(()))
-    }
-}
-
 impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
     fn from(inner: &'a mut T) -> Self {
         Queue {

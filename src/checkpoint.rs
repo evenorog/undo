@@ -190,38 +190,6 @@ impl<T> Checkpoint<'_, History<T>> {
     }
 }
 
-impl<T> Timeline for Checkpoint<'_, Record<T>> {
-    type Target = T;
-
-    fn apply(&mut self, command: impl Command<T>) -> Result {
-        self.apply(command)
-    }
-
-    fn undo(&mut self) -> Option<Result> {
-        self.undo()
-    }
-
-    fn redo(&mut self) -> Option<Result> {
-        self.redo()
-    }
-}
-
-impl<T> Timeline for Checkpoint<'_, History<T>> {
-    type Target = T;
-
-    fn apply(&mut self, command: impl Command<T>) -> Result {
-        self.apply(command)
-    }
-
-    fn undo(&mut self) -> Option<Result> {
-        self.undo()
-    }
-
-    fn redo(&mut self) -> Option<Result> {
-        self.redo()
-    }
-}
-
 impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
     fn from(inner: &'a mut T) -> Self {
         Checkpoint {

@@ -204,9 +204,9 @@ impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
 /// signal to tell the user.
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
-    /// Says if the record can undo.
+    /// Says if the `Timeline` can undo.
     Undo(bool),
-    /// Says if the record can redo.
+    /// Says if the `Timeline` can redo.
     Redo(bool),
     /// Says if the target is in a saved state.
     Saved(bool),
