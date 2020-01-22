@@ -55,13 +55,13 @@
 //!     record.apply(Add('b'))?;
 //!     record.apply(Add('c'))?;
 //!     assert_eq!(record.target(), "abc");
-//!     record.undo().unwrap()?;
-//!     record.undo().unwrap()?;
-//!     record.undo().unwrap()?;
+//!     record.undo()?;
+//!     record.undo()?;
+//!     record.undo()?;
 //!     assert_eq!(record.target(), "");
-//!     record.redo().unwrap()?;
-//!     record.redo().unwrap()?;
-//!     record.redo().unwrap()?;
+//!     record.redo()?;
+//!     record.redo()?;
+//!     record.redo()?;
 //!     assert_eq!(record.target(), "abc");
 //!     Ok(())
 //! }
@@ -127,8 +127,8 @@ pub trait Command<T>: 'static + fmt::Debug {
     }
 
     /// Returns the text of the command.
-    fn text(&self) -> Option<String> {
-        None
+    fn text(&self) -> String {
+        "anonymous command".to_string()
     }
 }
 
@@ -149,7 +149,7 @@ impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
         (**self).merge()
     }
 
-    fn text(&self) -> Option<String> {
+    fn text(&self) -> String {
         (**self).text()
     }
 }
@@ -208,6 +208,10 @@ impl<T: 'static> Command<T> for Entry<T> {
 
     fn merge(&self) -> Merge {
         self.command.merge()
+    }
+
+    fn text(&self) -> String {
+        self.command.text()
     }
 }
 

@@ -90,16 +90,8 @@ impl<'a, T> Queue<'a, T> {
         for action in self.actions {
             match action {
                 Action::Apply(command) => self.record.apply(command)?,
-                Action::Undo => {
-                    if let Some(Err(error)) = self.record.undo() {
-                        return Err(error);
-                    }
-                }
-                Action::Redo => {
-                    if let Some(Err(error)) = self.record.redo() {
-                        return Err(error);
-                    }
-                }
+                Action::Undo => self.record.undo()?,
+                Action::Redo => self.record.redo()?,
             }
         }
         Ok(())

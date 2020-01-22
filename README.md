@@ -61,13 +61,13 @@ fn main() -> undo::Result {
     record.apply(Add('b'))?;
     record.apply(Add('c'))?;
     assert_eq!(record.target(), "abc");
-    record.undo().unwrap()?;
-    record.undo().unwrap()?;
-    record.undo().unwrap()?;
+    record.undo()?;
+    record.undo()?;
+    record.undo()?;
     assert_eq!(record.target(), "");
-    record.redo().unwrap()?;
-    record.redo().unwrap()?;
-    record.redo().unwrap()?;
+    record.redo()?;
+    record.redo()?;
+    record.redo()?;
     assert_eq!(record.target(), "abc");
     Ok(())
 }

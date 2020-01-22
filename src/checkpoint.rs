@@ -78,21 +78,21 @@ impl<T> Checkpoint<'_, T> {
     }
 
     /// Calls the `undo` method.
-    pub fn undo(&mut self) -> Option<Result> {
-        let undo = self.record.undo();
-        if let Some(Ok(_)) = undo {
+    pub fn undo(&mut self) -> Result {
+        let result = self.record.undo();
+        if result.is_ok() {
             self.actions.push(Action::Undo);
         }
-        undo
+        result
     }
 
     /// Calls the `redo` method.
-    pub fn redo(&mut self) -> Option<Result> {
-        let redo = self.record.redo();
-        if let Some(Ok(_)) = redo {
+    pub fn redo(&mut self) -> Result {
+        let result = self.record.redo();
+        if result.is_ok() {
             self.actions.push(Action::Redo);
         }
-        redo
+        result
     }
 
     /// Commits the changes and consumes the checkpoint.
@@ -107,13 +107,13 @@ impl<T> Checkpoint<'_, T> {
         for action in self.actions.into_iter().rev() {
             match action {
                 Action::Apply(saved, mut entries) => {
-                    self.record.undo().unwrap()?;
+                    self.record.undo()?;
                     self.record.entries.pop_back();
                     self.record.entries.append(&mut entries);
                     self.record.saved = saved;
                 }
-                Action::Undo => self.record.redo().unwrap()?,
-                Action::Redo => self.record.undo().unwrap()?,
+                Action::Undo => self.record.redo()?,
+                Action::Redo => self.record.undo()?,
             }
         }
         Ok(())
@@ -243,9 +243,9 @@ mod tests {
         record.apply(Add('b')).unwrap();
         record.apply(Add('c')).unwrap();
         record.set_saved(true);
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
-        record.undo().unwrap().unwrap();
+        record.undo().unwrap();
+        record.undo().unwrap();
+        record.undo().unwrap();
         let mut cp = record.checkpoint();
         cp.apply(Add('d')).unwrap();
         cp.apply(Add('e')).unwrap();
@@ -253,9 +253,9 @@ mod tests {
         assert_eq!(cp.target(), "def");
         cp.cancel().unwrap();
         assert_eq!(record.target(), "");
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
-        record.redo().unwrap().unwrap();
+        record.redo().unwrap();
+        record.redo().unwrap();
+        record.redo().unwrap();
         assert!(record.is_saved());
         assert_eq!(record.target(), "abc");
     }

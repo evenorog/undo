@@ -33,13 +33,13 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// record.apply(Add('b'))?;
 /// record.apply(Add('c'))?;
 /// assert_eq!(record.target(), "abc");
-/// record.undo().unwrap()?;
-/// record.undo().unwrap()?;
-/// record.undo().unwrap()?;
+/// record.undo()?;
+/// record.undo()?;
+/// record.undo()?;
 /// assert_eq!(record.target(), "");
-/// record.redo().unwrap()?;
-/// record.redo().unwrap()?;
-/// record.redo().unwrap()?;
+/// record.redo()?;
+/// record.redo()?;
+/// record.redo()?;
 /// assert_eq!(record.target(), "abc");
 /// # Ok(())
 /// # }
@@ -239,15 +239,13 @@ impl<T> Record<T> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
-    pub fn undo(&mut self) -> Option<Result> {
+    pub fn undo(&mut self) -> Result {
         if !self.can_undo() {
-            return None;
+            return Ok(());
         }
         let was_saved = self.is_saved();
         let old = self.current();
-        if let Err(error) = self.entries[self.current - 1].undo(&mut self.target) {
-            return Some(Err(error));
-        }
+        self.entries[self.current - 1].undo(&mut self.target)?;
         self.current -= 1;
         let len = self.len();
         let is_saved = self.is_saved();
@@ -262,7 +260,7 @@ impl<T> Record<T> {
                 slot(Signal::Saved(is_saved));
             }
         }
-        Some(Ok(()))
+        Ok(())
     }
 
     /// Calls the [`redo`] method for the active command and sets the next one as the
@@ -272,15 +270,13 @@ impl<T> Record<T> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn redo(&mut self) -> Option<Result> {
+    pub fn redo(&mut self) -> Result {
         if !self.can_redo() {
-            return None;
+            return Ok(());
         }
         let was_saved = self.is_saved();
         let old = self.current();
-        if let Err(error) = self.entries[self.current].redo(&mut self.target) {
-            return Some(Err(error));
-        }
+        self.entries[self.current].redo(&mut self.target)?;
         self.current += 1;
         let len = self.len();
         let is_saved = self.is_saved();
@@ -295,7 +291,7 @@ impl<T> Record<T> {
                 slot(Signal::Saved(is_saved));
             }
         }
-        Some(Ok(()))
+        Ok(())
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the command at `current` is reached.
@@ -321,7 +317,7 @@ impl<T> Record<T> {
             Record::undo
         };
         while self.current() != current {
-            if let Err(error) = f(self).unwrap() {
+            if let Err(error) = f(self) {
                 self.slot = slot;
                 return Some(Err(error));
             }
@@ -383,7 +379,7 @@ impl<T> Record<T> {
     /// [`undo`]: struct.Record.html#method.undo
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
-            self.entries[self.current - 1].text()
+            Some(self.entries[self.current - 1].text())
         } else {
             None
         }
@@ -394,7 +390,7 @@ impl<T> Record<T> {
     /// [`redo`]: struct.Record.html#method.redo
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
-            self.entries[self.current].text()
+            Some(self.entries[self.current].text())
         } else {
             None
         }
@@ -592,18 +588,5 @@ mod tests {
         assert_eq!(record.target(), "abc");
         assert!(record.go_to(6).is_none());
         assert_eq!(record.current(), 3);
-    }
-
-    #[test]
-    fn time_travel() {
-        let mut record = Record::default();
-        record.apply(Add('a')).unwrap();
-        let a = chrono::Utc::now();
-        record.apply(Add('b')).unwrap();
-        record.apply(Add('c')).unwrap();
-        record.time_travel(&a).unwrap().unwrap();
-        assert_eq!(record.target(), "a");
-        record.time_travel(&chrono::Utc::now()).unwrap().unwrap();
-        assert_eq!(record.target(), "abc");
     }
 }

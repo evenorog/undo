@@ -35,6 +35,10 @@ impl<T, C: Command<T>> Command<T> for Text<C> {
     fn merge(&self) -> Merge {
         self.command.merge()
     }
+
+    fn text(&self) -> String {
+        self.text.clone()
+    }
 }
 
 /// A command wrapper with a specified merge behavior.
@@ -67,6 +71,10 @@ impl<T, C: Command<T>> Command<T> for Merger<C> {
     fn merge(&self) -> Merge {
         self.merge
     }
+
+    fn text(&self) -> String {
+        self.command.text()
+    }
 }
 
 /// A command wrapper used for joining commands.
@@ -96,5 +104,9 @@ impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
     fn redo(&mut self, target: &mut T) -> crate::Result {
         self.0.redo(target)?;
         self.1.redo(target)
+    }
+
+    fn text(&self) -> String {
+        format!("{} & {}", self.0.text(), self.1.text())
     }
 }

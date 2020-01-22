@@ -118,9 +118,7 @@ impl Config {
         command: &impl Command<T>,
         level: usize,
     ) -> fmt::Result {
-        let msg = command
-            .text()
-            .unwrap_or_else(|| "<unknown command>".to_string());
+        let msg = command.text();
         let lines = msg.lines();
         if self.detailed {
             for line in lines {
