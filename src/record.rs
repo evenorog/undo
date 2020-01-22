@@ -2,8 +2,6 @@ use crate::{Checkpoint, Command, Display, Entry, Join, Merge, Queue, Result, Sig
 use chrono::{DateTime, TimeZone, Utc};
 use std::{cmp::Ordering, collections::VecDeque, error::Error, fmt, num::NonZeroUsize};
 
-const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_value()) };
-
 /// A record of commands.
 ///
 /// The record can roll the targets state backwards and forwards by using
@@ -23,7 +21,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// #         Ok(())
 /// #     }
 /// #     fn undo(&mut self, s: &mut String) -> undo::Result {
-/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         self.0 = s.pop().ok_or("s is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
@@ -182,6 +180,7 @@ impl<T> Record<T> {
         self.__apply(Entry::new(command)).map(|_| ())
     }
 
+    #[allow(clippy::type_complexity)]
     pub(crate) fn __apply(
         &mut self,
         mut entry: Entry<T>,
@@ -445,12 +444,6 @@ impl<T: fmt::Debug> fmt::Debug for Record<T> {
     }
 }
 
-impl<T> fmt::Display for Record<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.display() as &dyn fmt::Display).fmt(f)
-    }
-}
-
 /// Builder for a record.
 ///
 /// # Examples
@@ -476,7 +469,7 @@ impl RecordBuilder {
     pub fn new() -> RecordBuilder {
         RecordBuilder {
             capacity: 0,
-            limit: MAX_LIMIT,
+            limit: unsafe { NonZeroUsize::new_unchecked(usize::max_value()) },
             saved: true,
         }
     }
@@ -554,7 +547,7 @@ mod tests {
         }
 
         fn undo(&mut self, s: &mut String) -> Result {
-            self.0 = s.pop().ok_or("`s` is empty")?;
+            self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
     }

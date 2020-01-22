@@ -14,13 +14,14 @@ it is easy to apply, undo, and redo changes made to a target.
 ## Features
 
 * [Command] provides the base functionality for all commands.
-* [Record] provides linear undo-redo functionality.
-* [Queue] wraps a [Record] and extends it with queue functionality.
-* [Checkpoint] wraps a [Record] and extends it with checkpoint functionality.
+* [Record] is a collection of commands and provides the undo-redo functionality.
+* [Queue] wraps a record and extends it with queue functionality.
+* [Checkpoint] wraps a record and extends it with checkpoint functionality.
 * Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
   in a single step.
-* The target can be marked as being saved to disk and the data-structures can track the saved state and notify
+* Configurable display formatting using [Display].
+* The target can be marked as being saved to disk and the record can track the saved state and notify
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 
@@ -50,7 +51,7 @@ impl Command<String> for Add {
     }
 
     fn undo(&mut self, s: &mut String) -> undo::Result {
-        self.0 = s.pop().ok_or("`s` is empty")?;
+        self.0 = s.pop().ok_or("s is empty")?;
         Ok(())
     }
 }
@@ -94,4 +95,5 @@ additional terms or conditions.
 [Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
 [Chain]: https://docs.rs/undo/latest/undo/struct.Chain.html
 [merge]: https://docs.rs/undo/latest/undo/trait.Command.html#method.merge
+[Display]: https://docs.rs/undo/latest/undo/struct.Display.html
 [redo]: https://github.com/evenorog/redo

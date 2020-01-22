@@ -3,19 +3,29 @@ use crate::{Command, Merge};
 /// A command wrapper with a specified text.
 ///
 /// Requires the `display` feature to be enabled.
-#[derive(Clone, Debug)]
-pub struct Text<C> {
-    command: C,
+#[derive(Debug)]
+pub struct Text<A> {
+    command: A,
     text: String,
 }
 
-impl<C> Text<C> {
+impl<A> Text<A> {
     /// Creates a command with the specified text.
-    pub fn new(command: C, text: impl Into<String>) -> Text<C> {
+    pub fn new(command: A, text: impl Into<String>) -> Text<A> {
         Text {
             command,
             text: text.into(),
         }
+    }
+
+    /// Joins the two commands.
+    pub fn join<B>(self, command: B) -> Join<Text<A>, B> {
+        Join(self, command)
+    }
+
+    /// Returns a new command with the provided merge behavior.
+    pub fn with_merge(self, merge: Merge) -> Merger<Text<A>> {
+        Merger::new(self, merge)
     }
 }
 
@@ -42,16 +52,26 @@ impl<T, C: Command<T>> Command<T> for Text<C> {
 }
 
 /// A command wrapper with a specified merge behavior.
-#[derive(Clone, Debug)]
-pub struct Merger<C> {
-    command: C,
+#[derive(Debug)]
+pub struct Merger<A> {
+    command: A,
     merge: Merge,
 }
 
-impl<C> Merger<C> {
+impl<A> Merger<A> {
     /// Creates a command with the specified merge behavior.
-    pub fn new(command: C, merge: Merge) -> Merger<C> {
+    pub fn new(command: A, merge: Merge) -> Merger<A> {
         Merger { command, merge }
+    }
+
+    /// Joins the two commands.
+    pub fn join<B>(self, command: B) -> Join<Merger<A>, B> {
+        Join(self, command)
+    }
+
+    /// Returns a new command with the provided text.
+    pub fn with_text(self, text: impl Into<String>) -> Text<Merger<A>> {
+        Text::new(self, text)
     }
 }
 
@@ -80,13 +100,28 @@ impl<T, C: Command<T>> Command<T> for Merger<C> {
 /// A command wrapper used for joining commands.
 ///
 /// The commands are executed in the order they were merged in.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Join<A, B>(A, B);
 
 impl<A, B> Join<A, B> {
     /// Joins the `a` and `b` command.
     pub fn new(a: A, b: B) -> Join<A, B> {
         Join(a, b)
+    }
+
+    /// Joins the two commands.
+    pub fn join<C>(self, command: C) -> Join<Join<A, B>, C> {
+        Join(self, command)
+    }
+
+    /// Returns a new command with the provided text.
+    pub fn with_text(self, text: impl Into<String>) -> Text<Join<A, B>> {
+        Text::new(self, text)
+    }
+
+    /// Returns a new command with the provided merge behavior.
+    pub fn with_merge(self, merge: Merge) -> Merger<Join<A, B>> {
+        Merger::new(self, merge)
     }
 }
 
@@ -104,6 +139,10 @@ impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
     fn redo(&mut self, target: &mut T) -> crate::Result {
         self.0.redo(target)?;
         self.1.redo(target)
+    }
+
+    fn merge(&self) -> Merge {
+        Merge::No
     }
 
     fn text(&self) -> String {

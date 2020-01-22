@@ -10,7 +10,7 @@ use std::fmt::{self, Write};
 /// # use undo::{Command, Record};
 /// # fn foo() -> Record<String> {
 /// let record = Record::default();
-/// println!("{}", record.display().colored(true).detailed(false));
+/// println!("{}", record.display().colored(false).detailed(false));
 /// # record
 /// # }
 /// ```
@@ -21,7 +21,7 @@ pub struct Display<'a, T: 'static> {
 }
 
 impl<T> Display<'_, T> {
-    /// Show colored output (off by default).
+    /// Show colored output (on by default).
     pub fn colored(&mut self, on: bool) -> &mut Self {
         self.config.colored = on;
         self
@@ -102,7 +102,7 @@ struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            colored: false,
+            colored: true,
             current: true,
             detailed: true,
             position: true,

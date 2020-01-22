@@ -8,13 +8,14 @@
 //! # Features
 //!
 //! * [Command] provides the base functionality for all commands.
-//! * [Record] provides linear undo-redo functionality.
-//! * [Queue] wraps a [Record] and extends it with queue functionality.
-//! * [Checkpoint] wraps a [Record] and extends it with checkpoint functionality.
+//! * [Record] is a collection of commands and provides the undo-redo functionality.
+//! * [Queue] wraps a record and extends it with queue functionality.
+//! * [Checkpoint] wraps a record and extends it with checkpoint functionality.
 //! * Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
 //!   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
 //!   in a single step.
-//! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
+//! * Configurable display formatting using [Display].
+//! * The target can be marked as being saved to disk and the record can track the saved state and notify
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //!
@@ -44,7 +45,7 @@
 //!     }
 //!
 //!     fn undo(&mut self, s: &mut String) -> undo::Result {
-//!         self.0 = s.pop().ok_or("`s` is empty")?;
+//!         self.0 = s.pop().ok_or("s is empty")?;
 //!         Ok(())
 //!     }
 //! }
@@ -73,6 +74,7 @@
 //! [Checkpoint]: struct.Checkpoint.html
 //! [Chain]: struct.Chain.html
 //! [merge]: trait.Command.html#method.merge
+//! [Display]: struct.Display.html
 //! [redo]: https://github.com/evenorog/redo
 
 #![doc(html_root_url = "https://docs.rs/undo")]
@@ -128,29 +130,7 @@ pub trait Command<T>: 'static + fmt::Debug {
 
     /// Returns the text of the command.
     fn text(&self) -> String {
-        "anonymous command".to_string()
-    }
-}
-
-impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
-    fn apply(&mut self, target: &mut T) -> Result {
-        (**self).apply(target)
-    }
-
-    fn undo(&mut self, target: &mut T) -> Result {
-        (**self).undo(target)
-    }
-
-    fn redo(&mut self, target: &mut T) -> Result {
-        (**self).redo(target)
-    }
-
-    fn merge(&self) -> Merge {
-        (**self).merge()
-    }
-
-    fn text(&self) -> String {
-        (**self).text()
+        format!("command @ {:?}", self as *const Self)
     }
 }
 
@@ -160,9 +140,9 @@ impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
 /// signal to tell the user.
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Signal {
-    /// Says if the `Timeline` can undo.
+    /// Says if the record can undo.
     Undo(bool),
-    /// Says if the `Timeline` can redo.
+    /// Says if the record can redo.
     Redo(bool),
     /// Says if the target is in a saved state.
     Saved(bool),

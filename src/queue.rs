@@ -1,5 +1,4 @@
-use crate::{Checkpoint, Command, Record, Result};
-use std::fmt;
+use crate::{Checkpoint, Command, Entry, Record, Result};
 
 /// A command queue wrapper.
 ///
@@ -17,7 +16,7 @@ use std::fmt;
 /// #         Ok(())
 /// #     }
 /// #     fn undo(&mut self, s: &mut String) -> undo::Result {
-/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         self.0 = s.pop().ok_or("s is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
@@ -33,6 +32,7 @@ use std::fmt;
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct Queue<'a, T: 'static> {
     record: &'a mut Record<T>,
     actions: Vec<Action<T>>,
@@ -69,7 +69,7 @@ impl<'a, T> Queue<'a, T> {
 
     /// Queues an `apply` action.
     pub fn apply(&mut self, command: impl Command<T>) {
-        self.actions.push(Action::Apply(Box::new(command)));
+        self.actions.push(Action::Apply(Entry::new(command)));
     }
 
     /// Queues an `undo` action.
@@ -89,7 +89,9 @@ impl<'a, T> Queue<'a, T> {
     pub fn commit(self) -> Result {
         for action in self.actions {
             match action {
-                Action::Apply(command) => self.record.apply(command)?,
+                Action::Apply(entry) => {
+                    self.record.__apply(entry)?;
+                }
                 Action::Undo => self.record.undo()?,
                 Action::Redo => self.record.redo()?,
             }
@@ -117,37 +119,19 @@ impl<'a, T> Queue<'a, T> {
 }
 
 impl<'a, T> From<&'a mut Record<T>> for Queue<'a, T> {
-    fn from(inner: &'a mut Record<T>) -> Self {
+    fn from(record: &'a mut Record<T>) -> Self {
         Queue {
-            record: inner,
+            record,
             actions: Vec::new(),
         }
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Queue<'_, T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Queue")
-            .field("record", &self.record)
-            .field("actions", &self.actions)
-            .finish()
-    }
-}
-
+#[derive(Debug)]
 enum Action<T> {
-    Apply(Box<dyn Command<T>>),
+    Apply(Entry<T>),
     Undo,
     Redo,
-}
-
-impl<T> fmt::Debug for Action<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Action::Apply(_) => f.debug_struct("Apply").finish(),
-            Action::Undo => f.debug_struct("Undo").finish(),
-            Action::Redo => f.debug_struct("Redo").finish(),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -164,7 +148,7 @@ mod tests {
         }
 
         fn undo(&mut self, s: &mut String) -> Result {
-            self.0 = s.pop().ok_or("`s` is empty")?;
+            self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
     }

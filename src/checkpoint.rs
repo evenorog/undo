@@ -1,5 +1,5 @@
 use crate::{Command, Entry, Queue, Record, Result};
-use std::{collections::VecDeque, fmt};
+use std::collections::VecDeque;
 
 /// A checkpoint wrapper.
 ///
@@ -17,7 +17,7 @@ use std::{collections::VecDeque, fmt};
 /// #         Ok(())
 /// #     }
 /// #     fn undo(&mut self, s: &mut String) -> undo::Result {
-/// #         self.0 = s.pop().ok_or("`s` is empty")?;
+/// #         self.0 = s.pop().ok_or("s is empty")?;
 /// #         Ok(())
 /// #     }
 /// # }
@@ -33,6 +33,7 @@ use std::{collections::VecDeque, fmt};
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct Checkpoint<'a, T: 'static> {
     record: &'a mut Record<T>,
     actions: Vec<Action<T>>,
@@ -79,20 +80,20 @@ impl<T> Checkpoint<'_, T> {
 
     /// Calls the `undo` method.
     pub fn undo(&mut self) -> Result {
-        let result = self.record.undo();
-        if result.is_ok() {
+        if self.record.can_undo() {
+            self.record.undo()?;
             self.actions.push(Action::Undo);
         }
-        result
+        Ok(())
     }
 
     /// Calls the `redo` method.
     pub fn redo(&mut self) -> Result {
-        let result = self.record.redo();
-        if result.is_ok() {
+        if self.record.can_redo() {
+            self.record.redo()?;
             self.actions.push(Action::Redo);
         }
-        result
+        Ok(())
     }
 
     /// Commits the changes and consumes the checkpoint.
@@ -144,29 +145,11 @@ impl<'a, T> From<&'a mut Record<T>> for Checkpoint<'a, T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Checkpoint<'_, T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Checkpoint")
-            .field("record", &self.record)
-            .field("actions", &self.actions)
-            .finish()
-    }
-}
-
+#[derive(Debug)]
 enum Action<T> {
     Apply(Option<usize>, VecDeque<Entry<T>>),
     Undo,
     Redo,
-}
-
-impl<T> fmt::Debug for Action<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Action::Apply(_, _) => f.debug_struct("Apply").finish(),
-            Action::Undo => f.debug_struct("Undo").finish(),
-            Action::Redo => f.debug_struct("Redo").finish(),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -183,7 +166,7 @@ mod tests {
         }
 
         fn undo(&mut self, s: &mut String) -> Result {
-            self.0 = s.pop().ok_or("`s` is empty")?;
+            self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
     }
