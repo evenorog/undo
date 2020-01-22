@@ -4,16 +4,13 @@
 //! by creating objects of commands that applies the modifications. All commands knows
 //! how to undo the changes it applies, and by using the provided data structures
 //! it is easy to apply, undo, and redo changes made to a target.
-//! Both linear and non-linear undo-redo functionality is provided through
-//! the [Record] and [History] data structures.
 //!
 //! # Features
 //!
 //! * [Command] provides the base functionality for all commands.
 //! * [Record] provides linear undo-redo functionality.
-//! * [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
-//! * [Queue] wraps a [Record] or [History] and extends them with queue functionality.
-//! * [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
+//! * [Queue] wraps a [Record] and extends it with queue functionality.
+//! * [Checkpoint] wraps a [Record] and extends it with checkpoint functionality.
 //! * Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
 //!   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
 //!   in a single step.
@@ -22,6 +19,8 @@
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //! * Configurable display formatting is provided when the `display` feature is enabled.
 //! * Time stamps and time travel is provided when the `chrono` feature is enabled.
+//!
+//! *If you need more advanced features, check out the [redo] crate.*
 //!
 //! # Examples
 //!
@@ -71,11 +70,11 @@
 //!
 //! [Command]: trait.Command.html
 //! [Record]: struct.Record.html
-//! [History]: struct.History.html
 //! [Queue]: struct.Queue.html
 //! [Checkpoint]: struct.Checkpoint.html
 //! [Chain]: struct.Chain.html
 //! [merge]: trait.Command.html#method.merge
+//! [redo]: https://github.com/evenorog/redo
 
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
@@ -84,7 +83,6 @@ mod checkpoint;
 mod command;
 #[cfg(feature = "display")]
 mod display;
-mod history;
 mod queue;
 mod record;
 
@@ -97,7 +95,6 @@ use std::fmt;
 pub use self::{
     checkpoint::Checkpoint,
     command::{Join, Merger},
-    history::{History, HistoryBuilder},
     queue::Queue,
     record::{Record, RecordBuilder},
 };
@@ -106,21 +103,6 @@ pub use self::{command::Text, display::Display};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result = std::result::Result<(), Box<dyn Error>>;
-
-/// Base functionality for data structures that can use commands.
-pub trait Timeline {
-    /// The target type used.
-    type Target;
-
-    /// Applies the command to the record.
-    fn apply(&mut self, command: impl Command<Self::Target>) -> Result;
-
-    /// Calls the undo method on the current command.
-    fn undo(&mut self) -> Option<Result>;
-
-    /// Calls the redo method on the current command.
-    fn redo(&mut self) -> Option<Result>;
-}
 
 /// Base functionality for all commands.
 #[cfg(not(feature = "display"))]
@@ -221,19 +203,6 @@ pub enum Merge {
     If(u32),
     /// The command should not merge.
     No,
-}
-
-/// A position in a history tree.
-#[derive(Copy, Clone, Debug, Default, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct At {
-    branch: usize,
-    current: usize,
-}
-
-impl At {
-    fn new(branch: usize, current: usize) -> At {
-        At { branch, current }
-    }
 }
 
 struct Entry<T> {

@@ -1,4 +1,4 @@
-use crate::{At, Entry, History, Record};
+use crate::{Entry, Record};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Local, Utc};
 use colored::{Color, Colorize};
@@ -8,16 +8,16 @@ use std::fmt::{self, Write};
 ///
 /// # Examples
 /// ```no_run
-/// # use undo::{Command, History};
-/// # fn foo() -> History<String> {
-/// let history = History::default();
-/// println!("{}", history.display().colored(true).detailed(false));
-/// # history
+/// # use undo::{Command, Record};
+/// # fn foo() -> Record<String> {
+/// let record = Record::default();
+/// println!("{}", record.display().colored(true).detailed(false));
+/// # record
 /// # }
 /// ```
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct Display<'a, T> {
-    data: &'a T,
+#[derive(Copy, Clone, Debug)]
+pub struct Display<'a, T: 'static> {
+    record: &'a Record<T>,
     config: Config,
 }
 
@@ -53,18 +53,16 @@ impl<T> Display<'_, T> {
     }
 }
 
-impl<T> Display<'_, Record<T>> {
-    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: &Entry<T>) -> fmt::Result {
+impl<T> Display<'_, T> {
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: usize, entry: &Entry<T>) -> fmt::Result {
         self.config.mark(f, 0)?;
-        self.config.position(f, at, false)?;
+        self.config.position(f, at)?;
         if self.config.detailed {
             #[cfg(feature = "chrono")]
             self.config.timestamp(f, &entry.timestamp)?;
         }
-        self.config
-            .current(f, at, At::new(0, self.data.current()))?;
-        self.config
-            .saved(f, at, self.data.saved.map(|saved| At::new(0, saved)))?;
+        self.config.current(f, at, self.record.current())?;
+        self.config.saved(f, at, self.record.saved)?;
         if self.config.detailed {
             writeln!(f)?;
             self.config.message(f, entry, 0)
@@ -76,96 +74,19 @@ impl<T> Display<'_, Record<T>> {
     }
 }
 
-impl<T> Display<'_, History<T>> {
-    fn fmt_list(
-        &self,
-        f: &mut fmt::Formatter,
-        at: At,
-        entry: &Entry<T>,
-        level: usize,
-    ) -> fmt::Result {
-        self.config.mark(f, level)?;
-        self.config.position(f, at, true)?;
-        if self.config.detailed {
-            #[cfg(feature = "chrono")]
-            self.config.timestamp(f, &entry.timestamp)?;
-        }
-        self.config
-            .current(f, at, At::new(self.data.branch(), self.data.current()))?;
-        self.config.saved(
-            f,
-            at,
-            self.data
-                .record
-                .saved
-                .map(|saved| At::new(self.data.branch(), saved))
-                .or(self.data.saved),
-        )?;
-        if self.config.detailed {
-            writeln!(f)?;
-            self.config.message(f, entry, level)
-        } else {
-            f.write_char(' ')?;
-            self.config.message(f, entry, level)?;
-            writeln!(f)
-        }
-    }
-
-    fn fmt_graph(
-        &self,
-        f: &mut fmt::Formatter,
-        at: At,
-        entry: &Entry<T>,
-        level: usize,
-    ) -> fmt::Result {
-        for (&i, branch) in self
-            .data
-            .branches
-            .iter()
-            .filter(|(_, branch)| branch.parent == at)
-        {
-            for (j, entry) in branch.entries.iter().enumerate().rev() {
-                let at = At::new(i, j + branch.parent.current + 1);
-                self.fmt_graph(f, at, entry, level + 1)?;
-            }
-            for j in 0..level {
-                self.config.edge(f, j)?;
-                f.write_char(' ')?;
-            }
-            self.config.split(f, level)?;
-            writeln!(f)?;
-        }
-        for i in 0..level {
-            self.config.edge(f, i)?;
-            f.write_char(' ')?;
-        }
-        self.fmt_list(f, at, entry, level)
-    }
-}
-
-impl<'a, T> From<&'a T> for Display<'a, T> {
-    fn from(data: &'a T) -> Self {
+impl<'a, T> From<&'a Record<T>> for Display<'a, T> {
+    fn from(data: &'a Record<T>) -> Self {
         Display {
-            data,
+            record: data,
             config: Config::default(),
         }
     }
 }
 
-impl<T> fmt::Display for Display<'_, Record<T>> {
+impl<T> fmt::Display for Display<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, entry) in self.data.entries.iter().enumerate().rev() {
-            self.fmt_list(f, At::new(0, i + 1), entry)?;
-        }
-        Ok(())
-    }
-}
-
-impl<T> fmt::Display for Display<'_, History<T>> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, entry) in self.data.record.entries.iter().enumerate().rev() {
-            let at = At::new(self.data.branch(), i + 1);
-            self.fmt_graph(f, at, entry, 0)?;
+        for (i, entry) in self.record.entries.iter().enumerate().rev() {
+            self.fmt_list(f, i + 1, entry)?;
         }
         Ok(())
     }
@@ -226,39 +147,19 @@ impl Config {
         }
     }
 
-    fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        if self.colored {
-            write!(
-                f,
-                "{}{}",
-                "|".color(color_of_level(level)),
-                "/".color(color_of_level(level + 1))
-            )
-        } else {
-            f.write_str("|/")
-        }
-    }
-
-    fn position(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
+    fn position(self, f: &mut fmt::Formatter, at: usize) -> fmt::Result {
         if self.position {
             if self.colored {
-                let position = if use_branch {
-                    format!("[{}:{}]", at.branch, at.current)
-                } else {
-                    format!("[{}]", at.current)
-                };
-                write!(f, " {}", position.yellow())
-            } else if use_branch {
-                write!(f, " [{}:{}]", at.branch, at.current)
+                write!(f, " {}", format!("[{}]", at).yellow())
             } else {
-                write!(f, " [{}]", at.current)
+                write!(f, " [{}]", at)
             }
         } else {
             Ok(())
         }
     }
 
-    fn current(self, f: &mut fmt::Formatter, at: At, current: At) -> fmt::Result {
+    fn current(self, f: &mut fmt::Formatter, at: usize, current: usize) -> fmt::Result {
         if self.current && at == current {
             if self.colored {
                 write!(f, " {}{}{}", "(".yellow(), "current".cyan(), ")".yellow())
@@ -270,7 +171,7 @@ impl Config {
         }
     }
 
-    fn saved(self, f: &mut fmt::Formatter, at: At, saved: Option<At>) -> fmt::Result {
+    fn saved(self, f: &mut fmt::Formatter, at: usize, saved: Option<usize>) -> fmt::Result {
         if self.saved && saved.map_or(false, |saved| saved == at) {
             if self.colored {
                 write!(

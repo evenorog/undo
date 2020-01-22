@@ -1,4 +1,6 @@
-use crate::{Checkpoint, Command, History, Record, Result, Timeline};
+use crate::{Checkpoint, Command, Record, Result};
+#[cfg(feature = "display")]
+use std::fmt;
 
 /// A command queue wrapper.
 ///
@@ -31,13 +33,12 @@ use crate::{Checkpoint, Command, History, Record, Result, Timeline};
 /// # Ok(())
 /// # }
 /// ```
-#[cfg_attr(feature = "display", derive(Debug))]
-pub struct Queue<'a, T: Timeline + ?Sized> {
-    inner: &'a mut T,
-    actions: Vec<Action<T::Target>>,
+pub struct Queue<'a, T: 'static> {
+    record: &'a mut Record<T>,
+    actions: Vec<Action<T>>,
 }
 
-impl<'a, T: Timeline> Queue<'a, T> {
+impl<'a, T> Queue<'a, T> {
     /// Reserves capacity for at least `additional` more commands in the queue.
     ///
     /// # Panics
@@ -67,7 +68,7 @@ impl<'a, T: Timeline> Queue<'a, T> {
     }
 
     /// Queues an `apply` action.
-    pub fn apply(&mut self, command: impl Command<T::Target>) {
+    pub fn apply(&mut self, command: impl Command<T>) {
         self.actions.push(Action::Apply(Box::new(command)));
     }
 
@@ -88,14 +89,14 @@ impl<'a, T: Timeline> Queue<'a, T> {
     pub fn commit(self) -> Result {
         for action in self.actions {
             match action {
-                Action::Apply(command) => self.inner.apply(command)?,
+                Action::Apply(command) => self.record.apply(command)?,
                 Action::Undo => {
-                    if let Some(Err(error)) = self.inner.undo() {
+                    if let Some(Err(error)) = self.record.undo() {
                         return Err(error);
                     }
                 }
                 Action::Redo => {
-                    if let Some(Err(error)) = self.inner.redo() {
+                    if let Some(Err(error)) = self.record.redo() {
                         return Err(error);
                     }
                 }
@@ -106,57 +107,57 @@ impl<'a, T: Timeline> Queue<'a, T> {
 
     /// Cancels the queued actions.
     pub fn cancel(self) {}
-}
 
-impl<T> Queue<'_, Record<T>> {
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<Record<T>> {
-        self.inner.queue()
+    pub fn queue(&mut self) -> Queue<T> {
+        self.record.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
-        self.inner.checkpoint()
+    pub fn checkpoint(&mut self) -> Checkpoint<T> {
+        self.record.checkpoint()
     }
 
     /// Returns a reference to the `target`.
     pub fn target(&self) -> &T {
-        self.inner.target()
+        self.record.target()
     }
 }
 
-impl<T> Queue<'_, History<T>> {
-    /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<History<T>> {
-        self.inner.queue()
-    }
-
-    /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
-        self.inner.checkpoint()
-    }
-
-    /// Returns a reference to the `target`.
-    pub fn target(&self) -> &T {
-        self.inner.target()
-    }
-}
-
-impl<'a, T: Timeline> From<&'a mut T> for Queue<'a, T> {
-    fn from(inner: &'a mut T) -> Self {
+impl<'a, T> From<&'a mut Record<T>> for Queue<'a, T> {
+    fn from(inner: &'a mut Record<T>) -> Self {
         Queue {
-            inner,
+            record: inner,
             actions: Vec::new(),
         }
     }
 }
 
-/// An action that can be applied to a Record or History.
-#[cfg_attr(feature = "display", derive(Debug))]
+#[cfg(feature = "display")]
+impl<T: fmt::Debug> fmt::Debug for Queue<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Queue")
+            .field("record", &self.record)
+            .field("actions", &self.actions)
+            .finish()
+    }
+}
+
 enum Action<T> {
     Apply(Box<dyn Command<T>>),
     Undo,
     Redo,
+}
+
+#[cfg(feature = "display")]
+impl<T> fmt::Debug for Action<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Action::Apply(_) => f.debug_struct("Apply").finish(),
+            Action::Undo => f.debug_struct("Undo").finish(),
+            Action::Redo => f.debug_struct("Redo").finish(),
+        }
+    }
 }
 
 #[cfg(all(test, not(feature = "display")))]

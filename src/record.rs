@@ -1,4 +1,4 @@
-use crate::{Checkpoint, Command, Entry, History, Join, Merge, Queue, Result, Signal, Timeline};
+use crate::{Checkpoint, Command, Entry, Join, Merge, Queue, Result, Signal};
 use std::{collections::VecDeque, error::Error, num::NonZeroUsize};
 #[cfg(feature = "display")]
 use {crate::Display, std::fmt};
@@ -375,12 +375,12 @@ impl<T> Record<T> {
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<Record<T>> {
+    pub fn queue(&mut self) -> Queue<T> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
+    pub fn checkpoint(&mut self) -> Checkpoint<T> {
         Checkpoint::from(self)
     }
 
@@ -416,7 +416,7 @@ impl<T> Record<T> {
     ///
     /// Requires the `display` feature to be enabled.
     #[cfg(feature = "display")]
-    pub fn display(&self) -> Display<Self> {
+    pub fn display(&self) -> Display<T> {
         Display::from(self)
     }
 
@@ -438,22 +438,6 @@ impl<T> Record<T> {
     }
 }
 
-impl<T> Timeline for Record<T> {
-    type Target = T;
-
-    fn apply(&mut self, command: impl Command<T>) -> Result {
-        self.apply(command)
-    }
-
-    fn undo(&mut self) -> Option<Result> {
-        self.undo()
-    }
-
-    fn redo(&mut self) -> Option<Result> {
-        self.redo()
-    }
-}
-
 impl<T: Default> Default for Record<T> {
     fn default() -> Record<T> {
         Record::new(T::default())
@@ -463,12 +447,6 @@ impl<T: Default> Default for Record<T> {
 impl<T> From<T> for Record<T> {
     fn from(target: T) -> Record<T> {
         Record::new(target)
-    }
-}
-
-impl<T> From<History<T>> for Record<T> {
-    fn from(history: History<T>) -> Record<T> {
-        history.record
     }
 }
 

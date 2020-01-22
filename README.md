@@ -10,16 +10,13 @@ It is an implementation of the command pattern, where all modifications are done
 by creating objects of commands that applies the modifications. All commands knows
 how to undo the changes it applies, and by using the provided data structures
 it is easy to apply, undo, and redo changes made to a target.
-Both linear and non-linear undo-redo functionality is provided through
-the [Record] and [History] data structures.
 
 ## Features
 
 * [Command] provides the base functionality for all commands.
 * [Record] provides linear undo-redo functionality.
-* [History] provides non-linear undo-redo functionality that allows you to jump between different branches.
-* [Queue] wraps a [Record] or [History] and extends them with queue functionality.
-* [Checkpoint] wraps a [Record] or [History] and extends them with checkpoint functionality.
+* [Queue] wraps a [Record] and extends it with queue functionality.
+* [Checkpoint] wraps a [Record] and extends it with checkpoint functionality.
 * Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
   in a single step.
@@ -28,6 +25,8 @@ the [Record] and [History] data structures.
 * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 * Configurable display formatting is provided when the `display` feature is enabled.
 * Time stamps and time travel is provided when the `chrono` feature is enabled.
+
+*If you need more advanced features, check out the [redo] crate.*
 
 ## Examples
 
@@ -92,8 +91,8 @@ additional terms or conditions.
 
 [Command]: https://docs.rs/undo/latest/undo/trait.Command.html
 [Record]: https://docs.rs/undo/latest/undo/struct.Record.html
-[History]: https://docs.rs/undo/latest/undo/struct.History.html
 [Queue]: https://docs.rs/undo/latest/undo/struct.Queue.html
 [Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
 [Chain]: https://docs.rs/undo/latest/undo/struct.Chain.html
 [merge]: https://docs.rs/undo/latest/undo/trait.Command.html#method.merge
+[redo]: https://github.com/evenorog/redo

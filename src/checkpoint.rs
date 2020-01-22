@@ -1,5 +1,7 @@
-use crate::{Command, Entry, History, Queue, Record, Result, Timeline};
+use crate::{Command, Entry, Queue, Record, Result};
 use std::collections::VecDeque;
+#[cfg(feature = "display")]
+use std::fmt;
 
 /// A checkpoint wrapper.
 ///
@@ -32,13 +34,12 @@ use std::collections::VecDeque;
 /// # Ok(())
 /// # }
 /// ```
-#[cfg_attr(feature = "display", derive(Debug))]
-pub struct Checkpoint<'a, T: Timeline + ?Sized> {
-    inner: &'a mut T,
-    actions: Vec<Action<T::Target>>,
+pub struct Checkpoint<'a, T: 'static> {
+    record: &'a mut Record<T>,
+    actions: Vec<Action<T>>,
 }
 
-impl<'a, T: Timeline> Checkpoint<'a, T> {
+impl<T> Checkpoint<'_, T> {
     /// Reserves capacity for at least `additional` more commands in the checkpoint.
     ///
     /// # Panics
@@ -67,9 +68,19 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
         self.actions.is_empty()
     }
 
+    /// Calls the [`apply`] method.
+    ///
+    /// [`apply`]: struct.Record.html#method.apply
+    pub fn apply(&mut self, command: impl Command<T>) -> Result {
+        let saved = self.record.saved;
+        let (_, tail) = self.record.__apply(Entry::new(command))?;
+        self.actions.push(Action::Apply(saved, tail));
+        Ok(())
+    }
+
     /// Calls the `undo` method.
     pub fn undo(&mut self) -> Option<Result> {
-        let undo = self.inner.undo();
+        let undo = self.record.undo();
         if let Some(Ok(_)) = undo {
             self.actions.push(Action::Undo);
         }
@@ -78,7 +89,7 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
 
     /// Calls the `redo` method.
     pub fn redo(&mut self) -> Option<Result> {
-        let redo = self.inner.redo();
+        let redo = self.record.redo();
         if let Some(Ok(_)) = redo {
             self.actions.push(Action::Redo);
         }
@@ -87,18 +98,6 @@ impl<'a, T: Timeline> Checkpoint<'a, T> {
 
     /// Commits the changes and consumes the checkpoint.
     pub fn commit(self) {}
-}
-
-impl<T> Checkpoint<'_, Record<T>> {
-    /// Calls the [`apply`] method.
-    ///
-    /// [`apply`]: struct.Record.html#method.apply
-    pub fn apply(&mut self, command: impl Command<T>) -> Result {
-        let saved = self.inner.saved;
-        let (_, tail) = self.inner.__apply(Entry::new(command))?;
-        self.actions.push(Action::Apply(saved, tail));
-        Ok(())
-    }
 
     /// Cancels the changes and consumes the checkpoint.
     ///
@@ -109,103 +108,68 @@ impl<T> Checkpoint<'_, Record<T>> {
         for action in self.actions.into_iter().rev() {
             match action {
                 Action::Apply(saved, mut entries) => {
-                    self.inner.undo().unwrap()?;
-                    self.inner.entries.pop_back();
-                    self.inner.entries.append(&mut entries);
-                    self.inner.saved = saved;
+                    self.record.undo().unwrap()?;
+                    self.record.entries.pop_back();
+                    self.record.entries.append(&mut entries);
+                    self.record.saved = saved;
                 }
-                Action::Branch(_) => unreachable!(),
-                Action::Undo => self.inner.redo().unwrap()?,
-                Action::Redo => self.inner.undo().unwrap()?,
+                Action::Undo => self.record.redo().unwrap()?,
+                Action::Redo => self.record.undo().unwrap()?,
             }
         }
         Ok(())
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<Record<T>> {
-        self.inner.queue()
+    pub fn queue(&mut self) -> Queue<T> {
+        self.record.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<Record<T>> {
-        self.inner.checkpoint()
+    pub fn checkpoint(&mut self) -> Checkpoint<T> {
+        self.record.checkpoint()
     }
 
     /// Returns a reference to the `target`.
     pub fn target(&self) -> &T {
-        self.inner.target()
+        self.record.target()
     }
 }
 
-impl<T> Checkpoint<'_, History<T>> {
-    /// Calls the [`apply`] method.
-    ///
-    /// [`apply`]: struct.History.html#method.apply
-    pub fn apply(&mut self, command: impl Command<T>) -> Result {
-        let branch = self.inner.branch();
-        self.inner.apply(command)?;
-        self.actions.push(Action::Branch(branch));
-        Ok(())
-    }
-
-    /// Cancels the changes and consumes the checkpoint.
-    ///
-    /// # Errors
-    /// If an error occur when canceling the changes, the error is returned
-    /// and the remaining commands are not canceled.
-    pub fn cancel(self) -> Result {
-        for action in self.actions.into_iter().rev() {
-            match action {
-                Action::Apply(_, _) => unreachable!(),
-                Action::Branch(branch) => {
-                    let root = self.inner.branch();
-                    self.inner.jump_to(branch);
-                    if root == branch {
-                        self.inner.record.entries.pop_back();
-                    } else {
-                        self.inner.branches.remove(&root).unwrap();
-                    }
-                }
-                Action::Undo => self.inner.redo().unwrap()?,
-                Action::Redo => self.inner.undo().unwrap()?,
-            }
-        }
-        Ok(())
-    }
-
-    /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<History<T>> {
-        self.inner.queue()
-    }
-
-    /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<History<T>> {
-        self.inner.checkpoint()
-    }
-
-    /// Returns a reference to the `target`.
-    pub fn target(&self) -> &T {
-        self.inner.target()
-    }
-}
-
-impl<'a, T: Timeline> From<&'a mut T> for Checkpoint<'a, T> {
-    fn from(inner: &'a mut T) -> Self {
+impl<'a, T> From<&'a mut Record<T>> for Checkpoint<'a, T> {
+    fn from(record: &'a mut Record<T>) -> Self {
         Checkpoint {
-            inner,
+            record,
             actions: Vec::new(),
         }
     }
 }
 
-/// An action that can be applied to a Record or History.
-#[cfg_attr(feature = "display", derive(Debug))]
+#[cfg(feature = "display")]
+impl<T: fmt::Debug> fmt::Debug for Checkpoint<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Checkpoint")
+            .field("record", &self.record)
+            .field("actions", &self.actions)
+            .finish()
+    }
+}
+
 enum Action<T> {
     Apply(Option<usize>, VecDeque<Entry<T>>),
-    Branch(usize),
     Undo,
     Redo,
+}
+
+#[cfg(feature = "display")]
+impl<T> fmt::Debug for Action<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Action::Apply(_, _) => f.debug_struct("Apply").finish(),
+            Action::Undo => f.debug_struct("Undo").finish(),
+            Action::Redo => f.debug_struct("Redo").finish(),
+        }
+    }
 }
 
 #[cfg(all(test, not(feature = "display")))]
