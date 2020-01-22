@@ -1,5 +1,4 @@
-use crate::{Entry, Record};
-#[cfg(feature = "chrono")]
+use crate::{Command, Entry, Record};
 use chrono::{DateTime, Local, Utc};
 use colored::{Color, Colorize};
 use std::fmt::{self, Write};
@@ -58,7 +57,6 @@ impl<T> Display<'_, T> {
         self.config.mark(f, 0)?;
         self.config.position(f, at)?;
         if self.config.detailed {
-            #[cfg(feature = "chrono")]
             self.config.timestamp(f, &entry.timestamp)?;
         }
         self.config.current(f, at, self.record.current())?;
@@ -114,8 +112,15 @@ impl Default for Config {
 }
 
 impl Config {
-    fn message(self, f: &mut fmt::Formatter, msg: &impl ToString, level: usize) -> fmt::Result {
-        let msg = msg.to_string();
+    fn message<T>(
+        self,
+        f: &mut fmt::Formatter,
+        command: &impl Command<T>,
+        level: usize,
+    ) -> fmt::Result {
+        let msg = command
+            .text()
+            .unwrap_or_else(|| "<unknown command>".to_string());
         let lines = msg.lines();
         if self.detailed {
             for line in lines {
@@ -189,7 +194,6 @@ impl Config {
         }
     }
 
-    #[cfg(feature = "chrono")]
     fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Utc>) -> fmt::Result {
         let rfc2822 = timestamp.with_timezone(&Local).to_rfc2822();
         if self.colored {

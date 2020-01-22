@@ -1,12 +1,6 @@
-use crate::{Checkpoint, Command, Entry, Join, Merge, Queue, Result, Signal};
-use std::{collections::VecDeque, error::Error, num::NonZeroUsize};
-#[cfg(feature = "display")]
-use {crate::Display, std::fmt};
-#[cfg(feature = "chrono")]
-use {
-    chrono::{DateTime, TimeZone, Utc},
-    std::cmp::Ordering,
-};
+use crate::{Checkpoint, Command, Display, Entry, Join, Merge, Queue, Result, Signal};
+use chrono::{DateTime, TimeZone, Utc};
+use std::{cmp::Ordering, collections::VecDeque, error::Error, fmt, num::NonZeroUsize};
 
 const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_value()) };
 
@@ -21,6 +15,7 @@ const MAX_LIMIT: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(usize::max_
 /// # Examples
 /// ```
 /// # use undo::*;
+/// # #[derive(Debug)]
 /// # struct Add(char);
 /// # impl Command<String> for Add {
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result {
@@ -350,7 +345,6 @@ impl<T> Record<T> {
     }
 
     /// Go back or forward in the record to the command that was made closest to the datetime provided.
-    #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, to: &DateTime<impl TimeZone>) -> Option<Result> {
         let to = to.with_timezone(&Utc);
         let current = match self.entries.as_slices() {
@@ -386,13 +380,10 @@ impl<T> Record<T> {
 
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
-    /// Requires the `display` feature to be enabled.
-    ///
     /// [`undo`]: struct.Record.html#method.undo
-    #[cfg(feature = "display")]
     pub fn to_undo_string(&self) -> Option<String> {
         if self.can_undo() {
-            Some(self.entries[self.current - 1].to_string())
+            self.entries[self.current - 1].text()
         } else {
             None
         }
@@ -400,13 +391,10 @@ impl<T> Record<T> {
 
     /// Returns the string of the command which will be redone in the next call to [`redo`].
     ///
-    /// Requires the `display` feature to be enabled.
-    ///
     /// [`redo`]: struct.Record.html#method.redo
-    #[cfg(feature = "display")]
     pub fn to_redo_string(&self) -> Option<String> {
         if self.can_redo() {
-            Some(self.entries[self.current].to_string())
+            self.entries[self.current].text()
         } else {
             None
         }
@@ -415,7 +403,6 @@ impl<T> Record<T> {
     /// Returns a structure for configurable formatting of the record.
     ///
     /// Requires the `display` feature to be enabled.
-    #[cfg(feature = "display")]
     pub fn display(&self) -> Display<T> {
         Display::from(self)
     }
@@ -450,7 +437,6 @@ impl<T> From<T> for Record<T> {
     }
 }
 
-#[cfg(feature = "display")]
 impl<T: fmt::Debug> fmt::Debug for Record<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
@@ -463,7 +449,6 @@ impl<T: fmt::Debug> fmt::Debug for Record<T> {
     }
 }
 
-#[cfg(feature = "display")]
 impl<T> fmt::Display for Record<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (&self.display() as &dyn fmt::Display).fmt(f)
@@ -559,10 +544,11 @@ impl Default for RecordBuilder {
     }
 }
 
-#[cfg(all(test, not(feature = "display")))]
+#[cfg(test)]
 mod tests {
     use crate::*;
 
+    #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {
@@ -609,7 +595,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "chrono")]
     fn time_travel() {
         let mut record = Record::default();
         record.apply(Add('a')).unwrap();

@@ -1,7 +1,5 @@
 use crate::{Command, Entry, Queue, Record, Result};
-use std::collections::VecDeque;
-#[cfg(feature = "display")]
-use std::fmt;
+use std::{collections::VecDeque, fmt};
 
 /// A checkpoint wrapper.
 ///
@@ -11,6 +9,7 @@ use std::fmt;
 /// # Examples
 /// ```
 /// # use undo::*;
+/// # #[derive(Debug)]
 /// # struct Add(char);
 /// # impl Command<String> for Add {
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result {
@@ -145,7 +144,6 @@ impl<'a, T> From<&'a mut Record<T>> for Checkpoint<'a, T> {
     }
 }
 
-#[cfg(feature = "display")]
 impl<T: fmt::Debug> fmt::Debug for Checkpoint<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Checkpoint")
@@ -161,7 +159,6 @@ enum Action<T> {
     Redo,
 }
 
-#[cfg(feature = "display")]
 impl<T> fmt::Debug for Action<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -172,10 +169,11 @@ impl<T> fmt::Debug for Action<T> {
     }
 }
 
-#[cfg(all(test, not(feature = "display")))]
+#[cfg(test)]
 mod tests {
     use crate::*;
 
+    #[derive(Debug)]
     struct Add(char);
 
     impl Command<String> for Add {

@@ -1,4 +1,4 @@
-//! Provides undo-redo functionality with dynamic dispatch and automatic command merging.
+//! Provides simple undo-redo functionality with dynamic dispatch.
 //!
 //! It is an implementation of the command pattern, where all modifications are done
 //! by creating objects of commands that applies the modifications. All commands knows
@@ -17,8 +17,6 @@
 //! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
-//! * Configurable display formatting is provided when the `display` feature is enabled.
-//! * Time stamps and time travel is provided when the `chrono` feature is enabled.
 //!
 //! *If you need more advanced features, check out the [redo] crate.*
 //!
@@ -36,6 +34,7 @@
 //! ```
 //! use undo::{Command, Record};
 //!
+//! #[derive(Debug)]
 //! struct Add(char);
 //!
 //! impl Command<String> for Add {
@@ -81,32 +80,27 @@
 
 mod checkpoint;
 mod command;
-#[cfg(feature = "display")]
 mod display;
 mod queue;
 mod record;
 
-#[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
 use std::error::Error;
-#[cfg(feature = "display")]
 use std::fmt;
 
 pub use self::{
     checkpoint::Checkpoint,
-    command::{Join, Merger},
+    command::{Join, Merger, Text},
+    display::Display,
     queue::Queue,
     record::{Record, RecordBuilder},
 };
-#[cfg(feature = "display")]
-pub use self::{command::Text, display::Display};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result = std::result::Result<(), Box<dyn Error>>;
 
 /// Base functionality for all commands.
-#[cfg(not(feature = "display"))]
-pub trait Command<T>: 'static {
+pub trait Command<T>: 'static + fmt::Debug {
     /// Applies the command on the target and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     fn apply(&mut self, target: &mut T) -> Result;
@@ -131,34 +125,10 @@ pub trait Command<T>: 'static {
     fn merge(&self) -> Merge {
         Merge::No
     }
-}
 
-/// Base functionality for all commands.
-#[cfg(feature = "display")]
-pub trait Command<T>: 'static + fmt::Debug + fmt::Display {
-    /// Applies the command on the target and returns `Ok` if everything went fine,
-    /// and `Err` if something went wrong.
-    fn apply(&mut self, target: &mut T) -> Result;
-
-    /// Restores the state of the target as it was before the command was applied
-    /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, target: &mut T) -> Result;
-
-    /// Reapplies the command on the target and return `Ok` if everything went fine,
-    /// and `Err` if something went wrong.
-    ///
-    /// The default implementation uses the [`apply`] implementation.
-    ///
-    /// [`apply`]: trait.Command.html#tymethod.apply
-    fn redo(&mut self, target: &mut T) -> Result {
-        self.apply(target)
-    }
-
-    /// Used for automatic merging of commands.
-    ///
-    /// When commands are merged together, undoing and redoing them are done in one step.
-    fn merge(&self) -> Merge {
-        Merge::No
+    /// Returns the text of the command.
+    fn text(&self) -> Option<String> {
+        None
     }
 }
 
@@ -177,6 +147,10 @@ impl<T, C: Command<T> + ?Sized> Command<T> for Box<C> {
 
     fn merge(&self) -> Merge {
         (**self).merge()
+    }
+
+    fn text(&self) -> Option<String> {
+        (**self).text()
     }
 }
 
@@ -207,7 +181,6 @@ pub enum Merge {
 
 struct Entry<T> {
     command: Box<dyn Command<T>>,
-    #[cfg(feature = "chrono")]
     timestamp: DateTime<Utc>,
 }
 
@@ -215,7 +188,6 @@ impl<T> Entry<T> {
     fn new(command: impl Command<T>) -> Entry<T> {
         Entry {
             command: Box::new(command),
-            #[cfg(feature = "chrono")]
             timestamp: Utc::now(),
         }
     }
@@ -239,27 +211,11 @@ impl<T: 'static> Command<T> for Entry<T> {
     }
 }
 
-#[cfg(feature = "display")]
 impl<T> fmt::Debug for Entry<T> {
-    #[cfg(not(feature = "chrono"))]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Entry")
-            .field("command", &self.command)
-            .finish()
-    }
-
-    #[cfg(feature = "chrono")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Entry")
             .field("command", &self.command)
             .field("timestamp", &self.timestamp)
             .finish()
-    }
-}
-
-#[cfg(feature = "display")]
-impl<T> fmt::Display for Entry<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.command as &dyn fmt::Display).fmt(f)
     }
 }

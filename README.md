@@ -4,7 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 
-Provides undo-redo functionality with dynamic dispatch and automatic command merging.
+Provides simple undo-redo functionality with dynamic dispatch.
 
 It is an implementation of the command pattern, where all modifications are done
 by creating objects of commands that applies the modifications. All commands knows
@@ -23,8 +23,6 @@ it is easy to apply, undo, and redo changes made to a target.
 * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
-* Configurable display formatting is provided when the `display` feature is enabled.
-* Time stamps and time travel is provided when the `chrono` feature is enabled.
 
 *If you need more advanced features, check out the [redo] crate.*
 
@@ -42,6 +40,7 @@ And this to `main.rs`:
 ```rust
 use undo::{Command, Record};
 
+#[derive(Debug)]
 struct Add(char);
 
 impl Command<String> for Add {
