@@ -87,8 +87,7 @@ mod queue;
 mod record;
 
 use chrono::{DateTime, Utc};
-use std::error::Error;
-use std::fmt;
+use std::{error::Error, fmt};
 
 pub use self::{
     checkpoint::Checkpoint,
@@ -130,7 +129,7 @@ pub trait Command<T>: 'static + fmt::Debug {
 
     /// Returns the text of the command.
     fn text(&self) -> String {
-        format!("command @ {:?}", self as *const Self)
+        format!("command @ {:?}", self as *const _)
     }
 }
 

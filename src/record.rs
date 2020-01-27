@@ -381,9 +381,9 @@ impl<T> Record<T> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
-    pub fn to_undo_string(&self) -> Option<String> {
+    pub fn undo_text(&self) -> Option<String> {
         if self.can_undo() {
-            Some(self.entries[self.current - 1].text())
+            self.entries.get(self.current - 1).map(Command::text)
         } else {
             None
         }
@@ -392,9 +392,9 @@ impl<T> Record<T> {
     /// Returns the string of the command which will be redone in the next call to [`redo`].
     ///
     /// [`redo`]: struct.Record.html#method.redo
-    pub fn to_redo_string(&self) -> Option<String> {
+    pub fn redo_text(&self) -> Option<String> {
         if self.can_redo() {
-            Some(self.entries[self.current].text())
+            self.entries.get(self.current).map(Command::text)
         } else {
             None
         }
@@ -474,7 +474,7 @@ impl Builder {
     pub fn new() -> Builder {
         Builder {
             capacity: 0,
-            limit: unsafe { NonZeroUsize::new_unchecked(usize::max_value()) },
+            limit: NonZeroUsize::new(usize::max_value()).unwrap(),
             saved: true,
         }
     }
