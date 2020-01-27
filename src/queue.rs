@@ -35,51 +35,23 @@ use crate::{Checkpoint, Command, Entry, Record, Result};
 #[derive(Debug)]
 pub struct Queue<'a, T: 'static> {
     record: &'a mut Record<T>,
-    actions: Vec<Action<T>>,
+    commands: Vec<QueueCommand<T>>,
 }
 
 impl<'a, T> Queue<'a, T> {
-    /// Reserves capacity for at least `additional` more commands in the queue.
-    ///
-    /// # Panics
-    /// Panics if the new capacity overflows usize.
-    pub fn reserve(&mut self, additional: usize) {
-        self.actions.reserve(additional);
-    }
-
-    /// Returns the capacity of the queue.
-    pub fn capacity(&self) -> usize {
-        self.actions.capacity()
-    }
-
-    /// Shrinks the capacity of the queue as much as possible.
-    pub fn shrink_to_fit(&mut self) {
-        self.actions.shrink_to_fit();
-    }
-
-    /// Returns the number of commands in the queue.
-    pub fn len(&self) -> usize {
-        self.actions.len()
-    }
-
-    /// Returns `true` if the queue is empty.
-    pub fn is_empty(&self) -> bool {
-        self.actions.is_empty()
-    }
-
     /// Queues an `apply` action.
     pub fn apply(&mut self, command: impl Command<T>) {
-        self.actions.push(Action::Apply(Entry::new(command)));
+        self.commands.push(QueueCommand::Apply(Entry::new(command)));
     }
 
     /// Queues an `undo` action.
     pub fn undo(&mut self) {
-        self.actions.push(Action::Undo);
+        self.commands.push(QueueCommand::Undo);
     }
 
     /// Queues a `redo` action.
     pub fn redo(&mut self) {
-        self.actions.push(Action::Redo);
+        self.commands.push(QueueCommand::Redo);
     }
 
     /// Applies the actions that is queued.
@@ -87,13 +59,13 @@ impl<'a, T> Queue<'a, T> {
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
     pub fn commit(self) -> Result {
-        for action in self.actions {
-            match action {
-                Action::Apply(entry) => {
+        for command in self.commands {
+            match command {
+                QueueCommand::Apply(entry) => {
                     self.record.__apply(entry)?;
                 }
-                Action::Undo => self.record.undo()?,
-                Action::Redo => self.record.redo()?,
+                QueueCommand::Undo => self.record.undo()?,
+                QueueCommand::Redo => self.record.redo()?,
             }
         }
         Ok(())
@@ -122,13 +94,13 @@ impl<'a, T> From<&'a mut Record<T>> for Queue<'a, T> {
     fn from(record: &'a mut Record<T>) -> Self {
         Queue {
             record,
-            actions: Vec::new(),
+            commands: Vec::new(),
         }
     }
 }
 
 #[derive(Debug)]
-enum Action<T> {
+enum QueueCommand<T> {
     Apply(Entry<T>),
     Undo,
     Redo,

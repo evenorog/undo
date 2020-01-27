@@ -57,7 +57,12 @@ pub struct Record<T: 'static> {
 impl<T> Record<T> {
     /// Returns a new record.
     pub fn new(target: T) -> Record<T> {
-        RecordBuilder::new().build(target)
+        Builder::new().build(target)
+    }
+
+    /// Returns a new record builder.
+    pub fn builder() -> Builder {
+        Builder::new()
     }
 
     /// Reserves capacity for at least `additional` more commands.
@@ -444,13 +449,13 @@ impl<T: fmt::Debug> fmt::Debug for Record<T> {
     }
 }
 
-/// Builder for a record.
+/// A builder for a record.
 ///
 /// # Examples
 /// ```
-/// # use undo::{Record, RecordBuilder};
+/// # use undo::{Record, Builder};
 /// # fn foo() -> Record<String> {
-/// RecordBuilder::new()
+/// Builder::new()
 ///     .capacity(100)
 ///     .limit(100)
 ///     .saved(false)
@@ -458,16 +463,16 @@ impl<T: fmt::Debug> fmt::Debug for Record<T> {
 /// # }
 /// ```
 #[derive(Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct RecordBuilder {
+pub struct Builder {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
 }
 
-impl RecordBuilder {
+impl Builder {
     /// Returns a builder for a record.
-    pub fn new() -> RecordBuilder {
-        RecordBuilder {
+    pub fn new() -> Builder {
+        Builder {
             capacity: 0,
             limit: unsafe { NonZeroUsize::new_unchecked(usize::max_value()) },
             saved: true,
@@ -475,7 +480,7 @@ impl RecordBuilder {
     }
 
     /// Sets the capacity for the record.
-    pub fn capacity(&mut self, capacity: usize) -> &mut RecordBuilder {
+    pub fn capacity(&mut self, capacity: usize) -> &mut Builder {
         self.capacity = capacity;
         self
     }
@@ -484,14 +489,14 @@ impl RecordBuilder {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(&mut self, limit: usize) -> &mut RecordBuilder {
+    pub fn limit(&mut self, limit: usize) -> &mut Builder {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(&mut self, saved: bool) -> &mut RecordBuilder {
+    pub fn saved(&mut self, saved: bool) -> &mut Builder {
         self.saved = saved;
         self
     }
@@ -527,9 +532,9 @@ impl RecordBuilder {
     }
 }
 
-impl Default for RecordBuilder {
+impl Default for Builder {
     fn default() -> Self {
-        RecordBuilder::new()
+        Builder::new()
     }
 }
 

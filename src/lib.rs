@@ -95,7 +95,7 @@ pub use self::{
     command::{Join, Merger, Text},
     display::Display,
     queue::Queue,
-    record::{Record, RecordBuilder},
+    record::{Builder, Record},
 };
 
 /// A specialized Result type for undo-redo operations.

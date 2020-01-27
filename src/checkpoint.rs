@@ -36,45 +36,17 @@ use std::collections::VecDeque;
 #[derive(Debug)]
 pub struct Checkpoint<'a, T: 'static> {
     record: &'a mut Record<T>,
-    actions: Vec<Action<T>>,
+    commands: Vec<CheckpointCommand<T>>,
 }
 
 impl<T> Checkpoint<'_, T> {
-    /// Reserves capacity for at least `additional` more commands in the checkpoint.
-    ///
-    /// # Panics
-    /// Panics if the new capacity overflows usize.
-    pub fn reserve(&mut self, additional: usize) {
-        self.actions.reserve(additional);
-    }
-
-    /// Returns the capacity of the checkpoint.
-    pub fn capacity(&self) -> usize {
-        self.actions.capacity()
-    }
-
-    /// Shrinks the capacity of the checkpoint as much as possible.
-    pub fn shrink_to_fit(&mut self) {
-        self.actions.shrink_to_fit();
-    }
-
-    /// Returns the number of commands in the checkpoint.
-    pub fn len(&self) -> usize {
-        self.actions.len()
-    }
-
-    /// Returns `true` if the checkpoint is empty.
-    pub fn is_empty(&self) -> bool {
-        self.actions.is_empty()
-    }
-
     /// Calls the [`apply`] method.
     ///
     /// [`apply`]: struct.Record.html#method.apply
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let saved = self.record.saved;
         let (_, tail) = self.record.__apply(Entry::new(command))?;
-        self.actions.push(Action::Apply(saved, tail));
+        self.commands.push(CheckpointCommand::Apply(saved, tail));
         Ok(())
     }
 
@@ -82,7 +54,7 @@ impl<T> Checkpoint<'_, T> {
     pub fn undo(&mut self) -> Result {
         if self.record.can_undo() {
             self.record.undo()?;
-            self.actions.push(Action::Undo);
+            self.commands.push(CheckpointCommand::Undo);
         }
         Ok(())
     }
@@ -91,7 +63,7 @@ impl<T> Checkpoint<'_, T> {
     pub fn redo(&mut self) -> Result {
         if self.record.can_redo() {
             self.record.redo()?;
-            self.actions.push(Action::Redo);
+            self.commands.push(CheckpointCommand::Redo);
         }
         Ok(())
     }
@@ -105,16 +77,16 @@ impl<T> Checkpoint<'_, T> {
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining commands are not canceled.
     pub fn cancel(self) -> Result {
-        for action in self.actions.into_iter().rev() {
-            match action {
-                Action::Apply(saved, mut entries) => {
+        for command in self.commands.into_iter().rev() {
+            match command {
+                CheckpointCommand::Apply(saved, mut entries) => {
                     self.record.undo()?;
                     self.record.entries.pop_back();
                     self.record.entries.append(&mut entries);
                     self.record.saved = saved;
                 }
-                Action::Undo => self.record.redo()?,
-                Action::Redo => self.record.undo()?,
+                CheckpointCommand::Undo => self.record.redo()?,
+                CheckpointCommand::Redo => self.record.undo()?,
             }
         }
         Ok(())
@@ -140,13 +112,13 @@ impl<'a, T> From<&'a mut Record<T>> for Checkpoint<'a, T> {
     fn from(record: &'a mut Record<T>) -> Self {
         Checkpoint {
             record,
-            actions: Vec::new(),
+            commands: Vec::new(),
         }
     }
 }
 
 #[derive(Debug)]
-enum Action<T> {
+enum CheckpointCommand<T> {
     Apply(Option<usize>, VecDeque<Entry<T>>),
     Undo,
     Redo,
