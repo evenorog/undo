@@ -21,44 +21,6 @@
 //!
 //! *If you need more advanced features, check out the [redo] crate.*
 //!
-//! # Examples
-//!
-//! ```
-//! use undo::{Command, Record};
-//!
-//! #[derive(Debug)]
-//! struct Add(char);
-//!
-//! impl Command<String> for Add {
-//!     fn apply(&mut self, s: &mut String) -> undo::Result {
-//!         s.push(self.0);
-//!         Ok(())
-//!     }
-//!
-//!     fn undo(&mut self, s: &mut String) -> undo::Result {
-//!         self.0 = s.pop().ok_or("s is empty")?;
-//!         Ok(())
-//!     }
-//! }
-//!
-//! fn main() -> undo::Result {
-//!     let mut record = Record::default();
-//!     record.apply(Add('a'))?;
-//!     record.apply(Add('b'))?;
-//!     record.apply(Add('c'))?;
-//!     assert_eq!(record.target(), "abc");
-//!     record.undo()?;
-//!     record.undo()?;
-//!     record.undo()?;
-//!     assert_eq!(record.target(), "");
-//!     record.redo()?;
-//!     record.redo()?;
-//!     record.redo()?;
-//!     assert_eq!(record.target(), "abc");
-//!     Ok(())
-//! }
-//! ```
-//!
 //! [Command]: trait.Command.html
 //! [Record]: struct.Record.html
 //! [Queue]: struct.Queue.html
@@ -147,6 +109,30 @@ pub enum Merge {
     If(u32),
     /// The command should not merge.
     No,
+}
+
+#[derive(Default)]
+struct Slot {
+    f: Option<Box<dyn FnMut(Signal)>>,
+}
+
+impl Slot {
+    fn emit_if(&mut self, cond: bool, signal: Signal) {
+        if let Some(ref mut f) = self.f {
+            if cond {
+                f(signal);
+            }
+        }
+    }
+}
+
+impl fmt::Debug for Slot {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.f {
+            Some(_) => f.pad("Slot { .. }"),
+            None => f.pad("Empty"),
+        }
+    }
 }
 
 struct Entry<T> {
