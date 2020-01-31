@@ -29,15 +29,6 @@ it is easy to apply, undo, and redo changes made to a target.
 
 ## Examples
 
-Add this to `Cargo.toml`:
-
-```toml
-[dependencies]
-undo = "0.40"
-```
-
-And this to `main.rs`:
-
 ```rust
 use undo::{Command, Record};
 

@@ -60,11 +60,6 @@ impl<T> Record<T> {
         Builder::new().build(target)
     }
 
-    /// Returns a new record builder.
-    pub fn builder() -> Builder {
-        Builder::new()
-    }
-
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -182,15 +177,15 @@ impl<T> Record<T> {
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
-        self.__apply(Entry::new(command)).map(|_| ())
+        self.__apply(command).map(|_| ())
     }
 
     #[allow(clippy::type_complexity)]
     pub(crate) fn __apply(
         &mut self,
-        mut entry: Entry<T>,
+        mut command: impl Command<T>,
     ) -> std::result::Result<(bool, VecDeque<Entry<T>>), Box<dyn Error>> {
-        entry.apply(&mut self.target)?;
+        command.apply(&mut self.target)?;
         let current = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -201,15 +196,15 @@ impl<T> Record<T> {
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the target is in a saved state.
-        let merges = match (entry.merge(), self.entries.back().map(Command::merge)) {
+        let merges = match (command.merge(), self.entries.back().map(Command::merge)) {
             (Merge::Yes, Some(_)) => !self.is_saved(),
             (Merge::If(id1), Some(Merge::If(id2))) => id1 == id2 && !self.is_saved(),
             _ => false,
         };
         if merges {
             // Merge the command with the one on the top of the stack.
-            let command = Join::new(self.entries.pop_back().unwrap(), entry);
-            self.entries.push_back(Entry::new(command));
+            let command = Join::new(self.entries.pop_back().unwrap(), command);
+            self.entries.push_back(Entry::new(Box::new(command)));
         } else {
             // If commands are not merged push it onto the record.
             if self.limit() == self.current() {
@@ -219,7 +214,7 @@ impl<T> Record<T> {
             } else {
                 self.current += 1;
             }
-            self.entries.push_back(entry);
+            self.entries.push_back(Entry::new(Box::new(command)));
         }
         debug_assert_eq!(self.current(), self.len());
         if let Some(ref mut slot) = self.slot {
@@ -393,11 +388,7 @@ impl<T> Record<T> {
     ///
     /// [`redo`]: struct.Record.html#method.redo
     pub fn redo_text(&self) -> Option<String> {
-        if self.can_redo() {
-            self.entries.get(self.current).map(Command::text)
-        } else {
-            None
-        }
+        self.entries.get(self.current).map(Command::text)
     }
 
     /// Returns a structure for configurable formatting of the record.

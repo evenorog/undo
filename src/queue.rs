@@ -41,7 +41,7 @@ pub struct Queue<'a, T: 'static> {
 impl<'a, T> Queue<'a, T> {
     /// Queues an `apply` action.
     pub fn apply(&mut self, command: impl Command<T>) {
-        self.commands.push(QueueCommand::Apply(Entry::new(command)));
+        self.commands.push(QueueCommand::Apply(Box::new(command)));
     }
 
     /// Queues an `undo` action.
@@ -62,7 +62,7 @@ impl<'a, T> Queue<'a, T> {
         for command in self.commands {
             match command {
                 QueueCommand::Apply(entry) => {
-                    self.record.__apply(entry)?;
+                    self.record.__apply(Entry::new(entry))?;
                 }
                 QueueCommand::Undo => self.record.undo()?,
                 QueueCommand::Redo => self.record.redo()?,
@@ -101,7 +101,7 @@ impl<'a, T> From<&'a mut Record<T>> for Queue<'a, T> {
 
 #[derive(Debug)]
 enum QueueCommand<T> {
-    Apply(Entry<T>),
+    Apply(Box<dyn Command<T>>),
     Undo,
     Redo,
 }

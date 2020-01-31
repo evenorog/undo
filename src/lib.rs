@@ -23,15 +23,6 @@
 //!
 //! # Examples
 //!
-//! Add this to `Cargo.toml`:
-//!
-//! ```toml
-//! [dependencies]
-//! undo = "0.40"
-//! ```
-//!
-//! And this to `main.rs`:
-//!
 //! ```
 //! use undo::{Command, Record};
 //!
@@ -164,9 +155,9 @@ struct Entry<T> {
 }
 
 impl<T> Entry<T> {
-    fn new(command: impl Command<T>) -> Entry<T> {
+    fn new(command: Box<dyn Command<T>>) -> Entry<T> {
         Entry {
-            command: Box::new(command),
+            command,
             timestamp: Utc::now(),
         }
     }

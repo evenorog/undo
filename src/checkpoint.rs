@@ -45,7 +45,7 @@ impl<T> Checkpoint<'_, T> {
     /// [`apply`]: struct.Record.html#method.apply
     pub fn apply(&mut self, command: impl Command<T>) -> Result {
         let saved = self.record.saved;
-        let (_, tail) = self.record.__apply(Entry::new(command))?;
+        let (_, tail) = self.record.__apply(command)?;
         self.commands.push(CheckpointCommand::Apply(saved, tail));
         Ok(())
     }

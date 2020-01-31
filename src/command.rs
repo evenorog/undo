@@ -18,11 +18,6 @@ impl<A> Text<A> {
         }
     }
 
-    /// Joins the two commands.
-    pub fn join<B>(self, command: B) -> Join<Text<A>, B> {
-        Join(self, command)
-    }
-
     /// Returns a new command with the provided merge behavior.
     pub fn with_merge(self, merge: Merge) -> Merger<Text<A>> {
         Merger::new(self, merge)
@@ -62,11 +57,6 @@ impl<A> Merger<A> {
     /// Creates a command with the specified merge behavior.
     pub fn new(command: A, merge: Merge) -> Merger<A> {
         Merger { command, merge }
-    }
-
-    /// Joins the two commands.
-    pub fn join<B>(self, command: B) -> Join<Merger<A>, B> {
-        Join(self, command)
     }
 
     /// Returns a new command with the provided text.
