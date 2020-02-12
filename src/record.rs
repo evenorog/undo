@@ -104,7 +104,7 @@ impl<T> Record<T> {
         self.slot.f.replace(Box::from(slot))
     }
 
-    /// Removes and returns the slot.
+    /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<impl FnMut(Signal) + 'static> {
         self.slot.f.take()
     }
@@ -179,7 +179,6 @@ impl<T> Record<T> {
         let was_saved = self.is_saved();
         // Pop off all elements after current from record.
         let tail = self.entries.split_off(current);
-        debug_assert_eq!(current, self.len());
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the target is in a saved state.
@@ -203,7 +202,6 @@ impl<T> Record<T> {
             }
             self.entries.push_back(Entry::new(Box::new(command)));
         }
-        debug_assert_eq!(self.current(), self.len());
         self.slot.emit_if(could_redo, Signal::Redo(false));
         self.slot.emit_if(!could_undo, Signal::Undo(true));
         self.slot.emit_if(was_saved, Signal::Saved(false));

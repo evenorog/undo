@@ -61,9 +61,7 @@ impl<'a, T> Queue<'a, T> {
     pub fn commit(self) -> Result {
         for command in self.commands {
             match command {
-                QueueCommand::Apply(entry) => {
-                    self.record.__apply(Entry::new(entry))?;
-                }
+                QueueCommand::Apply(command) => self.record.apply(Entry::new(command))?,
                 QueueCommand::Undo => self.record.undo()?,
                 QueueCommand::Redo => self.record.redo()?,
             }

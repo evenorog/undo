@@ -17,66 +17,66 @@ use std::fmt::{self, Write};
 #[derive(Copy, Clone, Debug)]
 pub struct Display<'a, T: 'static> {
     record: &'a Record<T>,
-    config: Config,
+    format: Format,
 }
 
 impl<T> Display<'_, T> {
     /// Show colored output (on by default).
     pub fn colored(&mut self, on: bool) -> &mut Self {
-        self.config.colored = on;
+        self.format.colored = on;
         self
     }
 
     /// Show the current position in the output (on by default).
     pub fn current(&mut self, on: bool) -> &mut Self {
-        self.config.current = on;
+        self.format.current = on;
         self
     }
 
     /// Show detailed output (on by default).
     pub fn detailed(&mut self, on: bool) -> &mut Self {
-        self.config.detailed = on;
+        self.format.detailed = on;
         self
     }
 
     /// Show the position of the command (on by default).
     pub fn position(&mut self, on: bool) -> &mut Self {
-        self.config.position = on;
+        self.format.position = on;
         self
     }
 
     /// Show the saved command (on by default).
     pub fn saved(&mut self, on: bool) -> &mut Self {
-        self.config.saved = on;
+        self.format.saved = on;
         self
     }
 }
 
 impl<T> Display<'_, T> {
     fn fmt_list(&self, f: &mut fmt::Formatter, at: usize, entry: &Entry<T>) -> fmt::Result {
-        self.config.mark(f, 0)?;
-        self.config.position(f, at)?;
-        if self.config.detailed {
-            self.config.timestamp(f, &entry.timestamp)?;
+        self.format.mark(f, 0)?;
+        self.format.position(f, at)?;
+        if self.format.detailed {
+            self.format.timestamp(f, &entry.timestamp)?;
         }
-        self.config.current(f, at, self.record.current())?;
-        self.config.saved(f, at, self.record.saved)?;
-        if self.config.detailed {
+        self.format.current(f, at, self.record.current())?;
+        self.format.saved(f, at, self.record.saved)?;
+        if self.format.detailed {
             writeln!(f)?;
-            self.config.message(f, entry, 0)
+            self.format.message(f, entry, 0)
         } else {
             f.write_char(' ')?;
-            self.config.message(f, entry, 0)?;
+            self.format.message(f, entry, 0)?;
             writeln!(f)
         }
     }
 }
 
 impl<'a, T> From<&'a Record<T>> for Display<'a, T> {
-    fn from(data: &'a Record<T>) -> Self {
+    fn from(record: &'a Record<T>) -> Self {
         Display {
-            record: data,
-            config: Config::default(),
+            record,
+            format: Format::default(),
         }
     }
 }
@@ -91,7 +91,7 @@ impl<T> fmt::Display for Display<'_, T> {
 }
 
 #[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct Config {
+struct Format {
     colored: bool,
     current: bool,
     detailed: bool,
@@ -99,9 +99,9 @@ struct Config {
     saved: bool,
 }
 
-impl Default for Config {
+impl Default for Format {
     fn default() -> Self {
-        Config {
+        Format {
             colored: true,
             current: true,
             detailed: true,
@@ -111,7 +111,7 @@ impl Default for Config {
     }
 }
 
-impl Config {
+impl Format {
     fn message<T>(
         self,
         f: &mut fmt::Formatter,

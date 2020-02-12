@@ -1,8 +1,59 @@
 use crate::{Command, Merge};
 
-/// A command wrapper with a specified text.
+/// A command wrapper used for joining commands.
 ///
-/// Requires the `display` feature to be enabled.
+/// The commands are executed in the order they were merged in.
+#[derive(Debug)]
+pub struct Join<A, B>(A, B);
+
+impl<A, B> Join<A, B> {
+    /// Joins the `a` and `b` command.
+    pub fn new(a: A, b: B) -> Join<A, B> {
+        Join(a, b)
+    }
+
+    /// Joins the two commands.
+    pub fn join<C>(self, command: C) -> Join<Join<A, B>, C> {
+        Join(self, command)
+    }
+
+    /// Returns a new command with the provided text.
+    pub fn with_text(self, text: impl Into<String>) -> Text<Join<A, B>> {
+        Text::new(self, text)
+    }
+
+    /// Returns a new command with the provided merge behavior.
+    pub fn with_merge(self, merge: Merge) -> Merger<Join<A, B>> {
+        Merger::new(self, merge)
+    }
+}
+
+impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
+    fn apply(&mut self, target: &mut T) -> crate::Result {
+        self.0.apply(target)?;
+        self.1.apply(target)
+    }
+
+    fn undo(&mut self, target: &mut T) -> crate::Result {
+        self.1.undo(target)?;
+        self.0.undo(target)
+    }
+
+    fn redo(&mut self, target: &mut T) -> crate::Result {
+        self.0.redo(target)?;
+        self.1.redo(target)
+    }
+
+    fn merge(&self) -> Merge {
+        Merge::No
+    }
+
+    fn text(&self) -> String {
+        format!("{} & {}", self.0.text(), self.1.text())
+    }
+}
+
+/// A command wrapper with a specified text.
 #[derive(Debug)]
 pub struct Text<A> {
     command: A,
@@ -84,58 +135,5 @@ impl<T, C: Command<T>> Command<T> for Merger<C> {
 
     fn text(&self) -> String {
         self.command.text()
-    }
-}
-
-/// A command wrapper used for joining commands.
-///
-/// The commands are executed in the order they were merged in.
-#[derive(Debug)]
-pub struct Join<A, B>(A, B);
-
-impl<A, B> Join<A, B> {
-    /// Joins the `a` and `b` command.
-    pub fn new(a: A, b: B) -> Join<A, B> {
-        Join(a, b)
-    }
-
-    /// Joins the two commands.
-    pub fn join<C>(self, command: C) -> Join<Join<A, B>, C> {
-        Join(self, command)
-    }
-
-    /// Returns a new command with the provided text.
-    pub fn with_text(self, text: impl Into<String>) -> Text<Join<A, B>> {
-        Text::new(self, text)
-    }
-
-    /// Returns a new command with the provided merge behavior.
-    pub fn with_merge(self, merge: Merge) -> Merger<Join<A, B>> {
-        Merger::new(self, merge)
-    }
-}
-
-impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
-    fn apply(&mut self, target: &mut T) -> crate::Result {
-        self.0.apply(target)?;
-        self.1.apply(target)
-    }
-
-    fn undo(&mut self, target: &mut T) -> crate::Result {
-        self.1.undo(target)?;
-        self.0.undo(target)
-    }
-
-    fn redo(&mut self, target: &mut T) -> crate::Result {
-        self.0.redo(target)?;
-        self.1.redo(target)
-    }
-
-    fn merge(&self) -> Merge {
-        Merge::No
-    }
-
-    fn text(&self) -> String {
-        format!("{} & {}", self.0.text(), self.1.text())
     }
 }
