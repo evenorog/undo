@@ -13,19 +13,20 @@ it is easy to apply, undo, and redo changes made to a target.
 
 ## Features
 
-* [Command] provides the base functionality for all commands.
-* [Record] is a collection of commands and provides the undo-redo functionality.
-* [Queue] wraps a record and extends it with queue functionality.
-* [Checkpoint] wraps a record and extends it with checkpoint functionality.
-* Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
+* [Command](https://docs.rs/undo/latest/undo/trait.Command.html) provides the base functionality for all commands.
+* [Record](https://docs.rs/undo/latest/undo/struct.Record.html) is a collection of commands and provides the undo-redo functionality.
+* A [queue](https://docs.rs/undo/latest/undo/struct.Queue.html) wraps a record and extends it with queue functionality.
+* A [checkpoint](https://docs.rs/undo/latest/undo/struct.Checkpoint.html) wraps a record and extends it with checkpoint functionality.
+* Commands can be merged after being applied to the data-structures by implementing the 
+  [merge](https://docs.rs/undo/latest/undo/trait.Command.html#method.merge) method on the command.
   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
   in a single step.
-* Configurable display formatting using [Display].
+* Configurable display formatting using [Display](https://docs.rs/undo/latest/undo/struct.Display.html).
 * The target can be marked as being saved to disk and the record can track the saved state and notify
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 
-*If you need more advanced features, check out the [redo] crate.*
+*If you need more advanced features, check out the [redo](https://github.com/evenorog/redo) crate.*
 
 ## Examples
 
@@ -79,12 +80,3 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
 additional terms or conditions.
-
-[Command]: https://docs.rs/undo/latest/undo/trait.Command.html
-[Record]: https://docs.rs/undo/latest/undo/struct.Record.html
-[Queue]: https://docs.rs/undo/latest/undo/struct.Queue.html
-[Checkpoint]: https://docs.rs/undo/latest/undo/struct.Checkpoint.html
-[Chain]: https://docs.rs/undo/latest/undo/struct.Chain.html
-[merge]: https://docs.rs/undo/latest/undo/trait.Command.html#method.merge
-[Display]: https://docs.rs/undo/latest/undo/struct.Display.html
-[redo]: https://github.com/evenorog/redo

@@ -7,28 +7,20 @@
 //!
 //! # Features
 //!
-//! * [Command] provides the base functionality for all commands.
-//! * [Record] is a collection of commands and provides the undo-redo functionality.
-//! * [Queue] wraps a record and extends it with queue functionality.
-//! * [Checkpoint] wraps a record and extends it with checkpoint functionality.
-//! * Commands can be merged after being applied to the data-structures by implementing the [merge] method on the command.
+//! * [Command](trait.Command.html) provides the base functionality for all commands.
+//! * [Record](struct.Record.html) is a collection of commands and provides the undo-redo functionality.
+//! * A [queue](struct.Queue.html) wraps a record and extends it with queue functionality.
+//! * A [checkpoint](struct.Checkpoint.html) wraps a record and extends it with checkpoint functionality.
+//! * Commands can be merged after being applied to the data-structures by implementing the
+//!   [merge](trait.Command.html#method.merge) method on the command.
 //!   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
 //!   in a single step.
-//! * Configurable display formatting using [Display].
+//! * Configurable display formatting using [Display](struct.Display.html).
 //! * The target can be marked as being saved to disk and the record can track the saved state and notify
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //!
-//! *If you need more advanced features, check out the [redo] crate.*
-//!
-//! [Command]: trait.Command.html
-//! [Record]: struct.Record.html
-//! [Queue]: struct.Queue.html
-//! [Checkpoint]: struct.Checkpoint.html
-//! [Chain]: struct.Chain.html
-//! [merge]: trait.Command.html#method.merge
-//! [Display]: struct.Display.html
-//! [redo]: https://github.com/evenorog/redo
+//! *If you need more advanced features, check out the [redo](https://github.com/evenorog/redo) crate.*
 
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]

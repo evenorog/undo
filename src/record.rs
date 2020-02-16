@@ -6,9 +6,9 @@ use std::{cmp::Ordering, collections::VecDeque, error::Error, num::NonZeroUsize}
 ///
 /// The record can roll the targets state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
-/// about changes to the stack or the target through [signal]. The user
-/// can give the record a function that is called each time the state changes
-/// by using the [`builder`].
+/// about changes to the stack or the target through [signal](enum.Signal.html).
+/// The user can give the record a function that is called each time the state
+/// changes by using the [`builder`](struct.RecordBuilder.html).
 ///
 /// # Examples
 /// ```
@@ -42,9 +42,6 @@ use std::{cmp::Ordering, collections::VecDeque, error::Error, num::NonZeroUsize}
 /// # Ok(())
 /// # }
 /// ```
-///
-/// [`builder`]: struct.RecordBuilder.html
-/// [signal]: enum.Signal.html
 #[derive(Debug)]
 pub struct Record<T: 'static> {
     pub(crate) entries: VecDeque<Entry<T>>,
