@@ -1,4 +1,4 @@
-//! Provides simple undo-redo functionality with dynamic dispatch.
+//! **Provides simple undo-redo functionality with dynamic dispatch.**
 //!
 //! It is an implementation of the command pattern, where all modifications are done
 //! by creating objects of commands that applies the modifications. All commands knows

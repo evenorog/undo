@@ -1,10 +1,10 @@
 # undo
 
+**Provides simple undo-redo functionality with dynamic dispatch.**
+
 [![Travis](https://travis-ci.com/evenorog/undo.svg?branch=master)](https://travis-ci.com/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
-
-Provides simple undo-redo functionality with dynamic dispatch.
 
 It is an implementation of the command pattern, where all modifications are done
 by creating objects of commands that applies the modifications. All commands knows
