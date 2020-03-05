@@ -1,6 +1,6 @@
 use crate::{Command, Entry, Record};
 use chrono::{DateTime, Local, Utc};
-use colored::{Color, Colorize};
+use colored::Colorize;
 use std::fmt::{self, Write};
 
 /// Configurable display formatting of structures.
@@ -53,22 +53,26 @@ impl<T> Display<'_, T> {
 }
 
 impl<T> Display<'_, T> {
-    fn fmt_list(&self, f: &mut fmt::Formatter, at: usize, entry: &Entry<T>) -> fmt::Result {
-        self.format.mark(f, 0)?;
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: usize, entry: Option<&Entry<T>>) -> fmt::Result {
         self.format.position(f, at)?;
-        if self.format.detailed {
-            self.format.timestamp(f, &entry.timestamp)?;
+        if let Some(entry) = entry {
+            if self.format.detailed {
+                self.format.timestamp(f, &entry.timestamp)?;
+            }
         }
-        self.format.current(f, at, self.record.current())?;
-        self.format.saved(f, at, self.record.saved)?;
-        if self.format.detailed {
-            writeln!(f)?;
-            self.format.message(f, entry, 0)
-        } else {
-            f.write_char(' ')?;
-            self.format.message(f, entry, 0)?;
-            writeln!(f)
+        self.format
+            .labels(f, at, self.record.current(), self.record.saved)?;
+        if let Some(entry) = entry {
+            if self.format.detailed {
+                writeln!(f)?;
+                self.format.message(f, entry.text())?;
+            } else {
+                f.write_char(' ')?;
+                self.format.message(f, entry.text())?;
+                writeln!(f)?;
+            }
         }
+        Ok(())
     }
 }
 
@@ -84,8 +88,9 @@ impl<'a, T> From<&'a Record<T>> for Display<'a, T> {
 impl<T> fmt::Display for Display<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.record.entries.iter().enumerate().rev() {
-            self.fmt_list(f, i + 1, entry)?;
+            self.fmt_list(f, i + 1, Some(entry))?;
         }
+        self.fmt_list(f, 0, None)?;
         Ok(())
     }
 }
@@ -112,20 +117,10 @@ impl Default for Format {
 }
 
 impl Format {
-    fn message<T>(
-        self,
-        f: &mut fmt::Formatter,
-        command: &impl Command<T>,
-        level: usize,
-    ) -> fmt::Result {
-        let msg = command.text();
+    fn message(self, f: &mut fmt::Formatter, msg: String) -> fmt::Result {
         let lines = msg.lines();
         if self.detailed {
             for line in lines {
-                for i in 0..=level {
-                    self.edge(f, i)?;
-                    f.write_char(' ')?;
-                }
                 writeln!(f, "{}", line.trim())?;
             }
         } else if let Some(line) = lines.map(str::trim).find(|s| !s.is_empty()) {
@@ -134,82 +129,66 @@ impl Format {
         Ok(())
     }
 
-    fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        if self.colored {
-            write!(f, "{}", "*".color(color_of_level(level)))
-        } else {
-            f.write_char('*')
-        }
-    }
-
-    fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        if self.colored {
-            write!(f, "{}", "|".color(color_of_level(level)))
-        } else {
-            f.write_char('|')
-        }
-    }
-
     fn position(self, f: &mut fmt::Formatter, at: usize) -> fmt::Result {
         if self.position {
             if self.colored {
-                write!(f, " {}", format!("[{}]", at).yellow())
+                write!(f, "{}", format!("{}", at).yellow().bold())
             } else {
-                write!(f, " [{}]", at)
+                write!(f, "{}", at)
             }
         } else {
             Ok(())
         }
     }
 
-    fn current(self, f: &mut fmt::Formatter, at: usize, current: usize) -> fmt::Result {
-        if self.current && at == current {
-            if self.colored {
-                write!(f, " {}{}{}", "(".yellow(), "current".cyan(), ")".yellow())
-            } else {
-                f.write_str(" (current)")
-            }
-        } else {
-            Ok(())
-        }
-    }
-
-    fn saved(self, f: &mut fmt::Formatter, at: usize, saved: Option<usize>) -> fmt::Result {
-        if self.saved && saved.map_or(false, |saved| saved == at) {
-            if self.colored {
-                write!(
-                    f,
-                    " {}{}{}",
-                    "(".yellow(),
-                    "saved".bright_green(),
-                    ")".yellow()
-                )
-            } else {
-                f.write_str(" (saved)")
-            }
-        } else {
-            Ok(())
+    fn labels(
+        self,
+        f: &mut fmt::Formatter,
+        at: usize,
+        current: usize,
+        saved: Option<usize>,
+    ) -> fmt::Result {
+        match (
+            self.current && at == current,
+            self.saved && saved.map_or(false, |saved| saved == at),
+            self.colored,
+        ) {
+            (true, true, true) => write!(
+                f,
+                " {}{}{} {}{}",
+                "(".yellow(),
+                "current".cyan().bold(),
+                ",".yellow(),
+                "saved".green().bold(),
+                ")".yellow()
+            ),
+            (true, true, false) => f.write_str(" (current, saved)"),
+            (true, false, true) => write!(
+                f,
+                " {}{}{}",
+                "(".yellow(),
+                "current".cyan().bold(),
+                ")".yellow()
+            ),
+            (true, false, false) => f.write_str(" (current)"),
+            (false, true, true) => write!(
+                f,
+                " {}{}{}",
+                "(".yellow(),
+                "saved".green().bold(),
+                ")".yellow()
+            ),
+            (false, true, false) => f.write_str(" (saved)"),
+            (false, false, _) => Ok(()),
         }
     }
 
     fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Utc>) -> fmt::Result {
         let rfc2822 = timestamp.with_timezone(&Local).to_rfc2822();
         if self.colored {
-            write!(f, " {}{}{}", "[".yellow(), rfc2822.yellow(), "]".yellow())
+            write!(f, " {}{}{}", "".yellow(), rfc2822.yellow(), "".yellow())
         } else {
             write!(f, " [{}]", rfc2822)
         }
-    }
-}
-
-fn color_of_level(i: usize) -> Color {
-    match i % 6 {
-        0 => Color::Cyan,
-        1 => Color::Red,
-        2 => Color::Magenta,
-        3 => Color::Yellow,
-        4 => Color::Green,
-        5 => Color::Blue,
-        _ => unreachable!(),
     }
 }

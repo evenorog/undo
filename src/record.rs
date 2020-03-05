@@ -186,7 +186,8 @@ impl<T> Record<T> {
         };
         if merges {
             // Merge the command with the one on the top of the stack.
-            let command = Join::new(self.entries.pop_back().unwrap(), command);
+            let merge = command.merge();
+            let command = Join::new(self.entries.pop_back().unwrap(), command).with_merge(merge);
             self.entries.push_back(Entry::new(Box::new(command)));
         } else {
             // If commands are not merged push it onto the record.
