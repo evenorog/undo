@@ -90,8 +90,7 @@ impl<T> fmt::Display for Display<'_, T> {
         for (i, entry) in self.record.entries.iter().enumerate().rev() {
             self.fmt_list(f, i + 1, Some(entry))?;
         }
-        self.fmt_list(f, 0, None)?;
-        Ok(())
+        self.fmt_list(f, 0, None)
     }
 }
 
