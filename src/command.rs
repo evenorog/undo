@@ -1,4 +1,70 @@
 use crate::{Command, Merge};
+use std::fmt::{self, Debug, Formatter};
+
+/// A command wrapper created from a function.
+///
+/// The undo functionality is provided by cloning the original data before editing it.
+///
+/// # Examples
+/// ```
+/// # use undo::*;
+/// # fn main() -> undo::Result {
+/// let mut record = Record::default();
+/// record.apply(Fn::new(|s: &mut String| s.push('a')))?;
+/// record.apply(Fn::new(|s: &mut String| s.push('b')))?;
+/// record.apply(Fn::new(|s: &mut String| s.push('c')))?;
+/// assert_eq!(record.target(), "abc");
+/// record.undo()?;
+/// record.undo()?;
+/// record.undo()?;
+/// assert_eq!(record.target(), "");
+/// record.redo()?;
+/// record.redo()?;
+/// record.redo()?;
+/// assert_eq!(record.target(), "abc");
+/// # Ok(())
+/// # }
+/// ```
+pub struct Fn<T: 'static, F: 'static> {
+    f: F,
+    target: Option<T>,
+}
+
+impl<T, F> Fn<T, F> {
+    /// Creates a command from the provided function.
+    pub fn new(f: F) -> Fn<T, F> {
+        Fn { f, target: None }
+    }
+
+    /// Returns a new command with the provided text.
+    pub fn with_text(self, text: impl Into<String>) -> Text<Fn<T, F>> {
+        Text::new(self, text)
+    }
+
+    /// Returns a new command with the provided merge behavior.
+    pub fn with_merge(self, merge: Merge) -> Merger<Fn<T, F>> {
+        Merger::new(self, merge)
+    }
+}
+
+impl<T: Debug + Clone, F: FnMut(&mut T)> Command<T> for Fn<T, F> {
+    fn apply(&mut self, target: &mut T) -> crate::Result {
+        self.target = Some(target.clone());
+        (self.f)(target);
+        Ok(())
+    }
+
+    fn undo(&mut self, target: &mut T) -> crate::Result {
+        *target = self.target.take().unwrap();
+        Ok(())
+    }
+}
+
+impl<T: Debug, F> Debug for Fn<T, F> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Fn").field("target", &self.target).finish()
+    }
+}
 
 /// A command wrapper used for joining commands.
 ///
