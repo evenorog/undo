@@ -3,7 +3,7 @@ use chrono::{DateTime, Local, Utc};
 use colored::Colorize;
 use std::fmt::{self, Write};
 
-/// Configurable display formatting of structures.
+/// Configurable display formatting of a record.
 ///
 /// # Examples
 /// ```no_run

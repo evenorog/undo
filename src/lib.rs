@@ -36,7 +36,7 @@ use std::{error::Error, fmt};
 
 pub use self::{
     checkpoint::Checkpoint,
-    command::{Fn, Join, Merger, Text},
+    command::{from_fn, join, with_merge, with_text, FromFn, Join, WithMerge, WithText},
     display::Display,
     queue::Queue,
     record::{Builder, Record},

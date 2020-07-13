@@ -1,7 +1,7 @@
 use crate::{Command, Merge};
 use std::fmt::{self, Debug, Formatter};
 
-/// A command wrapper created from a function.
+/// Creates a command from the provided function.
 ///
 /// The undo functionality is provided by cloning the original data before editing it.
 ///
@@ -10,9 +10,9 @@ use std::fmt::{self, Debug, Formatter};
 /// # use undo::*;
 /// # fn main() -> undo::Result {
 /// let mut record = Record::default();
-/// record.apply(Fn::new(|s: &mut String| s.push('a')))?;
-/// record.apply(Fn::new(|s: &mut String| s.push('b')))?;
-/// record.apply(Fn::new(|s: &mut String| s.push('c')))?;
+/// record.apply(undo::from_fn(|s: &mut String| s.push('a')))?;
+/// record.apply(undo::from_fn(|s: &mut String| s.push('b')))?;
+/// record.apply(undo::from_fn(|s: &mut String| s.push('c')))?;
 /// assert_eq!(record.target(), "abc");
 /// record.undo()?;
 /// record.undo()?;
@@ -25,29 +25,31 @@ use std::fmt::{self, Debug, Formatter};
 /// # Ok(())
 /// # }
 /// ```
-pub struct Fn<T: 'static, F: 'static> {
+pub fn from_fn<T, F>(f: F) -> FromFn<T, F> {
+    FromFn { f, target: None }
+}
+
+/// A command wrapper created from a function.
+///
+/// Created by the [`from_fn`](fn.from_fn.html) function.
+pub struct FromFn<T: 'static, F: 'static> {
     f: F,
     target: Option<T>,
 }
 
-impl<T, F> Fn<T, F> {
-    /// Creates a command from the provided function.
-    pub fn new(f: F) -> Fn<T, F> {
-        Fn { f, target: None }
-    }
-
+impl<T, F> FromFn<T, F> {
     /// Returns a new command with the provided text.
-    pub fn with_text(self, text: impl Into<String>) -> Text<Fn<T, F>> {
-        Text::new(self, text)
+    pub fn with_text(self, text: impl Into<String>) -> WithText<FromFn<T, F>> {
+        with_text(self, text)
     }
 
     /// Returns a new command with the provided merge behavior.
-    pub fn with_merge(self, merge: Merge) -> Merger<Fn<T, F>> {
-        Merger::new(self, merge)
+    pub fn with_merge(self, merge: Merge) -> WithMerge<FromFn<T, F>> {
+        with_merge(self, merge)
     }
 }
 
-impl<T: Debug + Clone, F: FnMut(&mut T)> Command<T> for Fn<T, F> {
+impl<T: Debug + Clone, F: FnMut(&mut T)> Command<T> for FromFn<T, F> {
     fn apply(&mut self, target: &mut T) -> crate::Result {
         self.target = Some(target.clone());
         (self.f)(target);
@@ -60,37 +62,39 @@ impl<T: Debug + Clone, F: FnMut(&mut T)> Command<T> for Fn<T, F> {
     }
 }
 
-impl<T: Debug, F> Debug for Fn<T, F> {
+impl<T: Debug, F> Debug for FromFn<T, F> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Fn").field("target", &self.target).finish()
     }
 }
 
-/// A command wrapper used for joining commands.
+/// Joins the `a` and `b` command.
 ///
 /// The commands are executed in the order they were merged in.
+pub fn join<A, B>(a: A, b: B) -> Join<A, B> {
+    Join(a, b)
+}
+
+/// A command wrapper used for joining commands.
+///
+/// Created by the [`join`](fn.join.html) function.
 #[derive(Debug)]
 pub struct Join<A, B>(A, B);
 
 impl<A, B> Join<A, B> {
-    /// Joins the `a` and `b` command.
-    pub fn new(a: A, b: B) -> Join<A, B> {
-        Join(a, b)
-    }
-
     /// Joins the two commands.
     pub fn join<C>(self, command: C) -> Join<Join<A, B>, C> {
         Join(self, command)
     }
 
     /// Returns a new command with the provided text.
-    pub fn with_text(self, text: impl Into<String>) -> Text<Join<A, B>> {
-        Text::new(self, text)
+    pub fn with_text(self, text: impl Into<String>) -> WithText<Join<A, B>> {
+        with_text(self, text)
     }
 
     /// Returns a new command with the provided merge behavior.
-    pub fn with_merge(self, merge: Merge) -> Merger<Join<A, B>> {
-        Merger::new(self, merge)
+    pub fn with_merge(self, merge: Merge) -> WithMerge<Join<A, B>> {
+        with_merge(self, merge)
     }
 }
 
@@ -119,29 +123,31 @@ impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
     }
 }
 
+/// Creates a command wrapper with the specified text.
+pub fn with_text<A>(command: A, text: impl Into<String>) -> WithText<A> {
+    WithText {
+        command,
+        text: text.into(),
+    }
+}
+
 /// A command wrapper with a specified text.
+///
+/// Created by the [`with_text`](fn.with_text.html) function.
 #[derive(Debug)]
-pub struct Text<A> {
+pub struct WithText<A> {
     command: A,
     text: String,
 }
 
-impl<A> Text<A> {
-    /// Creates a command with the specified text.
-    pub fn new(command: A, text: impl Into<String>) -> Text<A> {
-        Text {
-            command,
-            text: text.into(),
-        }
-    }
-
+impl<A> WithText<A> {
     /// Returns a new command with the provided merge behavior.
-    pub fn with_merge(self, merge: Merge) -> Merger<Text<A>> {
-        Merger::new(self, merge)
+    pub fn with_merge(self, merge: Merge) -> WithMerge<WithText<A>> {
+        with_merge(self, merge)
     }
 }
 
-impl<T, C: Command<T>> Command<T> for Text<C> {
+impl<T, C: Command<T>> Command<T> for WithText<C> {
     fn apply(&mut self, target: &mut T) -> crate::Result {
         self.command.apply(target)
     }
@@ -163,26 +169,28 @@ impl<T, C: Command<T>> Command<T> for Text<C> {
     }
 }
 
+/// Creates a command wrapper with the specified merge behavior.
+pub fn with_merge<A>(command: A, merge: Merge) -> WithMerge<A> {
+    WithMerge { command, merge }
+}
+
 /// A command wrapper with a specified merge behavior.
+///
+/// Created by the [`with_merge`](fn.with_merge.html) function.
 #[derive(Debug)]
-pub struct Merger<A> {
+pub struct WithMerge<A> {
     command: A,
     merge: Merge,
 }
 
-impl<A> Merger<A> {
-    /// Creates a command with the specified merge behavior.
-    pub fn new(command: A, merge: Merge) -> Merger<A> {
-        Merger { command, merge }
-    }
-
+impl<A> WithMerge<A> {
     /// Returns a new command with the provided text.
-    pub fn with_text(self, text: impl Into<String>) -> Text<Merger<A>> {
-        Text::new(self, text)
+    pub fn with_text(self, text: impl Into<String>) -> WithText<WithMerge<A>> {
+        with_text(self, text)
     }
 }
 
-impl<T, C: Command<T>> Command<T> for Merger<C> {
+impl<T, C: Command<T>> Command<T> for WithMerge<C> {
     fn apply(&mut self, target: &mut T) -> crate::Result {
         self.command.apply(target)
     }

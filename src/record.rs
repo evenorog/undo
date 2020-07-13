@@ -1,4 +1,4 @@
-use crate::{Checkpoint, Command, Display, Entry, Join, Merge, Queue, Result, Signal, Slot};
+use crate::{join, Checkpoint, Command, Display, Entry, Merge, Queue, Result, Signal, Slot};
 use chrono::{DateTime, TimeZone, Utc};
 use std::{cmp::Ordering, collections::VecDeque, error::Error, num::NonZeroUsize};
 
@@ -187,7 +187,7 @@ impl<T> Record<T> {
         if merges {
             // Merge the command with the one on the top of the stack.
             let merge = command.merge();
-            let command = Join::new(self.entries.pop_back().unwrap(), command).with_merge(merge);
+            let command = join(self.entries.pop_back().unwrap(), command).with_merge(merge);
             self.entries.push_back(Entry::new(Box::new(command)));
         } else {
             // If commands are not merged push it onto the record.
