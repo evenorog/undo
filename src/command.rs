@@ -10,9 +10,9 @@ use std::fmt::{self, Debug, Formatter};
 /// # use undo::*;
 /// # fn main() -> undo::Result {
 /// let mut record = Record::default();
-/// record.apply(undo::from_fn(|s: &mut String| s.push('a')))?;
-/// record.apply(undo::from_fn(|s: &mut String| s.push('b')))?;
-/// record.apply(undo::from_fn(|s: &mut String| s.push('c')))?;
+/// record.apply(from_fn(|s: &mut String| s.push('a')))?;
+/// record.apply(from_fn(|s: &mut String| s.push('b')))?;
+/// record.apply(from_fn(|s: &mut String| s.push('c')))?;
 /// assert_eq!(record.target(), "abc");
 /// record.undo()?;
 /// record.undo()?;
@@ -71,6 +71,25 @@ impl<T: Debug, F> Debug for FromFn<T, F> {
 /// Joins the `a` and `b` command.
 ///
 /// The commands are executed in the order they were merged in.
+///
+/// # Examples
+/// ```
+/// # use undo::*;
+/// # fn main() -> undo::Result {
+/// let mut record = Record::default();
+/// let a = from_fn(|s: &mut String| s.push('a'));
+/// let b = from_fn(|s: &mut String| s.push('b'));
+/// let c = from_fn(|s: &mut String| s.push('c'));
+/// let abc = join(a, b).join(c);
+/// record.apply(abc)?;
+/// assert_eq!(record.target(), "abc");
+/// record.undo()?;
+/// assert_eq!(record.target(), "");
+/// record.redo()?;
+/// assert_eq!(record.target(), "abc");
+/// # Ok(())
+/// # }
+/// ```
 pub fn join<A, B>(a: A, b: B) -> Join<A, B> {
     Join(a, b)
 }
@@ -124,6 +143,19 @@ impl<T, A: Command<T>, B: Command<T>> Command<T> for Join<A, B> {
 }
 
 /// Creates a command wrapper with the specified text.
+///
+/// # Examples
+/// ```
+/// # use undo::*;
+/// # fn main() -> undo::Result {
+/// let mut record = Record::default();
+/// let a = from_fn(|s: &mut String| s.push('a'));
+/// let a = a.with_text("add 'a' to the string");
+/// record.apply(a)?;
+/// assert_eq!(record.undo_text(), Some(String::from("add 'a' to the string")));
+/// # Ok(())
+/// # }
+/// ```
 pub fn with_text<A>(command: A, text: impl Into<String>) -> WithText<A> {
     WithText {
         command,
@@ -170,6 +202,26 @@ impl<T, C: Command<T>> Command<T> for WithText<C> {
 }
 
 /// Creates a command wrapper with the specified merge behavior.
+///
+/// # Examples
+/// ```
+/// # use undo::*;
+/// # fn main() -> undo::Result {
+/// let mut record = Record::default();
+/// let a = from_fn(|s: &mut String| s.push('a'));
+/// let b = from_fn(|s: &mut String| s.push('b'));
+/// let a = a.with_merge(Merge::If(0));
+/// let b = b.with_merge(Merge::If(0));
+/// record.apply(a)?;
+/// record.apply(b)?;
+/// assert_eq!(record.target(), "ab");
+/// record.undo()?;
+/// assert_eq!(record.target(), "");
+/// record.redo()?;
+/// assert_eq!(record.target(), "ab");
+/// # Ok(())
+/// # }
+/// ```
 pub fn with_merge<A>(command: A, merge: Merge) -> WithMerge<A> {
     WithMerge { command, merge }
 }
