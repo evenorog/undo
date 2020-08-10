@@ -109,11 +109,15 @@ struct Slot {
 }
 
 impl Slot {
-    fn emit_if(&mut self, cond: bool, signal: Signal) {
+    fn emit(&mut self, signal: Signal) {
         if let Some(ref mut f) = self.f {
-            if cond {
-                f(signal);
-            }
+            f(signal);
+        }
+    }
+
+    fn emit_if(&mut self, cond: bool, signal: Signal) {
+        if cond {
+            self.emit(signal)
         }
     }
 }
