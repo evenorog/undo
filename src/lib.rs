@@ -9,8 +9,8 @@
 //!
 //! * [Command](trait.Command.html) provides the base functionality for all commands.
 //! * [Record](struct.Record.html) is a collection of commands and provides the undo-redo functionality.
-//! * A [queue](struct.Queue.html) wraps a record and extends it with queue functionality.
-//! * A [checkpoint](struct.Checkpoint.html) wraps a record and extends it with checkpoint functionality.
+//! * [Queue](struct.Queue.html) wraps a record and extends it with queue functionality.
+//! * [Checkpoint](struct.Checkpoint.html) wraps a record and extends it with checkpoint functionality.
 //! * Commands can be merged after being applied to the data-structures by implementing the
 //!   [merge](trait.Command.html#method.merge) method on the command.
 //!   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone

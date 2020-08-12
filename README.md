@@ -15,8 +15,8 @@ it is easy to apply, undo, and redo changes made to a target.
 
 * [Command](https://docs.rs/undo/latest/undo/trait.Command.html) provides the base functionality for all commands.
 * [Record](https://docs.rs/undo/latest/undo/struct.Record.html) is a collection of commands and provides the undo-redo functionality.
-* A [queue](https://docs.rs/undo/latest/undo/struct.Queue.html) wraps a record and extends it with queue functionality.
-* A [checkpoint](https://docs.rs/undo/latest/undo/struct.Checkpoint.html) wraps a record and extends it with checkpoint functionality.
+* [Queue](https://docs.rs/undo/latest/undo/struct.Queue.html) wraps a record and extends it with queue functionality.
+* [Checkpoint](https://docs.rs/undo/latest/undo/struct.Checkpoint.html) wraps a record and extends it with checkpoint functionality.
 * Commands can be merged after being applied to the data-structures by implementing the 
   [merge](https://docs.rs/undo/latest/undo/trait.Command.html#method.merge) method on the command.
   This allows smaller changes made gradually to be merged into larger operations that can be undone and redone
