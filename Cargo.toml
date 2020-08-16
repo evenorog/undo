@@ -1,6 +1,6 @@
 [package]
 name = "undo"
-version = "0.40.0"
+version = "0.41.0"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "Provides simple undo-redo functionality with dynamic dispatch."
 documentation = "https://docs.rs/undo"
@@ -14,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4"
-colored = "1"
+colored = "2"
 
 [badges]
 travis-ci = { repository = "evenorog/undo" }
