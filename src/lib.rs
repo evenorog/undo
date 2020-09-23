@@ -82,7 +82,7 @@ pub trait Command<T>: 'static + fmt::Debug {
 ///
 /// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
 /// signal to tell the user.
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the record can undo.
     Undo(bool),
@@ -93,7 +93,7 @@ pub enum Signal {
 }
 
 /// Says if the command should merge with another command.
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Merge {
     /// The command should merge.
     Yes,

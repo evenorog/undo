@@ -94,7 +94,7 @@ impl<T> fmt::Display for Display<'_, T> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 struct Format {
     colored: bool,
     current: bool,
