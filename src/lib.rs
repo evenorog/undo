@@ -24,6 +24,7 @@
 
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
+#![forbid(unsafe_code)]
 
 mod checkpoint;
 mod command;
