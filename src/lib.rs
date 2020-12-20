@@ -1,4 +1,4 @@
-//! **Low level undo-redo functionality.**
+//! **Low-level undo-redo functionality.**
 //!
 //! It is an implementation of the command pattern, where all modifications are done
 //! by creating objects of commands that applies the modifications. All commands knows

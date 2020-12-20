@@ -1,6 +1,6 @@
 # undo
 
-**Low level undo-redo functionality.**
+**Low-level undo-redo functionality.**
 
 [![Travis](https://travis-ci.com/evenorog/undo.svg?branch=master)](https://travis-ci.com/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
@@ -57,19 +57,19 @@ impl Command for Add {
 }
 
 fn main() -> undo::Result<Add> {
-    let mut string = String::new();
+    let mut target = String::new();
     let mut record = Record::new();
-    record.apply(Add('a'), &mut string)?;
-    record.apply(Add('b'), &mut string)?;
-    record.apply(Add('c'), &mut string)?;
+    record.apply(Add('a'), &mut target)?;
+    record.apply(Add('b'), &mut target)?;
+    record.apply(Add('c'), &mut target)?;
     assert_eq!(record.target(), "abc");
-    record.undo(&mut string)?;
-    record.undo(&mut string)?;
-    record.undo(&mut string)?;
+    record.undo(&mut target)?;
+    record.undo(&mut target)?;
+    record.undo(&mut target)?;
     assert_eq!(record.target(), "");
-    record.redo(&mut string)?;
-    record.redo(&mut string)?;
-    record.redo(&mut string)?;
+    record.redo(&mut target)?;
+    record.redo(&mut target)?;
+    record.redo(&mut target)?;
     assert_eq!(record.target(), "abc");
     Ok(())
 }

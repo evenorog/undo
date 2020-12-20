@@ -43,20 +43,20 @@ use {
 /// #     }
 /// # }
 /// # fn main() -> undo::Result<Add> {
-/// let mut string = String::new();
+/// let mut target = String::new();
 /// let mut record = Record::new();
-/// record.apply(Add('a'), &mut string)?;
-/// record.apply(Add('b'), &mut string)?;
-/// record.apply(Add('c'), &mut string)?;
-/// assert_eq!(string, "abc");
-/// record.undo(&mut string)?;
-/// record.undo(&mut string)?;
-/// record.undo(&mut string)?;
-/// assert_eq!(string, "");
-/// record.redo(&mut string)?;
-/// record.redo(&mut string)?;
-/// record.redo(&mut string)?;
-/// assert_eq!(string, "abc");
+/// record.apply(Add('a'), &mut target)?;
+/// record.apply(Add('b'), &mut target)?;
+/// record.apply(Add('c'), &mut target)?;
+/// assert_eq!(target, "abc");
+/// record.undo(&mut target)?;
+/// record.undo(&mut target)?;
+/// record.undo(&mut target)?;
+/// assert_eq!(target, "");
+/// record.redo(&mut target)?;
+/// record.redo(&mut target)?;
+/// record.redo(&mut target)?;
+/// assert_eq!(target, "abc");
 /// # Ok(())
 /// # }
 /// ```

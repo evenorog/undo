@@ -35,18 +35,18 @@ use serde::{Deserialize, Serialize};
 /// #     }
 /// # }
 /// # fn main() -> undo::Result<Add> {
-/// let mut string = String::new();
+/// let mut target = String::new();
 /// let mut history = History::new();
-/// history.apply(&mut string, Add('a'))?;
-/// history.apply(&mut string, Add('b'))?;
-/// history.apply(&mut string, Add('c'))?;
+/// history.apply(&mut target, Add('a'))?;
+/// history.apply(&mut target, Add('b'))?;
+/// history.apply(&mut target, Add('c'))?;
 /// let abc = history.branch();
-/// history.go_to(&mut string, abc, 1).unwrap()?;
-/// history.apply(&mut string, Add('f'))?;
-/// history.apply(&mut string, Add('g'))?;
-/// assert_eq!(string, "afg");
-/// history.go_to(&mut string, abc, 3).unwrap()?;
-/// assert_eq!(string, "abc");
+/// history.go_to(&mut target, abc, 1).unwrap()?;
+/// history.apply(&mut target, Add('f'))?;
+/// history.apply(&mut target, Add('g'))?;
+/// assert_eq!(target, "afg");
+/// history.go_to(&mut target, abc, 3).unwrap()?;
+/// assert_eq!(target, "abc");
 /// # Ok(())
 /// # }
 /// ```
