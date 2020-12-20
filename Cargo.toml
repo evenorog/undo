@@ -2,7 +2,7 @@
 name = "undo"
 version = "0.41.0"
 authors = ["evenorog <evenorog@gmail.com>"]
-description = "Provides simple undo-redo functionality with dynamic dispatch."
+description = "Low level undo-redo functionality."
 documentation = "https://docs.rs/undo"
 repository = "https://github.com/evenorog/undo"
 readme = "README.md"
@@ -13,9 +13,13 @@ exclude = ["/.travis.yml"]
 edition = "2018"
 
 [dependencies]
-chrono = "0.4"
-colored = "2"
+chrono = { version = "0.4", optional = true, features = ["serde"] }
+colored = { version = "2", optional = true }
+serde = { version = "1", optional = true, default-features = false, features = ["alloc", "derive"] }
 
 [badges]
 travis-ci = { repository = "evenorog/undo" }
 maintenance = { status = "actively-developed" }
+
+[package.metadata.docs.rs]
+features = ["chrono", "colored", "serde"]
