@@ -62,15 +62,15 @@ fn main() -> undo::Result<Add> {
     record.apply(&mut target, Add('a'))?;
     record.apply(&mut target, Add('b'))?;
     record.apply(&mut target, Add('c'))?;
-    assert_eq!(record.target(), "abc");
+    assert_eq!(target, "abc");
     record.undo(&mut target)?;
     record.undo(&mut target)?;
     record.undo(&mut target)?;
-    assert_eq!(record.target(), "");
+    assert_eq!(target, "");
     record.redo(&mut target)?;
     record.redo(&mut target)?;
     record.redo(&mut target)?;
-    assert_eq!(record.target(), "abc");
+    assert_eq!(target, "abc");
     Ok(())
 }
 ```
