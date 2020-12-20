@@ -186,7 +186,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     pub fn apply(&mut self, target: &mut C::Target, command: C) -> Result<C> {
         let at = self.at();
         let saved = self.record.saved.filter(|&saved| saved > at.current);
-        let (merged, tail) = self.record.__apply(command, target)?;
+        let (merged, tail) = self.record.__apply(target, command)?;
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -244,19 +244,19 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     ) -> Option<Result<C>> {
         let root = self.root;
         if root == branch {
-            return self.record.go_to(current, target);
+            return self.record.go_to(target, current);
         }
         // Walk the path from `root` to `branch`.
         for (new, branch) in self.mk_path(branch)? {
             // Walk to `branch.current` either by undoing or redoing.
-            if let Err(err) = self.record.go_to(branch.parent.current, target).unwrap() {
+            if let Err(err) = self.record.go_to(target, branch.parent.current).unwrap() {
                 return Some(Err(err));
             }
             // Apply the commands in the branch and move older commands into their own branch.
             for entry in branch.entries {
                 let current = self.current();
                 let saved = self.record.saved.filter(|&saved| saved > current);
-                let entries = match self.record.__apply(entry.command, target) {
+                let entries = match self.record.__apply(target, entry.command) {
                     Ok((_, entries)) => entries,
                     Err(err) => return Some(Err(err)),
                 };
@@ -267,7 +267,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
                 }
             }
         }
-        self.record.go_to(current, target)
+        self.record.go_to(target, current)
     }
 
     /// Go back or forward in the history to the command that was made closest to the datetime provided.
@@ -279,7 +279,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         target: &mut C::Target,
         to: &DateTime<impl TimeZone>,
     ) -> Option<Result<C>> {
-        self.record.time_travel(to, target)
+        self.record.time_travel(target, to)
     }
 
     pub(crate) fn jump_to(&mut self, root: usize) {

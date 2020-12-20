@@ -45,9 +45,9 @@ use {
 /// # fn main() -> undo::Result<Add> {
 /// let mut target = String::new();
 /// let mut record = Record::new();
-/// record.apply(Add('a'), &mut target)?;
-/// record.apply(Add('b'), &mut target)?;
-/// record.apply(Add('c'), &mut target)?;
+/// record.apply(&mut target, Add('a'))?;
+/// record.apply(&mut target, Add('b'))?;
+/// record.apply(&mut target, Add('c'))?;
 /// assert_eq!(target, "abc");
 /// record.undo(&mut target)?;
 /// record.undo(&mut target)?;
@@ -177,7 +177,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
 
     /// Revert the changes done to the target since the saved state.
     pub fn revert(&mut self, target: &mut C::Target) -> Option<Result<C>> {
-        self.saved.and_then(|saved| self.go_to(saved, target))
+        self.saved.and_then(|saved| self.go_to(target, saved))
     }
 
     /// Removes all commands from the record without undoing them.
@@ -197,14 +197,14 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    pub fn apply(&mut self, command: C, target: &mut C::Target) -> Result<C> {
-        self.__apply(command, target).map(|_| ())
+    pub fn apply(&mut self, target: &mut C::Target, command: C) -> Result<C> {
+        self.__apply(target, command).map(|_| ())
     }
 
     pub(crate) fn __apply(
         &mut self,
-        mut command: C,
         target: &mut C::Target,
+        mut command: C,
     ) -> core::result::Result<(bool, VecDeque<Entry<C>>), C::Error> {
         command.apply(target)?;
         let current = self.current();
@@ -300,7 +300,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn go_to(&mut self, current: usize, target: &mut C::Target) -> Option<Result<C>> {
+    pub fn go_to(&mut self, target: &mut C::Target, current: usize) -> Option<Result<C>> {
         if current > self.len() {
             return None;
         }
@@ -339,8 +339,8 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     #[cfg(feature = "chrono")]
     pub fn time_travel(
         &mut self,
-        to: &DateTime<impl TimeZone>,
         target: &mut C::Target,
+        to: &DateTime<impl TimeZone>,
     ) -> Option<Result<C>> {
         let to = to.with_timezone(&Utc);
         let current = match self.entries.as_slices() {
@@ -361,7 +361,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
                 },
             },
         };
-        self.go_to(current, target)
+        self.go_to(target, current)
     }
 }
 
@@ -556,7 +556,7 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
     pub fn commit(self, target: &mut C::Target) -> Result<C> {
         for command in self.commands {
             match command {
-                QueueCommand::Apply(command) => self.record.apply(command, target)?,
+                QueueCommand::Apply(command) => self.record.apply(target, command)?,
                 QueueCommand::Undo => self.record.undo(target)?,
                 QueueCommand::Redo => self.record.redo(target)?,
             }
@@ -602,9 +602,9 @@ pub struct Checkpoint<'a, C: Command, F> {
 
 impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     /// Calls the `apply` method.
-    pub fn apply(&mut self, command: C, target: &mut C::Target) -> Result<C> {
+    pub fn apply(&mut self, target: &mut C::Target, command: C) -> Result<C> {
         let saved = self.record.saved;
-        let (_, tail) = self.record.__apply(command, target)?;
+        let (_, tail) = self.record.__apply(target, command)?;
         self.commands.push(CheckpointCommand::Apply(saved, tail));
         Ok(())
     }
@@ -791,31 +791,31 @@ mod tests {
     fn go_to() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(Add('a'), &mut target).unwrap();
-        record.apply(Add('b'), &mut target).unwrap();
-        record.apply(Add('c'), &mut target).unwrap();
-        record.apply(Add('d'), &mut target).unwrap();
-        record.apply(Add('e'), &mut target).unwrap();
+        record.apply(&mut target, Add('a')).unwrap();
+        record.apply(&mut target, Add('b')).unwrap();
+        record.apply(&mut target, Add('c')).unwrap();
+        record.apply(&mut target, Add('d')).unwrap();
+        record.apply(&mut target, Add('e')).unwrap();
 
-        record.go_to(0, &mut target).unwrap().unwrap();
+        record.go_to(&mut target, 0).unwrap().unwrap();
         assert_eq!(record.current(), 0);
         assert_eq!(target, "");
-        record.go_to(5, &mut target).unwrap().unwrap();
+        record.go_to(&mut target, 5).unwrap().unwrap();
         assert_eq!(record.current(), 5);
         assert_eq!(target, "abcde");
-        record.go_to(1, &mut target).unwrap().unwrap();
+        record.go_to(&mut target, 1).unwrap().unwrap();
         assert_eq!(record.current(), 1);
         assert_eq!(target, "a");
-        record.go_to(4, &mut target).unwrap().unwrap();
+        record.go_to(&mut target, 4).unwrap().unwrap();
         assert_eq!(record.current(), 4);
         assert_eq!(target, "abcd");
-        record.go_to(2, &mut target).unwrap().unwrap();
+        record.go_to(&mut target, 2).unwrap().unwrap();
         assert_eq!(record.current(), 2);
         assert_eq!(target, "ab");
-        record.go_to(3, &mut target).unwrap().unwrap();
+        record.go_to(&mut target, 3).unwrap().unwrap();
         assert_eq!(record.current(), 3);
         assert_eq!(target, "abc");
-        assert!(record.go_to(6, &mut target).is_none());
+        assert!(record.go_to(&mut target, 6).is_none());
         assert_eq!(record.current(), 3);
     }
 
@@ -849,19 +849,19 @@ mod tests {
         let mut target = String::new();
         let mut record = Record::new();
         let mut cp1 = record.checkpoint();
-        cp1.apply(Add('a'), &mut target).unwrap();
-        cp1.apply(Add('b'), &mut target).unwrap();
-        cp1.apply(Add('c'), &mut target).unwrap();
+        cp1.apply(&mut target, Add('a')).unwrap();
+        cp1.apply(&mut target, Add('b')).unwrap();
+        cp1.apply(&mut target, Add('c')).unwrap();
         assert_eq!(target, "abc");
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(Add('d'), &mut target).unwrap();
-        cp2.apply(Add('e'), &mut target).unwrap();
-        cp2.apply(Add('f'), &mut target).unwrap();
+        cp2.apply(&mut target, Add('d')).unwrap();
+        cp2.apply(&mut target, Add('e')).unwrap();
+        cp2.apply(&mut target, Add('f')).unwrap();
         assert_eq!(target, "abcdef");
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(Add('g'), &mut target).unwrap();
-        cp3.apply(Add('h'), &mut target).unwrap();
-        cp3.apply(Add('i'), &mut target).unwrap();
+        cp3.apply(&mut target, Add('g')).unwrap();
+        cp3.apply(&mut target, Add('h')).unwrap();
+        cp3.apply(&mut target, Add('i')).unwrap();
         assert_eq!(target, "abcdefghi");
         cp3.commit();
         cp2.commit();
@@ -874,17 +874,17 @@ mod tests {
         let mut target = String::new();
         let mut record = Record::new();
         let mut cp1 = record.checkpoint();
-        cp1.apply(Add('a'), &mut target).unwrap();
-        cp1.apply(Add('b'), &mut target).unwrap();
-        cp1.apply(Add('c'), &mut target).unwrap();
+        cp1.apply(&mut target, Add('a')).unwrap();
+        cp1.apply(&mut target, Add('b')).unwrap();
+        cp1.apply(&mut target, Add('c')).unwrap();
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(Add('d'), &mut target).unwrap();
-        cp2.apply(Add('e'), &mut target).unwrap();
-        cp2.apply(Add('f'), &mut target).unwrap();
+        cp2.apply(&mut target, Add('d')).unwrap();
+        cp2.apply(&mut target, Add('e')).unwrap();
+        cp2.apply(&mut target, Add('f')).unwrap();
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(Add('g'), &mut target).unwrap();
-        cp3.apply(Add('h'), &mut target).unwrap();
-        cp3.apply(Add('i'), &mut target).unwrap();
+        cp3.apply(&mut target, Add('g')).unwrap();
+        cp3.apply(&mut target, Add('h')).unwrap();
+        cp3.apply(&mut target, Add('i')).unwrap();
         assert_eq!(target, "abcdefghi");
         cp3.cancel(&mut target).unwrap();
         assert_eq!(target, "abcdef");
@@ -898,17 +898,17 @@ mod tests {
     fn checkpoint_saved() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(Add('a'), &mut target).unwrap();
-        record.apply(Add('b'), &mut target).unwrap();
-        record.apply(Add('c'), &mut target).unwrap();
+        record.apply(&mut target, Add('a')).unwrap();
+        record.apply(&mut target, Add('b')).unwrap();
+        record.apply(&mut target, Add('c')).unwrap();
         record.set_saved(true);
         record.undo(&mut target).unwrap();
         record.undo(&mut target).unwrap();
         record.undo(&mut target).unwrap();
         let mut cp = record.checkpoint();
-        cp.apply(Add('d'), &mut target).unwrap();
-        cp.apply(Add('e'), &mut target).unwrap();
-        cp.apply(Add('f'), &mut target).unwrap();
+        cp.apply(&mut target, Add('d')).unwrap();
+        cp.apply(&mut target, Add('e')).unwrap();
+        cp.apply(&mut target, Add('f')).unwrap();
         assert_eq!(target, "def");
         cp.cancel(&mut target).unwrap();
         assert_eq!(target, "");

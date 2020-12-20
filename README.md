@@ -59,9 +59,9 @@ impl Command for Add {
 fn main() -> undo::Result<Add> {
     let mut target = String::new();
     let mut record = Record::new();
-    record.apply(Add('a'), &mut target)?;
-    record.apply(Add('b'), &mut target)?;
-    record.apply(Add('c'), &mut target)?;
+    record.apply(&mut target, Add('a'))?;
+    record.apply(&mut target, Add('b'))?;
+    record.apply(&mut target, Add('c'))?;
     assert_eq!(record.target(), "abc");
     record.undo(&mut target)?;
     record.undo(&mut target)?;
