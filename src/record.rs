@@ -473,13 +473,13 @@ impl Builder {
     }
 
     /// Builds the record with the slot.
-    pub fn build_with<C: Command, F>(&self, slot: F) -> Record<C, F> {
+    pub fn build_with<C: Command, F: FnMut(Signal)>(&self, slot: F) -> Record<C, F> {
         Record {
             entries: VecDeque::with_capacity(self.capacity),
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
-            slot: Slot { f: Some(slot) },
+            slot: Slot::new(slot),
         }
     }
 }

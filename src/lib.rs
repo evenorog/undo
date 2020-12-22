@@ -129,6 +129,10 @@ struct Slot<F> {
 }
 
 impl<F: FnMut(Signal)> Slot<F> {
+    fn new(f: F) -> Slot<F> {
+        Slot { f: Some(f) }
+    }
+
     fn emit(&mut self, signal: Signal) {
         if let Some(ref mut f) = self.f {
             f(signal);

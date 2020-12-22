@@ -480,7 +480,7 @@ impl Builder {
     }
 
     /// Builds the history with the slot.
-    pub fn build_with<C: Command, F>(&self, slot: F) -> History<C, F> {
+    pub fn build_with<C: Command, F: FnMut(Signal)>(&self, slot: F) -> History<C, F> {
         History::from(self.inner.build_with(slot))
     }
 }
