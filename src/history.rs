@@ -729,11 +729,9 @@ impl<C: Command + fmt::Display, F> Display<'_, C, F> {
         self.format.position(f, at, true)?;
 
         #[cfg(feature = "chrono")]
-        {
-            if let Some(entry) = entry {
-                if self.format.detailed {
-                    self.format.timestamp(f, &entry.timestamp)?;
-                }
+        if let Some(entry) = entry {
+            if self.format.detailed {
+                self.format.timestamp(f, &entry.timestamp)?;
             }
         }
 
