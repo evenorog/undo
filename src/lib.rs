@@ -68,9 +68,7 @@ pub trait Command: Sized {
     /// Reapplies the command on the target and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     ///
-    /// The default implementation uses the [`apply`] implementation.
-    ///
-    /// [`apply`]: trait.Command.html#tymethod.apply
+    /// The default implementation uses the [`apply`](trait.Command.html#tymethod.apply) implementation.
     fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
         self.apply(target)
     }
