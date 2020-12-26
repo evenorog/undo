@@ -121,6 +121,7 @@ impl At {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone)]
 struct Slot<F> {
     #[cfg_attr(feature = "serde", serde(default = "Option::default", skip))]
     f: Option<F>,

@@ -56,6 +56,7 @@ use serde::{Deserialize, Serialize};
     derive(Serialize, Deserialize),
     serde(bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>"))
 )]
+#[derive(Clone)]
 pub struct History<C, F = Box<dyn FnMut(Signal)>> {
     root: usize,
     next: usize,
@@ -408,7 +409,6 @@ impl<C: Command, F> From<Record<C, F>> for History<C, F> {
 impl<C: Command, F> fmt::Debug for History<C, F>
 where
     C: fmt::Debug,
-    C::Target: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("History")
@@ -440,7 +440,7 @@ impl<C> Branch<C> {
 
 /// Builder for a History.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Builder {
     inner: crate::record::Builder,
 }
@@ -530,6 +530,7 @@ enum QueueCommand<C> {
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct Queue<'a, C: Command, F> {
     history: &'a mut History<C, F>,
     commands: Vec<QueueCommand<C>>,
@@ -597,6 +598,7 @@ enum CheckpointCommand {
 }
 
 /// Wraps a history and gives it checkpoint functionality.
+#[derive(Debug)]
 pub struct Checkpoint<'a, C: Command, F> {
     history: &'a mut History<C, F>,
     commands: Vec<CheckpointCommand>,
@@ -677,7 +679,7 @@ impl<'a, C: Command, F> From<&'a mut History<C, F>> for Checkpoint<'a, C, F> {
 }
 
 /// Configurable display formatting for history.
-#[derive(Copy, Clone)]
+#[derive(Clone, Debug)]
 pub struct Display<'a, C: Command, F> {
     history: &'a History<C, F>,
     format: Format,

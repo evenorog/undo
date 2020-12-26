@@ -66,6 +66,7 @@ use {
     derive(Serialize, Deserialize),
     serde(bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>"))
 )]
+#[derive(Clone)]
 pub struct Record<C, F = Box<dyn FnMut(Signal)>> {
     pub(crate) entries: VecDeque<Entry<C>>,
     current: usize,
@@ -408,7 +409,6 @@ impl<C: Command, F: FnMut(Signal)> From<History<C, F>> for Record<C, F> {
 impl<C: Command, F> fmt::Debug for Record<C, F>
 where
     C: fmt::Debug,
-    C::Target: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
@@ -423,7 +423,7 @@ where
 
 /// Builder for a record.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Builder {
     capacity: usize,
     limit: NonZeroUsize,
@@ -529,6 +529,7 @@ enum QueueCommand<C> {
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct Queue<'a, C: Command, F> {
     record: &'a mut Record<C, F>,
     commands: Vec<QueueCommand<C>>,
@@ -596,6 +597,7 @@ enum CheckpointCommand<C> {
 }
 
 /// Wraps a record and gives it checkpoint functionality.
+#[derive(Debug)]
 pub struct Checkpoint<'a, C: Command, F> {
     record: &'a mut Record<C, F>,
     commands: Vec<CheckpointCommand<C>>,
@@ -673,7 +675,7 @@ impl<'a, C: Command, F> From<&'a mut Record<C, F>> for Checkpoint<'a, C, F> {
 }
 
 /// Configurable display formatting for record.
-#[derive(Copy, Clone)]
+#[derive(Clone, Debug)]
 pub struct Display<'a, C: Command, F> {
     record: &'a Record<C, F>,
     format: crate::format::Format,
@@ -719,11 +721,9 @@ impl<C: Command + fmt::Display, F> Display<'_, C, F> {
         self.format.position(f, at, false)?;
 
         #[cfg(feature = "chrono")]
-        {
-            if let Some(entry) = entry {
-                if self.format.detailed {
-                    self.format.timestamp(f, &entry.timestamp)?;
-                }
+        if let Some(entry) = entry {
+            if self.format.detailed {
+                self.format.timestamp(f, &entry.timestamp)?;
             }
         }
 
