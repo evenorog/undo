@@ -2,6 +2,7 @@
 
 use crate::{format::Format, At, Command, Entry, History, Merge, Result, Signal, Slot};
 use alloc::{
+    boxed::Box,
     collections::VecDeque,
     string::{String, ToString},
     vec::Vec,
@@ -65,7 +66,7 @@ use {
     derive(Serialize, Deserialize),
     serde(bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>"))
 )]
-pub struct Record<C, F = fn(Signal)> {
+pub struct Record<C, F = Box<dyn FnMut(Signal)>> {
     pub(crate) entries: VecDeque<Entry<C>>,
     current: usize,
     limit: NonZeroUsize,

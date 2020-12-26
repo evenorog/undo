@@ -2,6 +2,7 @@
 
 use crate::{format::Format, At, Command, Entry, Record, Result, Signal};
 use alloc::{
+    boxed::Box,
     collections::{BTreeMap, VecDeque},
     string::{String, ToString},
     vec,
@@ -55,7 +56,7 @@ use serde::{Deserialize, Serialize};
     derive(Serialize, Deserialize),
     serde(bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>"))
 )]
-pub struct History<C, F = fn(Signal)> {
+pub struct History<C, F = Box<dyn FnMut(Signal)>> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
