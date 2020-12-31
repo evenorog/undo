@@ -10,8 +10,8 @@
 //! * [Command](trait.Command.html) provides the base functionality for all commands.
 //! * [Record](struct.Record.html) provides basic linear undo-redo functionality.
 //! * [History](struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
-//! * Queue wraps a record or history and extends them with queue functionality.
-//! * Checkpoint wraps a record or history and extends them with checkpoint functionality.
+//! * Queues wraps a record or history and extends them with queue functionality.
+//! * Checkpoints wraps a record or history and extends them with checkpoint functionality.
 //! * Commands can be merged into a single command by implementing the
 //!   [merge](trait.Command.html#method.merge) method on the command.
 //!   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
