@@ -75,14 +75,14 @@ pub struct Record<C, F = Box<dyn FnMut(Signal)>> {
     pub(crate) slot: Slot<F>,
 }
 
-impl<C: Command> Record<C> {
+impl<C> Record<C> {
     /// Returns a new record.
     pub fn new() -> Record<C> {
         Builder::new().build()
     }
 }
 
-impl<C: Command, F> Record<C, F> {
+impl<C, F> Record<C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -367,7 +367,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     }
 }
 
-impl<C: Command + ToString, F> Record<C, F> {
+impl<C: ToString, F> Record<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.Record.html#method.undo
@@ -396,13 +396,13 @@ where
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> From<History<C, F>> for Record<C, F> {
+impl<C, F: FnMut(Signal)> From<History<C, F>> for Record<C, F> {
     fn from(history: History<C, F>) -> Record<C, F> {
         history.record
     }
 }
 
-impl<C: Command, F> fmt::Debug for Record<C, F>
+impl<C, F> fmt::Debug for Record<C, F>
 where
     C: fmt::Debug,
 {
@@ -449,7 +449,7 @@ pub struct Builder<F = Box<dyn FnMut(Signal)>> {
     slot: Slot<F>,
 }
 
-impl<F: FnMut(Signal)> Builder<F> {
+impl<F> Builder<F> {
     /// Returns a builder for a record.
     pub fn new() -> Builder<F> {
         Builder {
@@ -482,14 +482,8 @@ impl<F: FnMut(Signal)> Builder<F> {
         self
     }
 
-    /// Connects the slot.
-    pub fn connect(mut self, f: F) -> Builder<F> {
-        self.slot = Slot::new(f);
-        self
-    }
-
     /// Builds the record.
-    pub fn build<C: Command>(self) -> Record<C, F> {
+    pub fn build<C>(self) -> Record<C, F> {
         Record {
             entries: VecDeque::with_capacity(self.capacity),
             current: 0,
@@ -497,6 +491,14 @@ impl<F: FnMut(Signal)> Builder<F> {
             saved: if self.saved { Some(0) } else { None },
             slot: self.slot,
         }
+    }
+}
+
+impl<F: FnMut(Signal)> Builder<F> {
+    /// Connects the slot.
+    pub fn connect(mut self, f: F) -> Builder<F> {
+        self.slot = Slot::from(f);
+        self
     }
 }
 
@@ -545,7 +547,7 @@ enum QueueCommand<C> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Queue<'a, C: Command, F> {
+pub struct Queue<'a, C, F> {
     record: &'a mut Record<C, F>,
     commands: Vec<QueueCommand<C>>,
 }
@@ -595,7 +597,7 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
     }
 }
 
-impl<'a, C: Command, F> From<&'a mut Record<C, F>> for Queue<'a, C, F> {
+impl<'a, C, F> From<&'a mut Record<C, F>> for Queue<'a, C, F> {
     fn from(record: &'a mut Record<C, F>) -> Self {
         Queue {
             record,
@@ -613,7 +615,7 @@ enum CheckpointCommand<C> {
 
 /// Wraps a record and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, C: Command, F> {
+pub struct Checkpoint<'a, C, F> {
     record: &'a mut Record<C, F>,
     commands: Vec<CheckpointCommand<C>>,
 }
@@ -680,7 +682,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     }
 }
 
-impl<'a, C: Command, F> From<&'a mut Record<C, F>> for Checkpoint<'a, C, F> {
+impl<'a, C, F> From<&'a mut Record<C, F>> for Checkpoint<'a, C, F> {
     fn from(record: &'a mut Record<C, F>) -> Self {
         Checkpoint {
             record,
@@ -691,7 +693,7 @@ impl<'a, C: Command, F> From<&'a mut Record<C, F>> for Checkpoint<'a, C, F> {
 
 /// Configurable display formatting for record.
 #[derive(Clone, Debug)]
-pub struct Display<'a, C: Command, F> {
+pub struct Display<'a, C, F> {
     record: &'a Record<C, F>,
     format: crate::format::Format,
 }
@@ -731,7 +733,7 @@ impl<C: Command, F: FnMut(Signal)> Display<'_, C, F> {
     }
 }
 
-impl<C: Command + fmt::Display, F> Display<'_, C, F> {
+impl<C: fmt::Display, F> Display<'_, C, F> {
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<C>>) -> fmt::Result {
         self.format.position(f, at, false)?;
 
@@ -762,7 +764,7 @@ impl<C: Command + fmt::Display, F> Display<'_, C, F> {
     }
 }
 
-impl<'a, C: Command, F> From<&'a Record<C, F>> for Display<'a, C, F> {
+impl<'a, C, F> From<&'a Record<C, F>> for Display<'a, C, F> {
     fn from(record: &'a Record<C, F>) -> Self {
         Display {
             record,
@@ -771,7 +773,7 @@ impl<'a, C: Command, F> From<&'a Record<C, F>> for Display<'a, C, F> {
     }
 }
 
-impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, C, F> {
+impl<C: fmt::Display, F> fmt::Display for Display<'_, C, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.record.entries.iter().enumerate().rev() {
             let at = At::new(0, i + 1);

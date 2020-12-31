@@ -65,14 +65,14 @@ pub struct History<C, F = Box<dyn FnMut(Signal)>> {
     pub(crate) branches: BTreeMap<usize, Branch<C>>,
 }
 
-impl<C: Command> History<C> {
+impl<C> History<C> {
     /// Returns a new history.
     pub fn new() -> History<C> {
         History::from(Record::new())
     }
 }
 
-impl<C: Command, F> History<C, F> {
+impl<C, F> History<C, F> {
     /// Reserves capacity for at least `additional` more commands.
     ///
     /// # Panics
@@ -369,7 +369,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     }
 }
 
-impl<C: Command + ToString, F> History<C, F> {
+impl<C: ToString, F> History<C, F> {
     /// Returns the string of the command which will be undone in the next call to [`undo`].
     ///
     /// [`undo`]: struct.History.html#method.undo
@@ -394,7 +394,7 @@ where
     }
 }
 
-impl<C: Command, F> From<Record<C, F>> for History<C, F> {
+impl<C, F> From<Record<C, F>> for History<C, F> {
     fn from(record: Record<C, F>) -> Self {
         History {
             root: 0,
@@ -406,10 +406,7 @@ impl<C: Command, F> From<Record<C, F>> for History<C, F> {
     }
 }
 
-impl<C: Command, F> fmt::Debug for History<C, F>
-where
-    C: fmt::Debug,
-{
+impl<C: fmt::Debug, F> fmt::Debug for History<C, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("History")
             .field("root", &self.root)
@@ -465,7 +462,7 @@ impl<C> Branch<C> {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Builder<F = Box<dyn FnMut(Signal)>>(crate::record::Builder<F>);
 
-impl<F: FnMut(Signal)> Builder<F> {
+impl<F> Builder<F> {
     /// Returns a builder for a history.
     pub fn new() -> Builder<F> {
         Builder(crate::record::Builder::new())
@@ -490,14 +487,16 @@ impl<F: FnMut(Signal)> Builder<F> {
         Builder(self.0.saved(saved))
     }
 
+    /// Builds the history.
+    pub fn build<C>(self) -> History<C, F> {
+        History::from(self.0.build())
+    }
+}
+
+impl<F: FnMut(Signal)> Builder<F> {
     /// Connects the slot.
     pub fn connect(self, f: F) -> Builder<F> {
         Builder(self.0.connect(f))
-    }
-
-    /// Builds the history.
-    pub fn build<C: Command>(self) -> History<C, F> {
-        History::from(self.0.build())
     }
 }
 
@@ -546,7 +545,7 @@ enum QueueCommand<C> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Queue<'a, C: Command, F> {
+pub struct Queue<'a, C, F> {
     history: &'a mut History<C, F>,
     commands: Vec<QueueCommand<C>>,
 }
@@ -596,7 +595,7 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
     }
 }
 
-impl<'a, C: Command, F> From<&'a mut History<C, F>> for Queue<'a, C, F> {
+impl<'a, C, F> From<&'a mut History<C, F>> for Queue<'a, C, F> {
     fn from(history: &'a mut History<C, F>) -> Self {
         Queue {
             history,
@@ -614,7 +613,7 @@ enum CheckpointCommand {
 
 /// Wraps a history and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, C: Command, F> {
+pub struct Checkpoint<'a, C, F> {
     history: &'a mut History<C, F>,
     commands: Vec<CheckpointCommand>,
 }
@@ -684,7 +683,7 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     }
 }
 
-impl<'a, C: Command, F> From<&'a mut History<C, F>> for Checkpoint<'a, C, F> {
+impl<'a, C, F> From<&'a mut History<C, F>> for Checkpoint<'a, C, F> {
     fn from(history: &'a mut History<C, F>) -> Self {
         Checkpoint {
             history,
@@ -695,12 +694,12 @@ impl<'a, C: Command, F> From<&'a mut History<C, F>> for Checkpoint<'a, C, F> {
 
 /// Configurable display formatting for history.
 #[derive(Clone, Debug)]
-pub struct Display<'a, C: Command, F> {
+pub struct Display<'a, C, F> {
     history: &'a History<C, F>,
     format: Format,
 }
 
-impl<C: Command, F> Display<'_, C, F> {
+impl<C, F> Display<'_, C, F> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -735,7 +734,7 @@ impl<C: Command, F> Display<'_, C, F> {
     }
 }
 
-impl<C: Command + fmt::Display, F> Display<'_, C, F> {
+impl<C: fmt::Display, F> Display<'_, C, F> {
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
@@ -808,7 +807,7 @@ impl<C: Command + fmt::Display, F> Display<'_, C, F> {
     }
 }
 
-impl<'a, C: Command, F> From<&'a History<C, F>> for Display<'a, C, F> {
+impl<'a, C, F> From<&'a History<C, F>> for Display<'a, C, F> {
     fn from(history: &'a History<C, F>) -> Self {
         Display {
             history,
@@ -817,7 +816,7 @@ impl<'a, C: Command, F> From<&'a History<C, F>> for Display<'a, C, F> {
     }
 }
 
-impl<C: Command + fmt::Display, F> fmt::Display for Display<'_, C, F> {
+impl<C: fmt::Display, F> fmt::Display for Display<'_, C, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let branch = self.history.branch();
         for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
