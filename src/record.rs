@@ -421,27 +421,51 @@ where
     }
 }
 
-/// Builder for a record.
+/// Builder for a Record.
+///
+/// # Examples
+/// ```
+/// # use undo::{Command, record::Builder, Record};
+/// # struct Add(char);
+/// # impl Command for Add {
+/// #     type Target = String;
+/// #     type Error = &'static str;
+/// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
+/// #         self.0 = s.pop().ok_or("s is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// let _ = Builder::new()
+///     .limit(100)
+///     .capacity(100)
+///     .connect(|s| { dbg!(s); })
+///     .build::<Add>();
+/// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug)]
-pub struct Builder {
+pub struct Builder<F = Box<dyn FnMut(Signal)>> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
+    slot: Slot<F>,
 }
 
-impl Builder {
+impl<F: FnMut(Signal)> Builder<F> {
     /// Returns a builder for a record.
-    pub fn new() -> Builder {
+    pub fn new() -> Builder<F> {
         Builder {
             capacity: 0,
             limit: NonZeroUsize::new(usize::max_value()).unwrap(),
             saved: true,
+            slot: Slot::default(),
         }
     }
 
     /// Sets the capacity for the record.
-    pub fn capacity(&mut self, capacity: usize) -> &mut Builder {
+    pub fn capacity(mut self, capacity: usize) -> Builder<F> {
         self.capacity = capacity;
         self
     }
@@ -450,37 +474,32 @@ impl Builder {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(&mut self, limit: usize) -> &mut Builder {
+    pub fn limit(mut self, limit: usize) -> Builder<F> {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(&mut self, saved: bool) -> &mut Builder {
+    pub fn saved(mut self, saved: bool) -> Builder<F> {
         self.saved = saved;
         self
     }
 
-    /// Builds the record.
-    pub fn build<C: Command>(&self) -> Record<C> {
-        Record {
-            entries: VecDeque::with_capacity(self.capacity),
-            current: 0,
-            limit: self.limit,
-            saved: if self.saved { Some(0) } else { None },
-            slot: Slot::default(),
-        }
+    /// Connects the slot.
+    pub fn connect(mut self, f: F) -> Builder<F> {
+        self.slot = Slot::new(f);
+        self
     }
 
-    /// Builds the record with the slot.
-    pub fn build_with<C: Command, F: FnMut(Signal)>(&self, slot: F) -> Record<C, F> {
+    /// Builds the record.
+    pub fn build<C: Command>(self) -> Record<C, F> {
         Record {
             entries: VecDeque::with_capacity(self.capacity),
             current: 0,
             limit: self.limit,
             saved: if self.saved { Some(0) } else { None },
-            slot: Slot::new(slot),
+            slot: self.slot,
         }
     }
 }

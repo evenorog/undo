@@ -439,50 +439,65 @@ impl<C> Branch<C> {
 }
 
 /// Builder for a History.
+///
+/// # Examples
+/// ```
+/// # use undo::{Command, history::Builder, Record};
+/// # struct Add(char);
+/// # impl Command for Add {
+/// #     type Target = String;
+/// #     type Error = &'static str;
+/// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
+/// #         self.0 = s.pop().ok_or("s is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// let _ = Builder::new()
+///     .limit(100)
+///     .capacity(100)
+///     .connect(|s| { dbg!(s); })
+///     .build::<Add>();
+/// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug)]
-pub struct Builder {
-    inner: crate::record::Builder,
-}
+pub struct Builder<F = Box<dyn FnMut(Signal)>>(crate::record::Builder<F>);
 
-impl Builder {
+impl<F: FnMut(Signal)> Builder<F> {
     /// Returns a builder for a history.
-    pub fn new() -> Builder {
-        Builder {
-            inner: crate::record::Builder::new(),
-        }
+    pub fn new() -> Builder<F> {
+        Builder(crate::record::Builder::new())
     }
 
     /// Sets the capacity for the history.
-    pub fn capacity(&mut self, capacity: usize) -> &mut Builder {
-        self.inner.capacity(capacity);
-        self
+    pub fn capacity(self, capacity: usize) -> Builder<F> {
+        Builder(self.0.capacity(capacity))
     }
 
     /// Sets the `limit` for the history.
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(&mut self, limit: usize) -> &mut Builder {
-        self.inner.limit(limit);
-        self
+    pub fn limit(self, limit: usize) -> Builder<F> {
+        Builder(self.0.limit(limit))
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(&mut self, saved: bool) -> &mut Builder {
-        self.inner.saved(saved);
-        self
+    pub fn saved(self, saved: bool) -> Builder<F> {
+        Builder(self.0.saved(saved))
+    }
+
+    /// Connects the slot.
+    pub fn connect(self, f: F) -> Builder<F> {
+        Builder(self.0.connect(f))
     }
 
     /// Builds the history.
-    pub fn build<C: Command>(&self) -> History<C> {
-        History::from(self.inner.build())
-    }
-
-    /// Builds the history with the slot.
-    pub fn build_with<C: Command, F: FnMut(Signal)>(&self, slot: F) -> History<C, F> {
-        History::from(self.inner.build_with(slot))
+    pub fn build<C: Command>(self) -> History<C, F> {
+        History::from(self.0.build())
     }
 }
 
