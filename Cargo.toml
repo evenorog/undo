@@ -16,10 +16,11 @@ edition = "2018"
 chrono = { version = "0.4", optional = true, features = ["serde"] }
 colored = { version = "2", optional = true }
 serde = { version = "1", optional = true, default-features = false, features = ["derive"] }
+arrayvec = { version = "0.5", default-features = false }
 
 [features]
 default = ["alloc"]
-alloc = ["serde/alloc"]
+alloc = ["serde/alloc", "arrayvec/serde"]
 
 [badges]
 travis-ci = { repository = "evenorog/undo" }

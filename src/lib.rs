@@ -43,6 +43,7 @@ mod format;
 pub mod history;
 #[cfg(feature = "alloc")]
 pub mod record;
+mod timeline;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
