@@ -26,7 +26,7 @@ it is easy to apply, undo, and redo changes made to a target.
   when it changes.
 * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 * Configurable display formatting using the display structure.
-* The library can be used as `no_std` by default.
+* The library can be used as `no_std`.
 
 ## Cargo Feature Flags
 

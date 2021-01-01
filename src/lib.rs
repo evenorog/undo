@@ -20,7 +20,7 @@
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //! * Configurable display formatting using the display structure.
-//! * The library can be used as `no_std` by default.
+//! * The library can be used as `no_std`.
 //!
 //! # Cargo Feature Flags
 //!
@@ -32,11 +32,16 @@
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "alloc"), allow(dead_code))]
 
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(feature = "alloc")]
 mod format;
+#[cfg(feature = "alloc")]
 pub mod history;
+#[cfg(feature = "alloc")]
 pub mod record;
 
 #[cfg(feature = "chrono")]
@@ -45,6 +50,7 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "alloc")]
 pub use self::{history::History, record::Record};
 
 /// A specialized Result type for undo-redo operations.
