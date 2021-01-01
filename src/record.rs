@@ -347,19 +347,19 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let to = to.with_timezone(&Utc);
         let current = match self.entries.as_slices() {
             ([], []) => return None,
-            (start, []) => match start.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
+            (head, []) => match head.binary_search_by(|e| e.timestamp.cmp(&to)) {
                 Ok(current) | Err(current) => current,
             },
-            ([], end) => match end.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
+            ([], tail) => match tail.binary_search_by(|e| e.timestamp.cmp(&to)) {
                 Ok(current) | Err(current) => current,
             },
-            (start, end) => match start.last().unwrap().timestamp.cmp(&to) {
-                Ordering::Less => match start.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
+            (head, tail) => match head.last().unwrap().timestamp.cmp(&to) {
+                Ordering::Less => match head.binary_search_by(|e| e.timestamp.cmp(&to)) {
                     Ok(current) | Err(current) => current,
                 },
-                Ordering::Equal => start.len(),
-                Ordering::Greater => match end.binary_search_by(|entry| entry.timestamp.cmp(&to)) {
-                    Ok(current) | Err(current) => start.len() + current,
+                Ordering::Equal => head.len(),
+                Ordering::Greater => match tail.binary_search_by(|e| e.timestamp.cmp(&to)) {
+                    Ok(current) | Err(current) => head.len() + current,
                 },
             },
         };
@@ -383,7 +383,7 @@ impl<C: ToString, F> Record<C, F> {
     }
 
     fn text(&self, i: usize) -> Option<String> {
-        self.entries.get(i).map(|c| c.command.to_string())
+        self.entries.get(i).map(|e| e.command.to_string())
     }
 }
 
@@ -396,7 +396,7 @@ where
     }
 }
 
-impl<C, F: FnMut(Signal)> From<History<C, F>> for Record<C, F> {
+impl<C, F> From<History<C, F>> for Record<C, F> {
     fn from(history: History<C, F>) -> Record<C, F> {
         history.record
     }
@@ -698,7 +698,7 @@ pub struct Display<'a, C, F> {
     format: crate::format::Format,
 }
 
-impl<C: Command, F: FnMut(Signal)> Display<'_, C, F> {
+impl<C, F> Display<'_, C, F> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
