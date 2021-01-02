@@ -4,6 +4,7 @@ use crate::{Command, Entry, Result, Signal, Slot};
 use arrayvec::ArrayVec;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
+use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -88,6 +89,17 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         _: &DateTime<impl TimeZone>,
     ) -> Option<Result<C>> {
         unimplemented!()
+    }
+}
+
+impl<C: fmt::Debug, F> fmt::Debug for Timeline<C, F> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Timeline")
+            .field("entries", &self.entries)
+            .field("current", &self.current)
+            .field("saved", &self.saved)
+            .field("slot", &self.slot)
+            .finish()
     }
 }
 
