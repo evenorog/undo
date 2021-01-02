@@ -385,10 +385,7 @@ impl<C: ToString, F> History<C, F> {
     }
 }
 
-impl<C: Command> Default for History<C>
-where
-    C::Target: Default,
-{
+impl<C> Default for History<C> {
     fn default() -> History<C> {
         History::new()
     }

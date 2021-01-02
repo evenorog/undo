@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
 use crate::{Command, Entry, Result, Signal, Slot};
+#[cfg(feature = "alloc")]
+use alloc::string::{String, ToString};
 use arrayvec::ArrayVec;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
@@ -114,6 +116,27 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         self.current = 0;
         self.slot.emit_if(could_undo, Signal::Undo(false));
         self.slot.emit_if(could_redo, Signal::Redo(false));
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<C: ToString, F> Timeline<C, F> {
+    pub fn undo_text(&self) -> Option<String> {
+        self.current.checked_sub(1).and_then(|i| self.text(i))
+    }
+
+    pub fn redo_text(&self) -> Option<String> {
+        self.text(self.current)
+    }
+
+    fn text(&self, i: usize) -> Option<String> {
+        self.entries.get(i).map(|e| e.command.to_string())
+    }
+}
+
+impl<C> Default for Timeline<C> {
+    fn default() -> Timeline<C> {
+        Timeline::new()
     }
 }
 

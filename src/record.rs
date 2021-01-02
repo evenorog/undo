@@ -387,10 +387,7 @@ impl<C: ToString, F> Record<C, F> {
     }
 }
 
-impl<C: Command> Default for Record<C>
-where
-    C::Target: Default,
-{
+impl<C> Default for Record<C> {
     fn default() -> Record<C> {
         Record::new()
     }
@@ -402,10 +399,7 @@ impl<C, F> From<History<C, F>> for Record<C, F> {
     }
 }
 
-impl<C, F> fmt::Debug for Record<C, F>
-where
-    C: fmt::Debug,
-{
+impl<C: fmt::Debug, F> fmt::Debug for Record<C, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
             .field("entries", &self.entries)
