@@ -441,7 +441,6 @@ where
 ///     .connect(|s| { dbg!(s); })
 ///     .build::<Add>();
 /// ```
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Builder<F = Box<dyn FnMut(Signal)>> {
     capacity: usize,
     limit: NonZeroUsize,

@@ -459,7 +459,6 @@ impl<C> Branch<C> {
 ///     .connect(|s| { dbg!(s); })
 ///     .build::<Add>();
 /// ```
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Builder<F = Box<dyn FnMut(Signal)>>(crate::record::Builder<F>);
 
 impl<F> Builder<F> {
