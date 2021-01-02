@@ -191,7 +191,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge commands unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
-            Some(ref mut last) if !was_saved => last.command.merge(command),
+            Some(last) if !was_saved => last.command.merge(command),
             _ => Merge::No(command),
         };
         let merged_or_annulled = match merged {
