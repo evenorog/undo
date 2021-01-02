@@ -164,21 +164,6 @@ impl<C, F> History<C, F> {
 }
 
 impl<C: Command, F: FnMut(Signal)> History<C, F> {
-    /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
-        self.saved = None;
-        self.record.set_saved(saved);
-    }
-
-    /// Removes all commands from the history without undoing them.
-    pub fn clear(&mut self) {
-        self.root = 0;
-        self.next = 1;
-        self.saved = None;
-        self.record.clear();
-        self.branches.clear();
-    }
-
     /// Pushes the command to the top of the history and executes its [`apply`] method.
     ///
     /// # Errors
@@ -282,6 +267,21 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         to: &DateTime<impl TimeZone>,
     ) -> Option<Result<C>> {
         self.record.time_travel(target, to)
+    }
+
+    /// Marks the target as currently being in a saved or unsaved state.
+    pub fn set_saved(&mut self, saved: bool) {
+        self.saved = None;
+        self.record.set_saved(saved);
+    }
+
+    /// Removes all commands from the history without undoing them.
+    pub fn clear(&mut self) {
+        self.root = 0;
+        self.next = 1;
+        self.saved = None;
+        self.record.clear();
+        self.branches.clear();
     }
 
     pub(crate) fn jump_to(&mut self, root: usize) {

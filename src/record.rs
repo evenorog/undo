@@ -165,34 +165,6 @@ impl<C, F> Record<C, F> {
 }
 
 impl<C: Command, F: FnMut(Signal)> Record<C, F> {
-    /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
-        let was_saved = self.is_saved();
-        if saved {
-            self.saved = Some(self.current());
-            self.slot.emit_if(!was_saved, Signal::Saved(true));
-        } else {
-            self.saved = None;
-            self.slot.emit_if(was_saved, Signal::Saved(false));
-        }
-    }
-
-    /// Revert the changes done to the target since the saved state.
-    pub fn revert(&mut self, target: &mut C::Target) -> Option<Result<C>> {
-        self.saved.and_then(|saved| self.go_to(target, saved))
-    }
-
-    /// Removes all commands from the record without undoing them.
-    pub fn clear(&mut self) {
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
-        self.entries.clear();
-        self.saved = if self.is_saved() { Some(0) } else { None };
-        self.current = 0;
-        self.slot.emit_if(could_undo, Signal::Undo(false));
-        self.slot.emit_if(could_redo, Signal::Redo(false));
-    }
-
     /// Pushes the command on top of the record and executes its [`apply`] method.
     ///
     /// # Errors
@@ -364,6 +336,34 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
             },
         };
         self.go_to(target, current)
+    }
+
+    /// Marks the target as currently being in a saved or unsaved state.
+    pub fn set_saved(&mut self, saved: bool) {
+        let was_saved = self.is_saved();
+        if saved {
+            self.saved = Some(self.current());
+            self.slot.emit_if(!was_saved, Signal::Saved(true));
+        } else {
+            self.saved = None;
+            self.slot.emit_if(was_saved, Signal::Saved(false));
+        }
+    }
+
+    /// Revert the changes done to the target since the saved state.
+    pub fn revert(&mut self, target: &mut C::Target) -> Option<Result<C>> {
+        self.saved.and_then(|saved| self.go_to(target, saved))
+    }
+
+    /// Removes all commands from the record without undoing them.
+    pub fn clear(&mut self) {
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        self.entries.clear();
+        self.saved = if self.is_saved() { Some(0) } else { None };
+        self.current = 0;
+        self.slot.emit_if(could_undo, Signal::Undo(false));
+        self.slot.emit_if(could_redo, Signal::Redo(false));
     }
 }
 

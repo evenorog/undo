@@ -90,6 +90,31 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
     ) -> Option<Result<C>> {
         unimplemented!()
     }
+
+    pub fn set_saved(&mut self, saved: bool) {
+        let was_saved = self.is_saved();
+        if saved {
+            self.saved = Some(self.current());
+            self.slot.emit_if(!was_saved, Signal::Saved(true));
+        } else {
+            self.saved = None;
+            self.slot.emit_if(was_saved, Signal::Saved(false));
+        }
+    }
+
+    pub fn revert(&mut self, target: &mut C::Target) -> Option<Result<C>> {
+        self.saved.and_then(|saved| self.go_to(target, saved))
+    }
+
+    pub fn clear(&mut self) {
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        self.entries.clear();
+        self.saved = if self.is_saved() { Some(0) } else { None };
+        self.current = 0;
+        self.slot.emit_if(could_undo, Signal::Undo(false));
+        self.slot.emit_if(could_redo, Signal::Redo(false));
+    }
 }
 
 impl<C: fmt::Debug, F> fmt::Debug for Timeline<C, F> {
