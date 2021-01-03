@@ -370,16 +370,14 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
 }
 
 impl<C: ToString, F> History<C, F> {
-    /// Returns the string of the command which will be undone in the next call to [`undo`].
-    ///
-    /// [`undo`]: struct.History.html#method.undo
+    /// Returns the string of the command which will be undone
+    /// in the next call to [`undo`](struct.History.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
         self.record.undo_text()
     }
 
-    /// Returns the string of the command which will be redone in the next call to [`redo`].
-    ///
-    /// [`redo`]: struct.History.html#method.redo
+    /// Returns the string of the command which will be redone
+    /// in the next call to [`redo`](struct.History.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
         self.record.redo_text()
     }

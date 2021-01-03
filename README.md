@@ -14,7 +14,8 @@ it is easy to apply, undo, and redo changes made to a target.
 ## Features
 
 * [Command](https://docs.rs/undo/latest/undo/trait.Command.html) provides the base functionality for all commands.
-* [Record](https://docs.rs/undo/latest/undo/struct.Record.html) provides basic linear undo-redo functionality.
+* [Record](https://docs.rs/undo/latest/undo/struct.Record.html) provides basic undo-redo functionality.
+* [Timeline](https://docs.rs/undo/latest/undo/struct.Timeline.html) provides basic undo-redo functionality using a fixed size.
 * [History](https://docs.rs/undo/latest/undo/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
 * Queues wraps a record or history and extends them with queue functionality.
 * Checkpoints wraps a record or history and extends them with checkpoint functionality.

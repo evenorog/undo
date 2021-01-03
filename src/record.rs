@@ -368,16 +368,14 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
 }
 
 impl<C: ToString, F> Record<C, F> {
-    /// Returns the string of the command which will be undone in the next call to [`undo`].
-    ///
-    /// [`undo`]: struct.Record.html#method.undo
+    /// Returns the string of the command which will be undone
+    /// in the next call to [`undo`](struct.Record.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
         self.current.checked_sub(1).and_then(|i| self.text(i))
     }
 
-    /// Returns the string of the command which will be redone in the next call to [`redo`].
-    ///
-    /// [`redo`]: struct.Record.html#method.redo
+    /// Returns the string of the command which will be redone
+    /// in the next call to [`redo`](struct.Record.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
         self.text(self.current)
     }

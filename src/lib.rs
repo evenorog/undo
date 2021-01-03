@@ -8,7 +8,8 @@
 //! # Features
 //!
 //! * [Command](trait.Command.html) provides the base functionality for all commands.
-//! * [Record](struct.Record.html) provides basic linear undo-redo functionality.
+//! * [Record](struct.Record.html) provides basic undo-redo functionality.
+//! * [Timeline](struct.Timeline.html) provides basic undo-redo functionality using a fixed size.
 //! * [History](struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
 //! * Queues wraps a record or history and extends them with queue functionality.
 //! * Checkpoints wraps a record or history and extends them with checkpoint functionality.
@@ -43,7 +44,7 @@ mod format;
 pub mod history;
 #[cfg(feature = "alloc")]
 pub mod record;
-mod timeline;
+pub mod timeline;
 
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
@@ -51,6 +52,7 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+pub use self::timeline::Timeline;
 #[cfg(feature = "alloc")]
 pub use self::{history::History, record::Record};
 

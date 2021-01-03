@@ -1,3 +1,5 @@
+//! A timeline of commands.
+
 #![allow(dead_code)]
 
 use crate::{Command, Entry, Merge, Result, Signal, Slot};
@@ -12,6 +14,46 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+/// A timeline of commands.
+///
+/// A timeline works mostly like a record but stores a fixed number of commands on the stack.
+///
+/// Can be used without the `alloc` feature.
+///
+/// # Examples
+/// ```
+/// # use undo::{Command, Timeline};
+/// # struct Add(char);
+/// # impl Command for Add {
+/// #     type Target = String;
+/// #     type Error = &'static str;
+/// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
+/// #         self.0 = s.pop().ok_or("s is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// # fn main() -> undo::Result<Add> {
+/// let mut target = String::new();
+/// let mut timeline = Timeline::new();
+/// timeline.apply(&mut target, Add('a'))?;
+/// timeline.apply(&mut target, Add('b'))?;
+/// timeline.apply(&mut target, Add('c'))?;
+/// assert_eq!(target, "abc");
+/// timeline.undo(&mut target)?;
+/// timeline.undo(&mut target)?;
+/// timeline.undo(&mut target)?;
+/// assert_eq!(target, "");
+/// timeline.redo(&mut target)?;
+/// timeline.redo(&mut target)?;
+/// timeline.redo(&mut target)?;
+/// assert_eq!(target, "abc");
+/// # Ok(())
+/// # }
+/// ```
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -26,50 +68,68 @@ pub struct Timeline<C, F = fn(Signal)> {
 }
 
 impl<C> Timeline<C> {
+    /// Returns a new timeline.
     pub fn new() -> Timeline<C> {
         Builder::new().build()
     }
 }
 
 impl<C, F> Timeline<C, F> {
+    /// Returns the number of commands in the timeline.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
+    /// Returns `true` if the timeline is empty.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
+    /// Returns the limit of the timeline.
     pub fn limit(&self) -> usize {
         self.entries.capacity()
     }
 
+    /// Sets how the signal should be handled when the state changes.
+    ///
+    /// The previous slot is returned if it exists.
     pub fn connect(&mut self, slot: F) -> Option<F> {
         self.slot.f.replace(slot)
     }
 
+    /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<F> {
         self.slot.f.take()
     }
 
+    /// Returns `true` if the timeline can undo.
     pub fn can_undo(&self) -> bool {
         self.current() > 0
     }
 
+    /// Returns `true` if the timeline can redo.
     pub fn can_redo(&self) -> bool {
         self.current() < self.len()
     }
 
+    /// Returns `true` if the target is in a saved state, `false` otherwise.
     pub fn is_saved(&self) -> bool {
         self.saved.map_or(false, |saved| saved == self.current())
     }
 
+    /// Returns the position of the current command.
     pub fn current(&self) -> usize {
         self.current
     }
 }
 
 impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
+    /// Pushes the command on top of the timeline and executes its [`apply`] method.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`apply`] the error is returned.
+    ///
+    /// [`apply`]: trait.Command.html#tymethod.apply
     pub fn apply(&mut self, target: &mut C::Target, mut command: C) -> Result<C> {
         command.apply(target)?;
         let current = self.current();
@@ -108,6 +168,13 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         Ok(())
     }
 
+    /// Calls the [`undo`] method for the active command and sets
+    /// the previous one as the new active one.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] the error is returned.
+    ///
+    /// [`undo`]: ../trait.Command.html#tymethod.undo
     pub fn undo(&mut self, target: &mut C::Target) -> Result<C> {
         if !self.can_undo() {
             return Ok(());
@@ -125,6 +192,13 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         Ok(())
     }
 
+    /// Calls the [`redo`] method for the active command and sets
+    /// the next one as the new active one.
+    ///
+    /// # Errors
+    /// If an error occur when applying [`redo`] the error is returned.
+    ///
+    /// [`redo`]: trait.Command.html#method.redo
     pub fn redo(&mut self, target: &mut C::Target) -> Result<C> {
         if !self.can_redo() {
             return Ok(());
@@ -142,6 +216,13 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         Ok(())
     }
 
+    /// Repeatedly calls [`undo`] or [`redo`] until the command at `current` is reached.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
+    ///
+    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`redo`]: trait.Command.html#method.redo
     pub fn go_to(&mut self, target: &mut C::Target, current: usize) -> Option<Result<C>> {
         if current > self.len() {
             return None;
@@ -177,6 +258,7 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         Some(Ok(()))
     }
 
+    /// Go back or forward in the record to the command that was made closest to the datetime provided.
     #[cfg(feature = "chrono")]
     pub fn time_travel(
         &mut self,
@@ -189,6 +271,7 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         }
     }
 
+    /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
         if saved {
@@ -200,10 +283,12 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         }
     }
 
+    /// Revert the changes done to the target since the saved state.
     pub fn revert(&mut self, target: &mut C::Target) -> Option<Result<C>> {
         self.saved.and_then(|saved| self.go_to(target, saved))
     }
 
+    /// Removes all commands from the timeline without undoing them.
     pub fn clear(&mut self) {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -217,10 +302,14 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
 
 #[cfg(feature = "alloc")]
 impl<C: ToString, F> Timeline<C, F> {
+    /// Returns the string of the command which will be undone
+    /// in the next call to [`undo`](struct.Timeline.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
         self.current.checked_sub(1).and_then(|i| self.text(i))
     }
 
+    /// Returns the string of the command which will be redone
+    /// in the next call to [`redo`](struct.Timeline.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
         self.text(self.current)
     }
@@ -247,12 +336,36 @@ impl<C: fmt::Debug, F> fmt::Debug for Timeline<C, F> {
     }
 }
 
+/// Builder for a Timeline.
+///
+/// # Examples
+/// ```
+/// # use undo::{Command, timeline::Builder, Timeline};
+/// # struct Add(char);
+/// # impl Command for Add {
+/// #     type Target = String;
+/// #     type Error = &'static str;
+/// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
+/// #         s.push(self.0);
+/// #         Ok(())
+/// #     }
+/// #     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
+/// #         self.0 = s.pop().ok_or("s is empty")?;
+/// #         Ok(())
+/// #     }
+/// # }
+/// let _ = Builder::new()
+///     .saved(false)
+///     .connect(|s| { dbg!(s); })
+///     .build::<Add>();
+/// ```
 pub struct Builder<F = fn(Signal)> {
     saved: bool,
     slot: Slot<F>,
 }
 
 impl<F> Builder<F> {
+    /// Returns a builder for a timeline.
     pub fn new() -> Builder<F> {
         Builder {
             saved: true,
@@ -260,11 +373,14 @@ impl<F> Builder<F> {
         }
     }
 
+    /// Sets if the target is initially in a saved state.
+    /// By default the target is in a saved state.
     pub fn saved(mut self, saved: bool) -> Builder<F> {
         self.saved = saved;
         self
     }
 
+    /// Builds the timeline.
     pub fn build<C>(self) -> Timeline<C, F> {
         Timeline {
             entries: ArrayVec::new(),
@@ -276,6 +392,7 @@ impl<F> Builder<F> {
 }
 
 impl<F: FnMut(Signal)> Builder<F> {
+    /// Connects the slot.
     pub fn connect(mut self, f: F) -> Builder<F> {
         self.slot = Slot::from(f);
         self
