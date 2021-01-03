@@ -686,8 +686,7 @@ impl<'a, C, F> From<&'a mut History<C, F>> for Checkpoint<'a, C, F> {
     }
 }
 
-/// Configurable display formatting for history.
-#[derive(Clone, Debug)]
+/// Configurable display formatting for the history.
 pub struct Display<'a, C, F> {
     history: &'a History<C, F>,
     format: Format,

@@ -2,7 +2,9 @@
 
 #![allow(dead_code)]
 
-use crate::{Command, Entry, Merge, Result, Signal, Slot};
+#[cfg(feature = "alloc")]
+use crate::format::Format;
+use crate::{At, Command, Entry, Merge, Result, Signal, Slot};
 #[cfg(feature = "alloc")]
 use alloc::string::{String, ToString};
 use arrayvec::ArrayVec;
@@ -10,7 +12,7 @@ use arrayvec::ArrayVec;
 use chrono::Utc;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
-use core::fmt;
+use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -120,6 +122,12 @@ impl<C, F> Timeline<C, F> {
     /// Returns the position of the current command.
     pub fn current(&self) -> usize {
         self.current
+    }
+
+    /// Returns a structure for configurable formatting of the record.
+    #[cfg(feature = "alloc")]
+    pub fn display(&self) -> Display<C, F> {
+        Display::from(self)
     }
 }
 
@@ -402,5 +410,101 @@ impl<F: FnMut(Signal)> Builder<F> {
 impl Default for Builder {
     fn default() -> Self {
         Builder::new()
+    }
+}
+
+/// Configurable display formatting for the timeline.
+#[cfg(feature = "alloc")]
+pub struct Display<'a, C, F> {
+    timeline: &'a Timeline<C, F>,
+    format: Format,
+}
+
+#[cfg(feature = "alloc")]
+impl<C, F> Display<'_, C, F> {
+    /// Show colored output (on by default).
+    ///
+    /// Requires the `colored` feature to be enabled.
+    #[cfg(feature = "colored")]
+    pub fn colored(&mut self, on: bool) -> &mut Self {
+        self.format.colored = on;
+        self
+    }
+
+    /// Show the current position in the output (on by default).
+    pub fn current(&mut self, on: bool) -> &mut Self {
+        self.format.current = on;
+        self
+    }
+
+    /// Show detailed output (on by default).
+    pub fn detailed(&mut self, on: bool) -> &mut Self {
+        self.format.detailed = on;
+        self
+    }
+
+    /// Show the position of the command (on by default).
+    pub fn position(&mut self, on: bool) -> &mut Self {
+        self.format.position = on;
+        self
+    }
+
+    /// Show the saved command (on by default).
+    pub fn saved(&mut self, on: bool) -> &mut Self {
+        self.format.saved = on;
+        self
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<C: fmt::Display, F> Display<'_, C, F> {
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<C>>) -> fmt::Result {
+        self.format.position(f, at, false)?;
+
+        #[cfg(feature = "chrono")]
+        if let Some(entry) = entry {
+            if self.format.detailed {
+                self.format.timestamp(f, &entry.timestamp)?;
+            }
+        }
+
+        self.format.labels(
+            f,
+            at,
+            At::new(0, self.timeline.current()),
+            self.timeline.saved.map(|saved| At::new(0, saved)),
+        )?;
+        if let Some(entry) = entry {
+            if self.format.detailed {
+                writeln!(f)?;
+                self.format.message(f, entry, None)?;
+            } else {
+                f.write_char(' ')?;
+                self.format.message(f, entry, None)?;
+                writeln!(f)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, C, F> From<&'a Timeline<C, F>> for Display<'a, C, F> {
+    fn from(timeline: &'a Timeline<C, F>) -> Self {
+        Display {
+            timeline,
+            format: Format::default(),
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<C: fmt::Display, F> fmt::Display for Display<'_, C, F> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, entry) in self.timeline.entries.iter().enumerate().rev() {
+            let at = At::new(0, i + 1);
+            self.fmt_list(f, at, Some(entry))?;
+        }
+        self.fmt_list(f, At::new(0, 0), None)
     }
 }

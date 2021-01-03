@@ -682,11 +682,10 @@ impl<'a, C, F> From<&'a mut Record<C, F>> for Checkpoint<'a, C, F> {
     }
 }
 
-/// Configurable display formatting for record.
-#[derive(Clone, Debug)]
+/// Configurable display formatting for the record.
 pub struct Display<'a, C, F> {
     record: &'a Record<C, F>,
-    format: crate::format::Format,
+    format: Format,
 }
 
 impl<C, F> Display<'_, C, F> {
