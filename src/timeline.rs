@@ -512,20 +512,20 @@ impl<C: fmt::Display, F> fmt::Display for Display<'_, C, F> {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use alloc::string::String;
+    use arrayvec::ArrayString;
 
     struct Add(char);
 
     impl Command for Add {
-        type Target = String;
+        type Target = ArrayString<[u8; 64]>;
         type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<Add> {
+        fn apply(&mut self, s: &mut ArrayString<[u8; 64]>) -> Result<Add> {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<Add> {
+        fn undo(&mut self, s: &mut ArrayString<[u8; 64]>) -> Result<Add> {
             self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn limit() {
-        let mut target = String::new();
+        let mut target = ArrayString::new();
         let mut timeline = Timeline::new();
         for i in 64..128 {
             timeline.apply(&mut target, Add(char::from(i))).unwrap();
