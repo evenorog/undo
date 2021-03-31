@@ -7,7 +7,6 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::convert::identity;
 use core::{
     fmt::{self, Write},
     num::NonZeroUsize,
@@ -18,6 +17,7 @@ use serde_crate::{Deserialize, Serialize};
 use {
     chrono::{DateTime, TimeZone, Utc},
     core::cmp::Ordering,
+    core::convert::identity,
 };
 
 /// A record of commands.

@@ -2,20 +2,21 @@
 
 #![allow(dead_code)]
 
-#[cfg(feature = "alloc")]
-use crate::format::Format;
 use crate::{At, Command, Entry, Merge, Result};
-#[cfg(feature = "alloc")]
-use alloc::string::{String, ToString};
 use arrayvec::ArrayVec;
-#[cfg(feature = "chrono")]
-use chrono::Utc;
-#[cfg(feature = "chrono")]
-use chrono::{DateTime, TimeZone};
-use core::convert::identity;
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
+#[cfg(feature = "alloc")]
+use {
+    crate::format::Format,
+    alloc::string::{String, ToString},
+};
+#[cfg(feature = "chrono")]
+use {
+    chrono::{DateTime, TimeZone, Utc},
+    core::convert::identity,
+};
 
 /// A timeline of commands.
 ///

@@ -25,6 +25,8 @@
 //!
 //! # Cargo Feature Flags
 //!
+//! * `alloc`: Enables the use of the alloc crate, enabled by default.
+//! * `arrayvec`: Required for the timeline module, enabled by default.
 //! * `chrono`: Enables time stamps and time travel.
 //! * `serde`: Enables serialization and deserialization.
 //! * `colored`: Enables colored output when visualizing the display structures.
