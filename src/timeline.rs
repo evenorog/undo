@@ -237,11 +237,7 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
 
     /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
-        if saved {
-            self.saved = Some(self.current());
-        } else {
-            self.saved = None;
-        }
+        self.saved = saved.then(|| self.current());
     }
 
     /// Revert the changes done to the target since the saved state.
@@ -252,7 +248,7 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
     /// Removes all commands from the timeline without undoing them.
     pub fn clear(&mut self) {
         self.entries.clear();
-        self.saved = if self.is_saved() { Some(0) } else { None };
+        self.saved = self.is_saved().then(|| 0);
         self.current = 0;
     }
 }
