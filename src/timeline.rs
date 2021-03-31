@@ -94,11 +94,6 @@ impl<C, const LIMIT: usize> Timeline<C, LIMIT> {
         self.entries.is_empty()
     }
 
-    /// Returns the limit of the timeline.
-    pub fn limit(&self) -> usize {
-        self.entries.capacity()
-    }
-
     /// Returns `true` if the timeline can undo.
     pub fn can_undo(&self) -> bool {
         self.current() > 0
@@ -154,7 +149,7 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
             // If commands are not merged or annulled push it onto the record.
             Merge::No(command) => {
                 // If limit is reached, pop off the first command.
-                if self.limit() == self.current() {
+                if LIMIT == self.current() {
                     self.entries.pop_at(0);
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                 } else {
