@@ -44,6 +44,7 @@ mod format;
 pub mod history;
 #[cfg(feature = "alloc")]
 pub mod record;
+#[cfg(feature = "arrayvec")]
 pub mod timeline;
 
 #[cfg(feature = "chrono")]
@@ -52,6 +53,7 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 
+#[cfg(feature = "arrayvec")]
 pub use self::timeline::Timeline;
 #[cfg(feature = "alloc")]
 pub use self::{history::History, record::Record};

@@ -13,13 +13,13 @@ exclude = ["/.travis.yml"]
 edition = "2018"
 
 [dependencies]
+arrayvec = { version = "0.7", optional = true, default-features = false }
 chrono = { version = "0.4", optional = true }
 colored = { version = "2", optional = true }
 serde_crate = { package = "serde", version = "1", optional = true, default-features = false, features = ["derive"] }
-arrayvec = { version = "0.7", default-features = false }
 
 [features]
-default = ["alloc"]
+default = ["alloc", "arrayvec"]
 alloc = ["serde_crate/alloc"]
 serde = ["serde_crate", "chrono/serde", "arrayvec/serde"]
 
