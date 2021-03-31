@@ -12,7 +12,7 @@ use core::{
     num::NonZeroUsize,
 };
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde_crate::{Deserialize, Serialize};
 #[cfg(feature = "chrono")]
 use {
     chrono::{DateTime, TimeZone, Utc},
@@ -64,7 +64,10 @@ use {
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
-    serde(bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>"))
+    serde(
+        crate = "serde_crate",
+        bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>")
+    )
 )]
 #[derive(Clone)]
 pub struct Record<C, F = Box<dyn FnMut(Signal)>> {

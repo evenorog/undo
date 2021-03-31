@@ -4,7 +4,7 @@
 
 #[cfg(feature = "alloc")]
 use crate::format::Format;
-use crate::{At, Command, Entry, Merge, Result, Signal, Slot};
+use crate::{At, Command, Entry, Merge, Result};
 #[cfg(feature = "alloc")]
 use alloc::string::{String, ToString};
 use arrayvec::ArrayVec;
@@ -14,7 +14,7 @@ use chrono::Utc;
 use chrono::{DateTime, TimeZone};
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde_crate::{Deserialize, Serialize};
 
 /// A timeline of commands.
 ///
@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 /// # }
 /// # fn main() -> undo::Result<Add> {
 /// let mut target = String::new();
-/// let mut timeline = Timeline::new();
+/// let mut timeline = Timeline::<_, 32>::new();
 /// timeline.apply(&mut target, Add('a'))?;
 /// timeline.apply(&mut target, Add('b'))?;
 /// timeline.apply(&mut target, Add('c'))?;
@@ -59,24 +59,30 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
-    serde(bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>"))
+    serde(
+        crate = "serde_crate",
+        bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>")
+    )
 )]
 #[derive(Clone)]
-pub struct Timeline<C, F = fn(Signal)> {
-    entries: ArrayVec<[Entry<C>; 32]>,
+pub struct Timeline<C, const LIMIT: usize> {
+    entries: ArrayVec<Entry<C>, LIMIT>,
     current: usize,
     saved: Option<usize>,
-    slot: Slot<F>,
 }
 
-impl<C> Timeline<C> {
+impl<C, const LIMIT: usize> Timeline<C, LIMIT> {
     /// Returns a new timeline.
-    pub fn new() -> Timeline<C> {
-        Builder::new().build()
+    pub fn new() -> Timeline<C, LIMIT> {
+        Timeline {
+            entries: ArrayVec::new(),
+            current: 0,
+            saved: Some(0),
+        }
     }
 }
 
-impl<C, F> Timeline<C, F> {
+impl<C, const LIMIT: usize> Timeline<C, LIMIT> {
     /// Returns the number of commands in the timeline.
     pub fn len(&self) -> usize {
         self.entries.len()
@@ -90,18 +96,6 @@ impl<C, F> Timeline<C, F> {
     /// Returns the limit of the timeline.
     pub fn limit(&self) -> usize {
         self.entries.capacity()
-    }
-
-    /// Sets how the signal should be handled when the state changes.
-    ///
-    /// The previous slot is returned if it exists.
-    pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.slot.f.replace(slot)
-    }
-
-    /// Removes and returns the slot if it exists.
-    pub fn disconnect(&mut self) -> Option<F> {
-        self.slot.f.take()
     }
 
     /// Returns `true` if the timeline can undo.
@@ -126,12 +120,12 @@ impl<C, F> Timeline<C, F> {
 
     /// Returns a structure for configurable formatting of the record.
     #[cfg(feature = "alloc")]
-    pub fn display(&self) -> Display<C, F> {
+    pub fn display(&self) -> Display<C, LIMIT> {
         Display::from(self)
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
+impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
     /// Pushes the command on top of the timeline and executes its [`apply`] method.
     ///
     /// # Errors
@@ -141,8 +135,6 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
     pub fn apply(&mut self, target: &mut C::Target, mut command: C) -> Result<C> {
         command.apply(target)?;
         let current = self.current();
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Pop off all elements after len from record.
         self.entries.truncate(current);
@@ -170,9 +162,6 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
                 self.entries.push(Entry::from(command));
             }
         };
-        self.slot.emit_if(could_redo, Signal::Redo(false));
-        self.slot.emit_if(!could_undo, Signal::Undo(true));
-        self.slot.emit_if(was_saved, Signal::Saved(false));
         Ok(())
     }
 
@@ -187,16 +176,8 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         if !self.can_undo() {
             return Ok(());
         }
-        let was_saved = self.is_saved();
-        let old = self.current();
         self.entries[self.current - 1].undo(target)?;
         self.current -= 1;
-        let len = self.len();
-        let is_saved = self.is_saved();
-        self.slot.emit_if(old == len, Signal::Redo(true));
-        self.slot.emit_if(old == 1, Signal::Undo(false));
-        self.slot
-            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
         Ok(())
     }
 
@@ -211,16 +192,8 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         if !self.can_redo() {
             return Ok(());
         }
-        let was_saved = self.is_saved();
-        let old = self.current();
         self.entries[self.current].redo(target)?;
         self.current += 1;
-        let len = self.len();
-        let is_saved = self.is_saved();
-        self.slot.emit_if(old == len - 1, Signal::Redo(false));
-        self.slot.emit_if(old == 0, Signal::Undo(true));
-        self.slot
-            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
         Ok(())
     }
 
@@ -235,11 +208,6 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         if current > self.len() {
             return None;
         }
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
-        let was_saved = self.is_saved();
-        // Temporarily remove slot so they are not called each iteration.
-        let f = self.slot.f.take();
         // Decide if we need to undo or redo to reach current.
         let apply = if current > self.current() {
             Timeline::redo
@@ -248,21 +216,9 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
         };
         while self.current() != current {
             if let Err(err) = apply(self, target) {
-                self.slot.f = f;
                 return Some(Err(err));
             }
         }
-        // Add slot back.
-        self.slot.f = f;
-        let can_undo = self.can_undo();
-        let can_redo = self.can_redo();
-        let is_saved = self.is_saved();
-        self.slot
-            .emit_if(could_undo != can_undo, Signal::Undo(can_undo));
-        self.slot
-            .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
-        self.slot
-            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
         Some(Ok(()))
     }
 
@@ -281,13 +237,10 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
 
     /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
-        let was_saved = self.is_saved();
         if saved {
             self.saved = Some(self.current());
-            self.slot.emit_if(!was_saved, Signal::Saved(true));
         } else {
             self.saved = None;
-            self.slot.emit_if(was_saved, Signal::Saved(false));
         }
     }
 
@@ -298,18 +251,14 @@ impl<C: Command, F: FnMut(Signal)> Timeline<C, F> {
 
     /// Removes all commands from the timeline without undoing them.
     pub fn clear(&mut self) {
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
         self.entries.clear();
         self.saved = if self.is_saved() { Some(0) } else { None };
         self.current = 0;
-        self.slot.emit_if(could_undo, Signal::Undo(false));
-        self.slot.emit_if(could_redo, Signal::Redo(false));
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<C: ToString, F> Timeline<C, F> {
+impl<C: ToString, const LIMIT: usize> Timeline<C, LIMIT> {
     /// Returns the string of the command which will be undone
     /// in the next call to [`undo`](struct.Timeline.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
@@ -327,101 +276,31 @@ impl<C: ToString, F> Timeline<C, F> {
     }
 }
 
-impl<C> Default for Timeline<C> {
-    fn default() -> Timeline<C> {
+impl<C, const LIMIT: usize> Default for Timeline<C, LIMIT> {
+    fn default() -> Timeline<C, LIMIT> {
         Timeline::new()
     }
 }
 
-impl<C: fmt::Debug, F> fmt::Debug for Timeline<C, F> {
+impl<C: fmt::Debug, const LIMIT: usize> fmt::Debug for Timeline<C, LIMIT> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Timeline")
             .field("entries", &self.entries)
             .field("current", &self.current)
             .field("saved", &self.saved)
-            .field("slot", &self.slot)
             .finish()
-    }
-}
-
-/// Builder for a Timeline.
-///
-/// # Examples
-/// ```
-/// # use undo::{Command, timeline::Builder, Timeline};
-/// # struct Add(char);
-/// # impl Command for Add {
-/// #     type Target = String;
-/// #     type Error = &'static str;
-/// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         s.push(self.0);
-/// #         Ok(())
-/// #     }
-/// #     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         self.0 = s.pop().ok_or("s is empty")?;
-/// #         Ok(())
-/// #     }
-/// # }
-/// let _ = Builder::new()
-///     .saved(false)
-///     .connect(|s| { dbg!(s); })
-///     .build::<Add>();
-/// ```
-pub struct Builder<F = fn(Signal)> {
-    saved: bool,
-    slot: Slot<F>,
-}
-
-impl<F> Builder<F> {
-    /// Returns a builder for a timeline.
-    pub fn new() -> Builder<F> {
-        Builder {
-            saved: true,
-            slot: Slot::default(),
-        }
-    }
-
-    /// Sets if the target is initially in a saved state.
-    /// By default the target is in a saved state.
-    pub fn saved(mut self, saved: bool) -> Builder<F> {
-        self.saved = saved;
-        self
-    }
-
-    /// Builds the timeline.
-    pub fn build<C>(self) -> Timeline<C, F> {
-        Timeline {
-            entries: ArrayVec::new(),
-            current: 0,
-            saved: if self.saved { Some(0) } else { None },
-            slot: self.slot,
-        }
-    }
-}
-
-impl<F: FnMut(Signal)> Builder<F> {
-    /// Connects the slot.
-    pub fn connect(mut self, f: F) -> Builder<F> {
-        self.slot = Slot::from(f);
-        self
-    }
-}
-
-impl Default for Builder {
-    fn default() -> Self {
-        Builder::new()
     }
 }
 
 /// Configurable display formatting for the timeline.
 #[cfg(feature = "alloc")]
-pub struct Display<'a, C, F> {
-    timeline: &'a Timeline<C, F>,
+pub struct Display<'a, C, const LIMIT: usize> {
+    timeline: &'a Timeline<C, LIMIT>,
     format: Format,
 }
 
 #[cfg(feature = "alloc")]
-impl<C, F> Display<'_, C, F> {
+impl<C, const LIMIT: usize> Display<'_, C, LIMIT> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -457,7 +336,7 @@ impl<C, F> Display<'_, C, F> {
 }
 
 #[cfg(feature = "alloc")]
-impl<C: fmt::Display, F> Display<'_, C, F> {
+impl<C: fmt::Display, const LIMIT: usize> Display<'_, C, LIMIT> {
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<C>>) -> fmt::Result {
         self.format.position(f, at, false)?;
 
@@ -489,8 +368,8 @@ impl<C: fmt::Display, F> Display<'_, C, F> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, C, F> From<&'a Timeline<C, F>> for Display<'a, C, F> {
-    fn from(timeline: &'a Timeline<C, F>) -> Self {
+impl<'a, C, const LIMIT: usize> From<&'a Timeline<C, LIMIT>> for Display<'a, C, LIMIT> {
+    fn from(timeline: &'a Timeline<C, LIMIT>) -> Self {
         Display {
             timeline,
             format: Format::default(),
@@ -499,7 +378,7 @@ impl<'a, C, F> From<&'a Timeline<C, F>> for Display<'a, C, F> {
 }
 
 #[cfg(feature = "alloc")]
-impl<C: fmt::Display, F> fmt::Display for Display<'_, C, F> {
+impl<C: fmt::Display, const LIMIT: usize> fmt::Display for Display<'_, C, LIMIT> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.timeline.entries.iter().enumerate().rev() {
             let at = At::new(0, i + 1);
@@ -517,15 +396,15 @@ mod tests {
     struct Add(char);
 
     impl Command for Add {
-        type Target = ArrayString<[u8; 64]>;
+        type Target = ArrayString<64>;
         type Error = &'static str;
 
-        fn apply(&mut self, s: &mut ArrayString<[u8; 64]>) -> Result<Add> {
+        fn apply(&mut self, s: &mut ArrayString<64>) -> Result<Add> {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut ArrayString<[u8; 64]>) -> Result<Add> {
+        fn undo(&mut self, s: &mut ArrayString<64>) -> Result<Add> {
             self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
@@ -534,7 +413,7 @@ mod tests {
     #[test]
     fn limit() {
         let mut target = ArrayString::new();
-        let mut timeline = Timeline::new();
+        let mut timeline = Timeline::<_, 32>::new();
         for i in 64..128 {
             timeline.apply(&mut target, Add(char::from(i))).unwrap();
         }

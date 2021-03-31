@@ -13,14 +13,15 @@ exclude = ["/.travis.yml"]
 edition = "2018"
 
 [dependencies]
-chrono = { version = "0.4", optional = true, features = ["serde"] }
+chrono = { version = "0.4", optional = true }
 colored = { version = "2", optional = true }
-serde = { version = "1", optional = true, default-features = false, features = ["derive"] }
-arrayvec = { version = "0.5", default-features = false, features = ["serde"] }
+serde_crate = { package = "serde", version = "1", optional = true, default-features = false, features = ["derive"] }
+arrayvec = { version = "0.7", default-features = false }
 
 [features]
 default = ["alloc"]
-alloc = ["serde/alloc"]
+alloc = ["serde_crate/alloc"]
+serde = ["serde_crate", "chrono/serde", "arrayvec/serde"]
 
 [badges]
 travis-ci = { repository = "evenorog/undo" }

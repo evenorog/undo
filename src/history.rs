@@ -1,6 +1,8 @@
 //! A history of commands.
 
-use crate::{format::Format, At, Command, Entry, Record, Result, Signal};
+use crate::format::Format;
+use crate::record::Builder as RBuilder;
+use crate::{At, Command, Entry, Record, Result, Signal};
 use alloc::{
     boxed::Box,
     collections::{BTreeMap, VecDeque},
@@ -12,7 +14,7 @@ use alloc::{
 use chrono::{DateTime, TimeZone};
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde_crate::{Deserialize, Serialize};
 
 /// A history of commands.
 ///
@@ -54,7 +56,10 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
-    serde(bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>"))
+    serde(
+        crate = "serde_crate",
+        bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>")
+    )
 )]
 #[derive(Clone)]
 pub struct History<C, F = Box<dyn FnMut(Signal)>> {
@@ -414,7 +419,11 @@ impl<C: fmt::Debug, F> fmt::Debug for History<C, F> {
 }
 
 /// A branch in the history.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub(crate) struct Branch<C> {
     pub(crate) parent: At,
@@ -454,12 +463,12 @@ impl<C> Branch<C> {
 ///     .connect(|s| { dbg!(s); })
 ///     .build::<Add>();
 /// ```
-pub struct Builder<F = Box<dyn FnMut(Signal)>>(crate::record::Builder<F>);
+pub struct Builder<F = Box<dyn FnMut(Signal)>>(RBuilder<F>);
 
 impl<F> Builder<F> {
     /// Returns a builder for a history.
     pub fn new() -> Builder<F> {
-        Builder(crate::record::Builder::new())
+        Builder(RBuilder::new())
     }
 
     /// Sets the capacity for the history.
