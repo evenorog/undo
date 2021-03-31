@@ -12,6 +12,7 @@ use arrayvec::ArrayVec;
 use chrono::Utc;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone};
+use core::convert::identity;
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
@@ -230,9 +231,11 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
         to: &DateTime<impl TimeZone>,
     ) -> Option<Result<C>> {
         let to = to.with_timezone(&Utc);
-        match self.entries.binary_search_by(|e| e.timestamp.cmp(&to)) {
-            Ok(current) | Err(current) => self.go_to(target, current),
-        }
+        let current = self
+            .entries
+            .binary_search_by(|e| e.timestamp.cmp(&to))
+            .unwrap_or_else(identity);
+        self.go_to(target, current)
     }
 
     /// Marks the target as currently being in a saved or unsaved state.

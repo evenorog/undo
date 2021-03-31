@@ -7,6 +7,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::convert::identity;
 use core::{
     fmt::{self, Write},
     num::NonZeroUsize,
@@ -322,20 +323,23 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let to = to.with_timezone(&Utc);
         let current = match self.entries.as_slices() {
             ([], []) => return None,
-            (head, []) => match head.binary_search_by(|e| e.timestamp.cmp(&to)) {
-                Ok(current) | Err(current) => current,
-            },
-            ([], tail) => match tail.binary_search_by(|e| e.timestamp.cmp(&to)) {
-                Ok(current) | Err(current) => current,
-            },
+            (head, []) => head
+                .binary_search_by(|e| e.timestamp.cmp(&to))
+                .unwrap_or_else(identity),
+            ([], tail) => tail
+                .binary_search_by(|e| e.timestamp.cmp(&to))
+                .unwrap_or_else(identity),
             (head, tail) => match head.last().unwrap().timestamp.cmp(&to) {
-                Ordering::Less => match head.binary_search_by(|e| e.timestamp.cmp(&to)) {
-                    Ok(current) | Err(current) => current,
-                },
+                Ordering::Less => head
+                    .binary_search_by(|e| e.timestamp.cmp(&to))
+                    .unwrap_or_else(identity),
                 Ordering::Equal => head.len(),
-                Ordering::Greater => match tail.binary_search_by(|e| e.timestamp.cmp(&to)) {
-                    Ok(current) | Err(current) => head.len() + current,
-                },
+                Ordering::Greater => {
+                    head.len()
+                        + tail
+                            .binary_search_by(|e| e.timestamp.cmp(&to))
+                            .unwrap_or_else(identity)
+                }
             },
         };
         self.go_to(target, current)
@@ -363,7 +367,7 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         self.entries.clear();
-        self.saved = if self.is_saved() { Some(0) } else { None };
+        self.saved = self.is_saved().then(|| 0);
         self.current = 0;
         self.slot.emit_if(could_undo, Signal::Undo(false));
         self.slot.emit_if(could_redo, Signal::Redo(false));
