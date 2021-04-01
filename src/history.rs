@@ -1,8 +1,7 @@
 //! A history of commands.
 
-use crate::format::Format;
 use crate::record::Builder as RBuilder;
-use crate::{At, Command, Entry, Record, Result, Signal};
+use crate::{At, Command, Entry, Format, Record, Result, Signal};
 use alloc::{
     boxed::Box,
     collections::{BTreeMap, VecDeque},

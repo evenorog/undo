@@ -9,7 +9,7 @@ use core::fmt::{self, Write};
 use serde_crate::{Deserialize, Serialize};
 #[cfg(feature = "alloc")]
 use {
-    crate::format::Format,
+    crate::Format,
     alloc::string::{String, ToString},
 };
 #[cfg(feature = "chrono")]
@@ -206,13 +206,13 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
             return None;
         }
         // Decide if we need to undo or redo to reach current.
-        let apply = if current > self.current() {
+        let f = if current > self.current() {
             Timeline::redo
         } else {
             Timeline::undo
         };
         while self.current() != current {
-            if let Err(err) = apply(self, target) {
+            if let Err(err) = f(self, target) {
                 return Some(Err(err));
             }
         }

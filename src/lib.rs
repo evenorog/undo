@@ -49,6 +49,7 @@ pub mod record;
 #[cfg(feature = "arrayvec")]
 pub mod timeline;
 
+use crate::format::Format;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
 use core::fmt;
@@ -167,6 +168,10 @@ impl<F: FnMut(Signal)> Slot<F> {
         if cond {
             self.emit(signal)
         }
+    }
+
+    fn disable(&mut self) -> Slot<F> {
+        Slot { f: self.f.take() }
     }
 }
 

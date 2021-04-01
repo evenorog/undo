@@ -1,6 +1,6 @@
 //! A record of commands.
 
-use crate::{format::Format, At, Command, Entry, History, Merge, Result, Signal, Slot};
+use crate::{At, Command, Entry, Format, History, Merge, Result, Signal, Slot};
 use alloc::{
     boxed::Box,
     collections::VecDeque,
@@ -286,21 +286,21 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Temporarily remove slot so they are not called each iteration.
-        let f = self.slot.f.take();
+        let slot = self.slot.disable();
         // Decide if we need to undo or redo to reach current.
-        let apply = if current > self.current() {
+        let f = if current > self.current() {
             Record::redo
         } else {
             Record::undo
         };
         while self.current() != current {
-            if let Err(err) = apply(self, target) {
-                self.slot.f = f;
+            if let Err(err) = f(self, target) {
+                self.slot = slot;
                 return Some(Err(err));
             }
         }
         // Add slot back.
-        self.slot.f = f;
+        self.slot = slot;
         let can_undo = self.can_undo();
         let can_redo = self.can_redo();
         let is_saved = self.is_saved();
@@ -452,7 +452,7 @@ impl<F> Builder<F> {
     pub fn new() -> Builder<F> {
         Builder {
             capacity: 0,
-            limit: NonZeroUsize::new(usize::max_value()).unwrap(),
+            limit: NonZeroUsize::new(usize::MAX).unwrap(),
             saved: true,
             slot: Slot::default(),
         }

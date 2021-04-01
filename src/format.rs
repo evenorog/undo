@@ -3,7 +3,7 @@
 use crate::At;
 use alloc::string::ToString;
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Local, TimeZone};
 use core::fmt::{self, Write};
 #[cfg(feature = "colored")]
 use {
@@ -62,38 +62,29 @@ impl Format {
     pub fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
-            write!(f, "{} ", "*".color(color_of_level(level)))
-        } else {
-            f.write_str("* ")
+            return write!(f, "{} ", "*".color(color_of_level(level)));
         }
-        #[cfg(not(feature = "colored"))]
         f.write_str("* ")
     }
 
     pub fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
-            write!(f, "{}", "|".color(color_of_level(level)))
-        } else {
-            f.write_char('|')
+            return write!(f, "{}", "|".color(color_of_level(level)));
         }
-        #[cfg(not(feature = "colored"))]
         f.write_char('|')
     }
 
     pub fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
-            write!(
+            return write!(
                 f,
                 "{}{}",
                 "|".color(color_of_level(level)),
                 "/".color(color_of_level(level + 1))
-            )
-        } else {
-            f.write_str("|/")
+            );
         }
-        #[cfg(not(feature = "colored"))]
         f.write_str("|/")
     }
 
@@ -106,13 +97,8 @@ impl Format {
                 } else {
                     format!("{}", at.current)
                 };
-                write!(f, "{}", position.yellow().bold())
-            } else if use_branch {
-                write!(f, "{}:{}", at.branch, at.current)
-            } else {
-                write!(f, "{}", at.current)
+                return write!(f, "{}", position.yellow().bold());
             }
-            #[cfg(not(feature = "colored"))]
             if use_branch {
                 write!(f, "{}:{}", at.branch, at.current)
             } else {
@@ -137,7 +123,7 @@ impl Format {
             (true, true) => {
                 #[cfg(feature = "colored")]
                 if self.colored {
-                    write!(
+                    return write!(
                         f,
                         " {}{}{} {}{}",
                         "(".yellow(),
@@ -145,43 +131,34 @@ impl Format {
                         ",".yellow(),
                         "saved".green().bold(),
                         ")".yellow()
-                    )
-                } else {
-                    f.write_str(" (current, saved)")
+                    );
                 }
-                #[cfg(not(feature = "colored"))]
-                f.write_str(" (current)")
+                f.write_str(" (current, saved)")
             }
             (true, false) => {
                 #[cfg(feature = "colored")]
                 if self.colored {
-                    write!(
+                    return write!(
                         f,
                         " {}{}{}",
                         "(".yellow(),
                         "current".cyan().bold(),
                         ")".yellow()
-                    )
-                } else {
-                    f.write_str(" (current)")
+                    );
                 }
-                #[cfg(not(feature = "colored"))]
                 f.write_str(" (current)")
             }
             (false, true) => {
                 #[cfg(feature = "colored")]
                 if self.colored {
-                    write!(
+                    return write!(
                         f,
                         " {}{}{}",
                         "(".yellow(),
                         "saved".green().bold(),
                         ")".yellow()
-                    )
-                } else {
-                    f.write_str(" (saved)")
+                    );
                 }
-                #[cfg(not(feature = "colored"))]
                 f.write_str(" (saved)")
             }
             (false, false) => Ok(()),
@@ -189,15 +166,16 @@ impl Format {
     }
 
     #[cfg(feature = "chrono")]
-    pub fn timestamp(self, f: &mut fmt::Formatter, timestamp: &DateTime<Utc>) -> fmt::Result {
+    pub fn timestamp(
+        self,
+        f: &mut fmt::Formatter,
+        timestamp: &DateTime<impl TimeZone>,
+    ) -> fmt::Result {
         let rfc2822 = timestamp.with_timezone(&Local).to_rfc2822();
         #[cfg(feature = "colored")]
         if self.colored {
-            write!(f, " {}", rfc2822.yellow())
-        } else {
-            write!(f, " {}", rfc2822)
+            return write!(f, " {}", rfc2822.yellow());
         }
-        #[cfg(not(feature = "colored"))]
         write!(f, " {}", rfc2822)
     }
 }
