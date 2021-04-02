@@ -1,7 +1,7 @@
-//! A history of commands.
+//! A history of actions.
 
 use crate::record::Builder as RBuilder;
-use crate::{At, Command, Entry, Format, Record, Result, Signal};
+use crate::{Action, At, Entry, Format, Record, Result, Signal};
 use alloc::{
     boxed::Box,
     collections::{BTreeMap, VecDeque},
@@ -15,16 +15,16 @@ use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 
-/// A history of commands.
+/// A history of actions.
 ///
 /// Unlike [Record](struct.Record.html) which maintains a linear undo history, History maintains an undo tree
 /// containing every edit made to the target.
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, History};
+/// # use undo::{Action, History};
 /// # struct Add(char);
-/// # impl Command for Add {
+/// # impl Action for Add {
 /// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
@@ -57,27 +57,27 @@ use serde_crate::{Deserialize, Serialize};
     derive(Serialize, Deserialize),
     serde(
         crate = "serde_crate",
-        bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>")
+        bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>")
     )
 )]
 #[derive(Clone)]
-pub struct History<C, F = Box<dyn FnMut(Signal)>> {
+pub struct History<A, F = Box<dyn FnMut(Signal)>> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
-    pub(crate) record: Record<C, F>,
-    pub(crate) branches: BTreeMap<usize, Branch<C>>,
+    pub(crate) record: Record<A, F>,
+    pub(crate) branches: BTreeMap<usize, Branch<A>>,
 }
 
-impl<C> History<C> {
+impl<A> History<A> {
     /// Returns a new history.
-    pub fn new() -> History<C> {
+    pub fn new() -> History<A> {
         History::from(Record::new())
     }
 }
 
-impl<C, F> History<C, F> {
-    /// Reserves capacity for at least `additional` more commands.
+impl<A, F> History<A, F> {
+    /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
@@ -95,7 +95,7 @@ impl<C, F> History<C, F> {
         self.record.shrink_to_fit();
     }
 
-    /// Returns the number of commands in the current branch of the history.
+    /// Returns the number of actions in the current branch of the history.
     pub fn len(&self) -> usize {
         self.record.len()
     }
@@ -142,23 +142,23 @@ impl<C, F> History<C, F> {
         self.root
     }
 
-    /// Returns the position of the current command.
+    /// Returns the position of the current action.
     pub fn current(&self) -> usize {
         self.record.current()
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<C, F> {
+    pub fn queue(&mut self) -> Queue<A, F> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
         Checkpoint::from(self)
     }
 
     /// Returns a structure for configurable formatting of the history.
-    pub fn display(&self) -> Display<C, F> {
+    pub fn display(&self) -> Display<A, F> {
         Display::from(self)
     }
 
@@ -167,17 +167,17 @@ impl<C, F> History<C, F> {
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> History<C, F> {
-    /// Pushes the command to the top of the history and executes its [`apply`] method.
+impl<A: Action, F: FnMut(Signal)> History<A, F> {
+    /// Pushes the action to the top of the history and executes its [`apply`] method.
     ///
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    pub fn apply(&mut self, target: &mut C::Target, command: C) -> Result<C> {
+    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let at = self.at();
         let saved = self.record.saved.filter(|&saved| saved > at.current);
-        let (merged, tail) = self.record.__apply(target, command)?;
+        let (merged, tail) = self.record.__apply(target, action)?;
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -198,29 +198,29 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         Ok(())
     }
 
-    /// Calls the [`undo`] method for the active command
+    /// Calls the [`undo`] method for the active action
     /// and sets the previous one as the new active one.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
-    pub fn undo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
         self.record.undo(target)
     }
 
-    /// Calls the [`redo`] method for the active command
+    /// Calls the [`redo`] method for the active action
     /// and sets the next one as the new active one.
     ///
     /// # Errors
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn redo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
         self.record.redo(target)
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the command in `branch` at `current` is reached.
+    /// Repeatedly calls [`undo`] or [`redo`] until the action in `branch` at `current` is reached.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
@@ -229,10 +229,10 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     /// [`redo`]: trait.Command.html#method.redo
     pub fn go_to(
         &mut self,
-        target: &mut C::Target,
+        target: &mut A::Target,
         branch: usize,
         current: usize,
-    ) -> Option<Result<C>> {
+    ) -> Option<Result<A>> {
         let root = self.root;
         if root == branch {
             return self.record.go_to(target, current);
@@ -243,11 +243,11 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
             if let Err(err) = self.record.go_to(target, branch.parent.current).unwrap() {
                 return Some(Err(err));
             }
-            // Apply the commands in the branch and move older commands into their own branch.
+            // Apply the actions in the branch and move older actions into their own branch.
             for entry in branch.entries {
                 let current = self.current();
                 let saved = self.record.saved.filter(|&saved| saved > current);
-                let entries = match self.record.__apply(target, entry.command) {
+                let entries = match self.record.__apply(target, entry.action) {
                     Ok((_, entries)) => entries,
                     Err(err) => return Some(Err(err)),
                 };
@@ -261,15 +261,15 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.record.go_to(target, current)
     }
 
-    /// Go back or forward in the history to the command that was made closest to the datetime provided.
+    /// Go back or forward in the history to the action that was made closest to the datetime provided.
     ///
     /// This method does not jump across branches.
     #[cfg(feature = "chrono")]
     pub fn time_travel(
         &mut self,
-        target: &mut C::Target,
+        target: &mut A::Target,
         to: &DateTime<impl TimeZone>,
-    ) -> Option<Result<C>> {
+    ) -> Option<Result<A>> {
         self.record.time_travel(target, to)
     }
 
@@ -279,7 +279,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         self.record.set_saved(saved);
     }
 
-    /// Removes all commands from the history without undoing them.
+    /// Removes all actions from the history without undoing them.
     pub fn clear(&mut self) {
         self.root = 0;
         self.next = 1;
@@ -358,7 +358,7 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
         }
     }
 
-    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<C>)>> {
+    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<A>)>> {
         debug_assert_ne!(self.branch(), to);
         let mut dest = self.branches.remove(&to)?;
         let mut i = dest.parent.branch;
@@ -373,28 +373,28 @@ impl<C: Command, F: FnMut(Signal)> History<C, F> {
     }
 }
 
-impl<C: ToString, F> History<C, F> {
-    /// Returns the string of the command which will be undone
+impl<A: ToString, F> History<A, F> {
+    /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.History.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
         self.record.undo_text()
     }
 
-    /// Returns the string of the command which will be redone
+    /// Returns the string of the action which will be redone
     /// in the next call to [`redo`](struct.History.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
         self.record.redo_text()
     }
 }
 
-impl<C> Default for History<C> {
-    fn default() -> History<C> {
+impl<A> Default for History<A> {
+    fn default() -> History<A> {
         History::new()
     }
 }
 
-impl<C, F> From<Record<C, F>> for History<C, F> {
-    fn from(record: Record<C, F>) -> Self {
+impl<A, F> From<Record<A, F>> for History<A, F> {
+    fn from(record: Record<A, F>) -> Self {
         History {
             root: 0,
             next: 1,
@@ -405,7 +405,7 @@ impl<C, F> From<Record<C, F>> for History<C, F> {
     }
 }
 
-impl<C: fmt::Debug, F> fmt::Debug for History<C, F> {
+impl<A: fmt::Debug, F> fmt::Debug for History<A, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("History")
             .field("root", &self.root)
@@ -424,13 +424,13 @@ impl<C: fmt::Debug, F> fmt::Debug for History<C, F> {
     serde(crate = "serde_crate")
 )]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub(crate) struct Branch<C> {
+pub(crate) struct Branch<A> {
     pub(crate) parent: At,
-    pub(crate) entries: VecDeque<Entry<C>>,
+    pub(crate) entries: VecDeque<Entry<A>>,
 }
 
-impl<C> Branch<C> {
-    fn new(branch: usize, current: usize, entries: VecDeque<Entry<C>>) -> Branch<C> {
+impl<A> Branch<A> {
+    fn new(branch: usize, current: usize, entries: VecDeque<Entry<A>>) -> Branch<A> {
         Branch {
             parent: At::new(branch, current),
             entries,
@@ -442,9 +442,9 @@ impl<C> Branch<C> {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, history::Builder, Record};
+/// # use undo::{Action, history::Builder, Record};
 /// # struct Add(char);
-/// # impl Command for Add {
+/// # impl Action for Add {
 /// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
@@ -490,7 +490,7 @@ impl<F> Builder<F> {
     }
 
     /// Builds the history.
-    pub fn build<C>(self) -> History<C, F> {
+    pub fn build<A>(self) -> History<A, F> {
         History::from(self.0.build())
     }
 }
@@ -509,8 +509,8 @@ impl Default for Builder {
 }
 
 #[derive(Debug)]
-enum QueueCommand<C> {
-    Apply(C),
+enum QueueCommand<A> {
+    Apply(A),
     Undo,
     Redo,
 }
@@ -519,9 +519,9 @@ enum QueueCommand<C> {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, Record};
+/// # use undo::{Action, Record};
 /// # struct Add(char);
-/// # impl Command for Add {
+/// # impl Action for Add {
 /// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
@@ -547,35 +547,35 @@ enum QueueCommand<C> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Queue<'a, C, F> {
-    history: &'a mut History<C, F>,
-    commands: Vec<QueueCommand<C>>,
+pub struct Queue<'a, A, F> {
+    history: &'a mut History<A, F>,
+    actions: Vec<QueueCommand<A>>,
 }
 
-impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
+impl<A: Action, F: FnMut(Signal)> Queue<'_, A, F> {
     /// Queues an `apply` action.
-    pub fn apply(&mut self, command: C) {
-        self.commands.push(QueueCommand::Apply(command));
+    pub fn apply(&mut self, action: A) {
+        self.actions.push(QueueCommand::Apply(action));
     }
 
     /// Queues an `undo` action.
     pub fn undo(&mut self) {
-        self.commands.push(QueueCommand::Undo);
+        self.actions.push(QueueCommand::Undo);
     }
 
     /// Queues a `redo` action.
     pub fn redo(&mut self) {
-        self.commands.push(QueueCommand::Redo);
+        self.actions.push(QueueCommand::Redo);
     }
 
-    /// Applies the queued commands.
+    /// Applies the queued actions.
     ///
     /// # Errors
-    /// If an error occurs, it stops applying the commands and returns the error.
-    pub fn commit(self, target: &mut C::Target) -> Result<C> {
-        for command in self.commands {
-            match command {
-                QueueCommand::Apply(command) => self.history.apply(target, command)?,
+    /// If an error occurs, it stops applying the actions and returns the error.
+    pub fn commit(self, target: &mut A::Target) -> Result<A> {
+        for action in self.actions {
+            match action {
+                QueueCommand::Apply(action) => self.history.apply(target, action)?,
                 QueueCommand::Undo => self.history.undo(target)?,
                 QueueCommand::Redo => self.history.redo(target)?,
             }
@@ -587,21 +587,21 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
     pub fn cancel(self) {}
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<C, F> {
+    pub fn queue(&mut self) -> Queue<A, F> {
         self.history.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
         self.history.checkpoint()
     }
 }
 
-impl<'a, C, F> From<&'a mut History<C, F>> for Queue<'a, C, F> {
-    fn from(history: &'a mut History<C, F>) -> Self {
+impl<'a, A, F> From<&'a mut History<A, F>> for Queue<'a, A, F> {
+    fn from(history: &'a mut History<A, F>) -> Self {
         Queue {
             history,
-            commands: Vec::new(),
+            actions: Vec::new(),
         }
     }
 }
@@ -615,34 +615,34 @@ enum CheckpointCommand {
 
 /// Wraps a history and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, C, F> {
-    history: &'a mut History<C, F>,
-    commands: Vec<CheckpointCommand>,
+pub struct Checkpoint<'a, A, F> {
+    history: &'a mut History<A, F>,
+    actions: Vec<CheckpointCommand>,
 }
 
-impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
+impl<A: Action, F: FnMut(Signal)> Checkpoint<'_, A, F> {
     /// Calls the `apply` method.
-    pub fn apply(&mut self, target: &mut C::Target, command: C) -> Result<C> {
+    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let branch = self.history.branch();
-        self.history.apply(target, command)?;
-        self.commands.push(CheckpointCommand::Apply(branch));
+        self.history.apply(target, action)?;
+        self.actions.push(CheckpointCommand::Apply(branch));
         Ok(())
     }
 
     /// Calls the `undo` method.
-    pub fn undo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
         if self.history.can_undo() {
             self.history.undo(target)?;
-            self.commands.push(CheckpointCommand::Undo);
+            self.actions.push(CheckpointCommand::Undo);
         }
         Ok(())
     }
 
     /// Calls the `redo` method.
-    pub fn redo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
         if self.history.can_redo() {
             self.history.redo(target)?;
-            self.commands.push(CheckpointCommand::Redo);
+            self.actions.push(CheckpointCommand::Redo);
         }
         Ok(())
     }
@@ -654,10 +654,10 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     ///
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
-    /// and the remaining commands are not canceled.
-    pub fn cancel(self, target: &mut C::Target) -> Result<C> {
-        for command in self.commands.into_iter().rev() {
-            match command {
+    /// and the remaining actions are not canceled.
+    pub fn cancel(self, target: &mut A::Target) -> Result<A> {
+        for action in self.actions.into_iter().rev() {
+            match action {
                 CheckpointCommand::Apply(branch) => {
                     let root = self.history.branch();
                     self.history.jump_to(branch);
@@ -675,32 +675,32 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<C, F> {
+    pub fn queue(&mut self) -> Queue<A, F> {
         self.history.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
         self.history.checkpoint()
     }
 }
 
-impl<'a, C, F> From<&'a mut History<C, F>> for Checkpoint<'a, C, F> {
-    fn from(history: &'a mut History<C, F>) -> Self {
+impl<'a, A, F> From<&'a mut History<A, F>> for Checkpoint<'a, A, F> {
+    fn from(history: &'a mut History<A, F>) -> Self {
         Checkpoint {
             history,
-            commands: Vec::new(),
+            actions: Vec::new(),
         }
     }
 }
 
 /// Configurable display formatting for the history.
-pub struct Display<'a, C, F> {
-    history: &'a History<C, F>,
+pub struct Display<'a, A, F> {
+    history: &'a History<A, F>,
     format: Format,
 }
 
-impl<C, F> Display<'_, C, F> {
+impl<A, F> Display<'_, A, F> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -722,25 +722,25 @@ impl<C, F> Display<'_, C, F> {
         self
     }
 
-    /// Show the position of the command (on by default).
+    /// Show the position of the action (on by default).
     pub fn position(&mut self, on: bool) -> &mut Self {
         self.format.position = on;
         self
     }
 
-    /// Show the saved command (on by default).
+    /// Show the saved action (on by default).
     pub fn saved(&mut self, on: bool) -> &mut Self {
         self.format.saved = on;
         self
     }
 }
 
-impl<C: fmt::Display, F> Display<'_, C, F> {
+impl<A: fmt::Display, F> Display<'_, A, F> {
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: Option<&Entry<C>>,
+        entry: Option<&Entry<A>>,
         level: usize,
     ) -> fmt::Result {
         self.format.mark(f, level)?;
@@ -780,7 +780,7 @@ impl<C: fmt::Display, F> Display<'_, C, F> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: Option<&Entry<C>>,
+        entry: Option<&Entry<A>>,
         level: usize,
     ) -> fmt::Result {
         for (&i, branch) in self
@@ -808,8 +808,8 @@ impl<C: fmt::Display, F> Display<'_, C, F> {
     }
 }
 
-impl<'a, C, F> From<&'a History<C, F>> for Display<'a, C, F> {
-    fn from(history: &'a History<C, F>) -> Self {
+impl<'a, A, F> From<&'a History<A, F>> for Display<'a, A, F> {
+    fn from(history: &'a History<A, F>) -> Self {
         Display {
             history,
             format: Format::default(),
@@ -817,7 +817,7 @@ impl<'a, C, F> From<&'a History<C, F>> for Display<'a, C, F> {
     }
 }
 
-impl<C: fmt::Display, F> fmt::Display for Display<'_, C, F> {
+impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let branch = self.history.branch();
         for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
@@ -835,7 +835,7 @@ mod tests {
 
     struct Add(char);
 
-    impl Command for Add {
+    impl Action for Add {
         type Target = String;
         type Error = &'static str;
 

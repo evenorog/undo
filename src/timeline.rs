@@ -1,8 +1,6 @@
-//! A timeline of commands.
+//! A timeline of actions.
 
-#![allow(dead_code)]
-
-use crate::{At, Command, Entry, Merge, Result};
+use crate::{Action, At, Entry, Merged, Result};
 use arrayvec::ArrayVec;
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
@@ -18,17 +16,17 @@ use {
     core::convert::identity,
 };
 
-/// A timeline of commands.
+/// A timeline of actions.
 ///
-/// A timeline works mostly like a record but stores a fixed number of commands on the stack.
+/// A timeline works mostly like a record but stores a fixed number of actions on the stack.
 ///
 /// Can be used without the `alloc` feature.
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, Timeline};
+/// # use undo::{Action, Timeline};
 /// # struct Add(char);
-/// # impl Command for Add {
+/// # impl Action for Add {
 /// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
@@ -63,19 +61,19 @@ use {
     derive(Serialize, Deserialize),
     serde(
         crate = "serde_crate",
-        bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>")
+        bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>")
     )
 )]
 #[derive(Clone)]
-pub struct Timeline<C, const LIMIT: usize> {
-    entries: ArrayVec<Entry<C>, LIMIT>,
+pub struct Timeline<A, const LIMIT: usize> {
+    entries: ArrayVec<Entry<A>, LIMIT>,
     current: usize,
     saved: Option<usize>,
 }
 
-impl<C, const LIMIT: usize> Timeline<C, LIMIT> {
+impl<A, const LIMIT: usize> Timeline<A, LIMIT> {
     /// Returns a new timeline.
-    pub fn new() -> Timeline<C, LIMIT> {
+    pub fn new() -> Timeline<A, LIMIT> {
         Timeline {
             entries: ArrayVec::new(),
             current: 0,
@@ -84,8 +82,8 @@ impl<C, const LIMIT: usize> Timeline<C, LIMIT> {
     }
 }
 
-impl<C, const LIMIT: usize> Timeline<C, LIMIT> {
-    /// Returns the number of commands in the timeline.
+impl<A, const LIMIT: usize> Timeline<A, LIMIT> {
+    /// Returns the number of actions in the timeline.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -110,66 +108,66 @@ impl<C, const LIMIT: usize> Timeline<C, LIMIT> {
         self.saved.map_or(false, |saved| saved == self.current())
     }
 
-    /// Returns the position of the current command.
+    /// Returns the position of the current action.
     pub fn current(&self) -> usize {
         self.current
     }
 
     /// Returns a structure for configurable formatting of the record.
     #[cfg(feature = "alloc")]
-    pub fn display(&self) -> Display<C, LIMIT> {
+    pub fn display(&self) -> Display<A, LIMIT> {
         Display::from(self)
     }
 }
 
-impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
-    /// Pushes the command on top of the timeline and executes its [`apply`] method.
+impl<A: Action, const LIMIT: usize> Timeline<A, LIMIT> {
+    /// Pushes the action on top of the timeline and executes its [`apply`] method.
     ///
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    pub fn apply(&mut self, target: &mut C::Target, mut command: C) -> Result<C> {
-        command.apply(target)?;
+    pub fn apply(&mut self, target: &mut A::Target, mut action: A) -> Result<A> {
+        action.apply(target)?;
         let current = self.current();
         let was_saved = self.is_saved();
         // Pop off all elements after len from record.
         self.entries.truncate(current);
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
-        // Try to merge commands unless the target is in a saved state.
+        // Try to merge actions unless the target is in a saved state.
         let merged = match self.entries.last_mut() {
-            Some(last) if !was_saved => last.command.merge(command),
-            _ => Merge::No(command),
+            Some(last) if !was_saved => last.action.merge(&mut action),
+            _ => Merged::No,
         };
         match merged {
-            Merge::Yes => (),
-            Merge::Annul => {
+            Merged::Yes => (),
+            Merged::Annul => {
                 self.entries.pop();
             }
-            // If commands are not merged or annulled push it onto the record.
-            Merge::No(command) => {
-                // If limit is reached, pop off the first command.
+            // If actions are not merged or annulled push it onto the record.
+            Merged::No => {
+                // If limit is reached, pop off the first action.
                 if LIMIT == self.current() {
                     self.entries.pop_at(0);
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                 } else {
                     self.current += 1;
                 }
-                self.entries.push(Entry::from(command));
+                self.entries.push(Entry::from(action));
             }
         };
         Ok(())
     }
 
-    /// Calls the [`undo`] method for the active command and sets
+    /// Calls the [`undo`] method for the active action and sets
     /// the previous one as the new active one.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
-    pub fn undo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
         if !self.can_undo() {
             return Ok(());
         }
@@ -178,14 +176,14 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
         Ok(())
     }
 
-    /// Calls the [`redo`] method for the active command and sets
+    /// Calls the [`redo`] method for the active action and sets
     /// the next one as the new active one.
     ///
     /// # Errors
     /// If an error occur when applying [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn redo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
         if !self.can_redo() {
             return Ok(());
         }
@@ -194,14 +192,14 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
         Ok(())
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the command at `current` is reached.
+    /// Repeatedly calls [`undo`] or [`redo`] until the action at `current` is reached.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn go_to(&mut self, target: &mut C::Target, current: usize) -> Option<Result<C>> {
+    pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<Result<A>> {
         if current > self.len() {
             return None;
         }
@@ -219,13 +217,13 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
         Some(Ok(()))
     }
 
-    /// Go back or forward in the record to the command that was made closest to the datetime provided.
+    /// Go back or forward in the record to the action that was made closest to the datetime provided.
     #[cfg(feature = "chrono")]
     pub fn time_travel(
         &mut self,
-        target: &mut C::Target,
+        target: &mut A::Target,
         to: &DateTime<impl TimeZone>,
-    ) -> Option<Result<C>> {
+    ) -> Option<Result<A>> {
         let to = to.with_timezone(&Utc);
         let current = self
             .entries
@@ -240,11 +238,11 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
     }
 
     /// Revert the changes done to the target since the saved state.
-    pub fn revert(&mut self, target: &mut C::Target) -> Option<Result<C>> {
+    pub fn revert(&mut self, target: &mut A::Target) -> Option<Result<A>> {
         self.saved.and_then(|saved| self.go_to(target, saved))
     }
 
-    /// Removes all commands from the timeline without undoing them.
+    /// Removes all actions from the timeline without undoing them.
     pub fn clear(&mut self) {
         self.entries.clear();
         self.saved = self.is_saved().then(|| 0);
@@ -253,31 +251,31 @@ impl<C: Command, const LIMIT: usize> Timeline<C, LIMIT> {
 }
 
 #[cfg(feature = "alloc")]
-impl<C: ToString, const LIMIT: usize> Timeline<C, LIMIT> {
-    /// Returns the string of the command which will be undone
+impl<A: ToString, const LIMIT: usize> Timeline<A, LIMIT> {
+    /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.Timeline.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
         self.current.checked_sub(1).and_then(|i| self.text(i))
     }
 
-    /// Returns the string of the command which will be redone
+    /// Returns the string of the action which will be redone
     /// in the next call to [`redo`](struct.Timeline.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
         self.text(self.current)
     }
 
     fn text(&self, i: usize) -> Option<String> {
-        self.entries.get(i).map(|e| e.command.to_string())
+        self.entries.get(i).map(|e| e.action.to_string())
     }
 }
 
-impl<C, const LIMIT: usize> Default for Timeline<C, LIMIT> {
-    fn default() -> Timeline<C, LIMIT> {
+impl<A, const LIMIT: usize> Default for Timeline<A, LIMIT> {
+    fn default() -> Timeline<A, LIMIT> {
         Timeline::new()
     }
 }
 
-impl<C: fmt::Debug, const LIMIT: usize> fmt::Debug for Timeline<C, LIMIT> {
+impl<A: fmt::Debug, const LIMIT: usize> fmt::Debug for Timeline<A, LIMIT> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Timeline")
             .field("entries", &self.entries)
@@ -289,13 +287,13 @@ impl<C: fmt::Debug, const LIMIT: usize> fmt::Debug for Timeline<C, LIMIT> {
 
 /// Configurable display formatting for the timeline.
 #[cfg(feature = "alloc")]
-pub struct Display<'a, C, const LIMIT: usize> {
-    timeline: &'a Timeline<C, LIMIT>,
+pub struct Display<'a, A, const LIMIT: usize> {
+    timeline: &'a Timeline<A, LIMIT>,
     format: Format,
 }
 
 #[cfg(feature = "alloc")]
-impl<C, const LIMIT: usize> Display<'_, C, LIMIT> {
+impl<A, const LIMIT: usize> Display<'_, A, LIMIT> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -317,13 +315,13 @@ impl<C, const LIMIT: usize> Display<'_, C, LIMIT> {
         self
     }
 
-    /// Show the position of the command (on by default).
+    /// Show the position of the action (on by default).
     pub fn position(&mut self, on: bool) -> &mut Self {
         self.format.position = on;
         self
     }
 
-    /// Show the saved command (on by default).
+    /// Show the saved action (on by default).
     pub fn saved(&mut self, on: bool) -> &mut Self {
         self.format.saved = on;
         self
@@ -331,8 +329,8 @@ impl<C, const LIMIT: usize> Display<'_, C, LIMIT> {
 }
 
 #[cfg(feature = "alloc")]
-impl<C: fmt::Display, const LIMIT: usize> Display<'_, C, LIMIT> {
-    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<C>>) -> fmt::Result {
+impl<A: fmt::Display, const LIMIT: usize> Display<'_, A, LIMIT> {
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<A>>) -> fmt::Result {
         self.format.position(f, at, false)?;
 
         #[cfg(feature = "chrono")]
@@ -363,8 +361,8 @@ impl<C: fmt::Display, const LIMIT: usize> Display<'_, C, LIMIT> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, C, const LIMIT: usize> From<&'a Timeline<C, LIMIT>> for Display<'a, C, LIMIT> {
-    fn from(timeline: &'a Timeline<C, LIMIT>) -> Self {
+impl<'a, A, const LIMIT: usize> From<&'a Timeline<A, LIMIT>> for Display<'a, A, LIMIT> {
+    fn from(timeline: &'a Timeline<A, LIMIT>) -> Self {
         Display {
             timeline,
             format: Format::default(),
@@ -373,7 +371,7 @@ impl<'a, C, const LIMIT: usize> From<&'a Timeline<C, LIMIT>> for Display<'a, C, 
 }
 
 #[cfg(feature = "alloc")]
-impl<C: fmt::Display, const LIMIT: usize> fmt::Display for Display<'_, C, LIMIT> {
+impl<A: fmt::Display, const LIMIT: usize> fmt::Display for Display<'_, A, LIMIT> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.timeline.entries.iter().enumerate().rev() {
             let at = At::new(0, i + 1);
@@ -390,7 +388,7 @@ mod tests {
 
     struct Add(char);
 
-    impl Command for Add {
+    impl Action for Add {
         type Target = ArrayString<64>;
         type Error = &'static str;
 

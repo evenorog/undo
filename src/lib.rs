@@ -1,21 +1,21 @@
 //! **Low-level undo-redo functionality.**
 //!
-//! It is an implementation of the command pattern, where all modifications are done
-//! by creating objects of commands that applies the modifications. All commands knows
+//! It is an implementation of the action pattern, where all modifications are done
+//! by creating objects of actions that applies the modifications. All actions knows
 //! how to undo the changes it applies, and by using the provided data structures
 //! it is easy to apply, undo, and redo changes made to a target.
 //!
 //! # Features
 //!
-//! * [Command](trait.Command.html) provides the base functionality for all commands.
+//! * [Command](trait.Command.html) provides the base functionality for all actions.
 //! * [Record](struct.Record.html) provides basic undo-redo functionality.
 //! * [Timeline](struct.Timeline.html) provides basic undo-redo functionality using a fixed size.
 //! * [History](struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
 //! * Queues wraps a record or history and extends them with queue functionality.
 //! * Checkpoints wraps a record or history and extends them with checkpoint functionality.
-//! * Commands can be merged into a single command by implementing the
-//!   [merge](trait.Command.html#method.merge) method on the command.
-//!   This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
+//! * Commands can be merged into a single action by implementing the
+//!   [merge](trait.Command.html#method.merge) method on the action.
+//!   This allows smaller actions to be used to build more complex operations, or smaller incremental changes to be
 //!   merged into larger changes that can be undone and redone in a single step.
 //! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
 //!   when it changes.
@@ -62,24 +62,24 @@ pub use self::timeline::Timeline;
 pub use self::{history::History, record::Record};
 
 /// A specialized Result type for undo-redo operations.
-pub type Result<C> = core::result::Result<(), <C as Command>::Error>;
+pub type Result<A> = core::result::Result<(), <A as Action>::Error>;
 
-/// Base functionality for all commands.
-pub trait Command: Sized {
+/// Base functionality for all actions.
+pub trait Action {
     /// The target type.
     type Target;
     /// The error type.
     type Error;
 
-    /// Applies the command on the target and returns `Ok` if everything went fine,
+    /// Applies the action on the target and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     fn apply(&mut self, target: &mut Self::Target) -> Result<Self>;
 
-    /// Restores the state of the target as it was before the command was applied
+    /// Restores the state of the target as it was before the action was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
     fn undo(&mut self, target: &mut Self::Target) -> Result<Self>;
 
-    /// Reapplies the command on the target and return `Ok` if everything went fine,
+    /// Reapplies the action on the target and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     ///
     /// The default implementation uses the [`apply`](trait.Command.html#tymethod.apply) implementation.
@@ -87,44 +87,25 @@ pub trait Command: Sized {
         self.apply(target)
     }
 
-    /// Used for manual merging of commands.
-    fn merge(&mut self, command: Self) -> Merge<Self> {
-        Merge::No(command)
+    /// Used for manual merging of actions.
+    fn merge(&mut self, _: &mut Self) -> Merged {
+        Merged::No
     }
 }
 
-/// The signal used for communicating state changes.
-///
-/// For example, if the record can no longer redo any commands, it sends a `Redo(false)`
-/// signal to tell the user.
+/// Says if the action have been merged with another action.
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate")
 )]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub enum Signal {
-    /// Says if the structures can undo.
-    Undo(bool),
-    /// Says if the structures can redo.
-    Redo(bool),
-    /// Says if the target is in a saved state.
-    Saved(bool),
-}
-
-/// Says if the command have been merged with another command.
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate")
-)]
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub enum Merge<C> {
-    /// The commands have been merged.
+pub enum Merged {
+    /// The actions have been merged.
     Yes,
-    /// The commands have not been merged.
-    No(C),
-    /// The two commands cancels each other out.
+    /// The actions have not been merged.
+    No,
+    /// The two actions cancels each other out.
     Annul,
 }
 
@@ -144,6 +125,25 @@ impl At {
     fn new(branch: usize, current: usize) -> At {
         At { branch, current }
     }
+}
+
+/// The signal used for communicating state changes.
+///
+/// For example, if the record can no longer redo any actions, it sends a `Redo(false)`
+/// signal to tell the user.
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub enum Signal {
+    /// Says if the structures can undo.
+    Undo(bool),
+    /// Says if the structures can redo.
+    Redo(bool),
+    /// Says if the target is in a saved state.
+    Saved(bool),
 }
 
 #[cfg_attr(
@@ -202,49 +202,45 @@ impl<F> fmt::Debug for Slot<F> {
     serde(crate = "serde_crate")
 )]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-struct Entry<C> {
-    command: C,
+struct Entry<A> {
+    action: A,
     #[cfg(feature = "chrono")]
     timestamp: DateTime<Utc>,
 }
 
-impl<C> From<C> for Entry<C> {
-    fn from(command: C) -> Self {
+impl<A> From<A> for Entry<A> {
+    fn from(action: A) -> Self {
         Entry {
-            command,
+            action,
             #[cfg(feature = "chrono")]
             timestamp: Utc::now(),
         }
     }
 }
 
-impl<C: Command> Command for Entry<C> {
-    type Target = C::Target;
-    type Error = C::Error;
+impl<A: Action> Action for Entry<A> {
+    type Target = A::Target;
+    type Error = A::Error;
 
     fn apply(&mut self, target: &mut Self::Target) -> Result<Self> {
-        self.command.apply(target)
+        self.action.apply(target)
     }
 
     fn undo(&mut self, target: &mut Self::Target) -> Result<Self> {
-        self.command.undo(target)
+        self.action.undo(target)
     }
 
     fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
-        self.command.redo(target)
+        self.action.redo(target)
     }
 
-    fn merge(&mut self, command: Self) -> Merge<Self> {
-        match self.command.merge(command.command) {
-            Merge::Yes => Merge::Yes,
-            Merge::No(command) => Merge::No(Entry::from(command)),
-            Merge::Annul => Merge::Annul,
-        }
+    fn merge(&mut self, entry: &mut Self) -> Merged {
+        self.action.merge(&mut entry.action)
     }
 }
 
-impl<C: fmt::Display> fmt::Display for Entry<C> {
+impl<A: fmt::Display> fmt::Display for Entry<A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.command as &dyn fmt::Display).fmt(f)
+        (&self.action as &dyn fmt::Display).fmt(f)
     }
 }

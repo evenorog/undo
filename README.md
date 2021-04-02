@@ -7,21 +7,21 @@
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 
 It is an implementation of the command pattern, where all modifications are done
-by creating objects of commands that applies the modifications. All commands knows
+by creating objects that applies the modifications. All objects knows
 how to undo the changes it applies, and by using the provided data structures
 it is easy to apply, undo, and redo changes made to a target.
 
 ## Features
 
-* [Command](https://docs.rs/undo/latest/undo/trait.Command.html) provides the base functionality for all commands.
+* [Action](https://docs.rs/undo/latest/undo/trait.Command.html) provides the base functionality for all actions.
 * [Record](https://docs.rs/undo/latest/undo/struct.Record.html) provides basic undo-redo functionality.
 * [Timeline](https://docs.rs/undo/latest/undo/struct.Timeline.html) provides basic undo-redo functionality using a fixed size.
 * [History](https://docs.rs/undo/latest/undo/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
 * Queues wraps a record or history and extends them with queue functionality.
 * Checkpoints wraps a record or history and extends them with checkpoint functionality.
-* Commands can be merged into a single command by implementing the
-  [merge](https://docs.rs/undo/latest/undo.Command.html#method.merge) method on the command.
-  This allows smaller commands to be used to build more complex operations, or smaller incremental changes to be
+* Commands can be merged into a single action by implementing the
+  [merge](https://docs.rs/undo/latest/undo.Action.html#method.merge) method on the action.
+  This allows smaller actions to be used to build more complex operations, or smaller incremental changes to be
   merged into larger changes that can be undone and redone in a single step.
 * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
   when it changes.
@@ -40,11 +40,11 @@ it is easy to apply, undo, and redo changes made to a target.
 ## Examples
 
 ```rust
-use undo::{Command, Record};
+use undo::{Action, Record};
 
 struct Add(char);
 
-impl Command for Add {
+impl Action for Add {
     type Target = String;
     type Error = &'static str;
 

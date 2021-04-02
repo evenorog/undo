@@ -1,6 +1,6 @@
-//! A record of commands.
+//! A record of actions.
 
-use crate::{At, Command, Entry, Format, History, Merge, Result, Signal, Slot};
+use crate::{Action, At, Entry, Format, History, Merged, Result, Signal, Slot};
 use alloc::{
     boxed::Box,
     collections::VecDeque,
@@ -20,7 +20,7 @@ use {
     core::convert::identity,
 };
 
-/// A record of commands.
+/// A record of actions.
 ///
 /// The record can roll the targets state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
@@ -30,9 +30,9 @@ use {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, Record};
+/// # use undo::{Action, Record};
 /// # struct Add(char);
-/// # impl Command for Add {
+/// # impl Action for Add {
 /// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
@@ -67,27 +67,27 @@ use {
     derive(Serialize, Deserialize),
     serde(
         crate = "serde_crate",
-        bound(serialize = "C: Serialize", deserialize = "C: Deserialize<'de>")
+        bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>")
     )
 )]
 #[derive(Clone)]
-pub struct Record<C, F = Box<dyn FnMut(Signal)>> {
-    pub(crate) entries: VecDeque<Entry<C>>,
+pub struct Record<A, F = Box<dyn FnMut(Signal)>> {
+    pub(crate) entries: VecDeque<Entry<A>>,
     current: usize,
     limit: NonZeroUsize,
     pub(crate) saved: Option<usize>,
     pub(crate) slot: Slot<F>,
 }
 
-impl<C> Record<C> {
+impl<A> Record<A> {
     /// Returns a new record.
-    pub fn new() -> Record<C> {
+    pub fn new() -> Record<A> {
         Builder::new().build()
     }
 }
 
-impl<C, F> Record<C, F> {
-    /// Reserves capacity for at least `additional` more commands.
+impl<A, F> Record<A, F> {
+    /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
@@ -105,7 +105,7 @@ impl<C, F> Record<C, F> {
         self.entries.shrink_to_fit();
     }
 
-    /// Returns the number of commands in the record.
+    /// Returns the number of actions in the record.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -147,44 +147,44 @@ impl<C, F> Record<C, F> {
         self.saved.map_or(false, |saved| saved == self.current())
     }
 
-    /// Returns the position of the current command.
+    /// Returns the position of the current action.
     pub fn current(&self) -> usize {
         self.current
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<C, F> {
+    pub fn queue(&mut self) -> Queue<A, F> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
         Checkpoint::from(self)
     }
 
     /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<C, F> {
+    pub fn display(&self) -> Display<A, F> {
         Display::from(self)
     }
 }
 
-impl<C: Command, F: FnMut(Signal)> Record<C, F> {
-    /// Pushes the command on top of the record and executes its [`apply`] method.
+impl<A: Action, F: FnMut(Signal)> Record<A, F> {
+    /// Pushes the action on top of the record and executes its [`apply`] method.
     ///
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Command.html#tymethod.apply
-    pub fn apply(&mut self, target: &mut C::Target, command: C) -> Result<C> {
-        self.__apply(target, command).map(|_| ())
+    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
+        self.__apply(target, action).map(|_| ())
     }
 
     pub(crate) fn __apply(
         &mut self,
-        target: &mut C::Target,
-        mut command: C,
-    ) -> core::result::Result<(bool, VecDeque<Entry<C>>), C::Error> {
-        command.apply(target)?;
+        target: &mut A::Target,
+        mut action: A,
+    ) -> core::result::Result<(bool, VecDeque<Entry<A>>), A::Error> {
+        action.apply(target)?;
         let current = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -193,27 +193,27 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         let tail = self.entries.split_off(current);
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
-        // Try to merge commands unless the target is in a saved state.
+        // Try to merge actions unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
-            Some(last) if !was_saved => last.command.merge(command),
-            _ => Merge::No(command),
+            Some(last) if !was_saved => last.action.merge(&mut action),
+            _ => Merged::No,
         };
         let merged_or_annulled = match merged {
-            Merge::Yes => true,
-            Merge::Annul => {
+            Merged::Yes => true,
+            Merged::Annul => {
                 self.entries.pop_back();
                 true
             }
-            // If commands are not merged or annulled push it onto the record.
-            Merge::No(command) => {
-                // If limit is reached, pop off the first command.
+            // If actions are not merged or annulled push it onto the record.
+            Merged::No => {
+                // If limit is reached, pop off the first action.
                 if self.limit() == self.current() {
                     self.entries.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                 } else {
                     self.current += 1;
                 }
-                self.entries.push_back(Entry::from(command));
+                self.entries.push_back(Entry::from(action));
                 false
             }
         };
@@ -223,14 +223,14 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         Ok((merged_or_annulled, tail))
     }
 
-    /// Calls the [`undo`] method for the active command and sets
+    /// Calls the [`undo`] method for the active action and sets
     /// the previous one as the new active one.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: ../trait.Command.html#tymethod.undo
-    pub fn undo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
         if !self.can_undo() {
             return Ok(());
         }
@@ -247,14 +247,14 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         Ok(())
     }
 
-    /// Calls the [`redo`] method for the active command and sets
+    /// Calls the [`redo`] method for the active action and sets
     /// the next one as the new active one.
     ///
     /// # Errors
     /// If an error occur when applying [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn redo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
         if !self.can_redo() {
             return Ok(());
         }
@@ -271,14 +271,14 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         Ok(())
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the command at `current` is reached.
+    /// Repeatedly calls [`undo`] or [`redo`] until the action at `current` is reached.
     ///
     /// # Errors
     /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
     ///
     /// [`undo`]: trait.Command.html#tymethod.undo
     /// [`redo`]: trait.Command.html#method.redo
-    pub fn go_to(&mut self, target: &mut C::Target, current: usize) -> Option<Result<C>> {
+    pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<Result<A>> {
         if current > self.len() {
             return None;
         }
@@ -313,13 +313,13 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
         Some(Ok(()))
     }
 
-    /// Go back or forward in the record to the command that was made closest to the datetime provided.
+    /// Go back or forward in the record to the action that was made closest to the datetime provided.
     #[cfg(feature = "chrono")]
     pub fn time_travel(
         &mut self,
-        target: &mut C::Target,
+        target: &mut A::Target,
         to: &DateTime<impl TimeZone>,
-    ) -> Option<Result<C>> {
+    ) -> Option<Result<A>> {
         let to = to.with_timezone(&Utc);
         let current = match self.entries.as_slices() {
             ([], []) => return None,
@@ -358,11 +358,11 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     }
 
     /// Revert the changes done to the target since the saved state.
-    pub fn revert(&mut self, target: &mut C::Target) -> Option<Result<C>> {
+    pub fn revert(&mut self, target: &mut A::Target) -> Option<Result<A>> {
         self.saved.and_then(|saved| self.go_to(target, saved))
     }
 
-    /// Removes all commands from the record without undoing them.
+    /// Removes all actions from the record without undoing them.
     pub fn clear(&mut self) {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -374,37 +374,37 @@ impl<C: Command, F: FnMut(Signal)> Record<C, F> {
     }
 }
 
-impl<C: ToString, F> Record<C, F> {
-    /// Returns the string of the command which will be undone
+impl<A: ToString, F> Record<A, F> {
+    /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.Record.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
         self.current.checked_sub(1).and_then(|i| self.text(i))
     }
 
-    /// Returns the string of the command which will be redone
+    /// Returns the string of the action which will be redone
     /// in the next call to [`redo`](struct.Record.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
         self.text(self.current)
     }
 
     fn text(&self, i: usize) -> Option<String> {
-        self.entries.get(i).map(|e| e.command.to_string())
+        self.entries.get(i).map(|e| e.action.to_string())
     }
 }
 
-impl<C> Default for Record<C> {
-    fn default() -> Record<C> {
+impl<A> Default for Record<A> {
+    fn default() -> Record<A> {
         Record::new()
     }
 }
 
-impl<C, F> From<History<C, F>> for Record<C, F> {
-    fn from(history: History<C, F>) -> Record<C, F> {
+impl<A, F> From<History<A, F>> for Record<A, F> {
+    fn from(history: History<A, F>) -> Record<A, F> {
         history.record
     }
 }
 
-impl<C: fmt::Debug, F> fmt::Debug for Record<C, F> {
+impl<A: fmt::Debug, F> fmt::Debug for Record<A, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Record")
             .field("entries", &self.entries)
@@ -420,9 +420,9 @@ impl<C: fmt::Debug, F> fmt::Debug for Record<C, F> {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, record::Builder, Record};
+/// # use undo::{Action, record::Builder, Record};
 /// # struct Add(char);
-/// # impl Command for Add {
+/// # impl Action for Add {
 /// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
@@ -481,7 +481,7 @@ impl<F> Builder<F> {
     }
 
     /// Builds the record.
-    pub fn build<C>(self) -> Record<C, F> {
+    pub fn build<A>(self) -> Record<A, F> {
         Record {
             entries: VecDeque::with_capacity(self.capacity),
             current: 0,
@@ -507,8 +507,8 @@ impl Default for Builder {
 }
 
 #[derive(Debug)]
-enum QueueCommand<C> {
-    Apply(C),
+enum QueueCommand<A> {
+    Apply(A),
     Undo,
     Redo,
 }
@@ -517,9 +517,9 @@ enum QueueCommand<C> {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Command, Record};
+/// # use undo::{Action, Record};
 /// # struct Add(char);
-/// # impl Command for Add {
+/// # impl Action for Add {
 /// #     type Target = String;
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
@@ -545,35 +545,35 @@ enum QueueCommand<C> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Queue<'a, C, F> {
-    record: &'a mut Record<C, F>,
-    commands: Vec<QueueCommand<C>>,
+pub struct Queue<'a, A, F> {
+    record: &'a mut Record<A, F>,
+    actions: Vec<QueueCommand<A>>,
 }
 
-impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
+impl<A: Action, F: FnMut(Signal)> Queue<'_, A, F> {
     /// Queues an `apply` action.
-    pub fn apply(&mut self, command: C) {
-        self.commands.push(QueueCommand::Apply(command));
+    pub fn apply(&mut self, action: A) {
+        self.actions.push(QueueCommand::Apply(action));
     }
 
     /// Queues an `undo` action.
     pub fn undo(&mut self) {
-        self.commands.push(QueueCommand::Undo);
+        self.actions.push(QueueCommand::Undo);
     }
 
     /// Queues a `redo` action.
     pub fn redo(&mut self) {
-        self.commands.push(QueueCommand::Redo);
+        self.actions.push(QueueCommand::Redo);
     }
 
-    /// Applies the queued commands.
+    /// Applies the queued actions.
     ///
     /// # Errors
-    /// If an error occurs, it stops applying the commands and returns the error.
-    pub fn commit(self, target: &mut C::Target) -> Result<C> {
-        for command in self.commands {
-            match command {
-                QueueCommand::Apply(command) => self.record.apply(target, command)?,
+    /// If an error occurs, it stops applying the actions and returns the error.
+    pub fn commit(self, target: &mut A::Target) -> Result<A> {
+        for action in self.actions {
+            match action {
+                QueueCommand::Apply(action) => self.record.apply(target, action)?,
                 QueueCommand::Undo => self.record.undo(target)?,
                 QueueCommand::Redo => self.record.redo(target)?,
             }
@@ -585,62 +585,62 @@ impl<C: Command, F: FnMut(Signal)> Queue<'_, C, F> {
     pub fn cancel(self) {}
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<C, F> {
+    pub fn queue(&mut self) -> Queue<A, F> {
         self.record.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
         self.record.checkpoint()
     }
 }
 
-impl<'a, C, F> From<&'a mut Record<C, F>> for Queue<'a, C, F> {
-    fn from(record: &'a mut Record<C, F>) -> Self {
+impl<'a, A, F> From<&'a mut Record<A, F>> for Queue<'a, A, F> {
+    fn from(record: &'a mut Record<A, F>) -> Self {
         Queue {
             record,
-            commands: Vec::new(),
+            actions: Vec::new(),
         }
     }
 }
 
 #[derive(Debug)]
-enum CheckpointCommand<C> {
-    Apply(Option<usize>, VecDeque<Entry<C>>),
+enum CheckpointCommand<A> {
+    Apply(Option<usize>, VecDeque<Entry<A>>),
     Undo,
     Redo,
 }
 
 /// Wraps a record and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, C, F> {
-    record: &'a mut Record<C, F>,
-    commands: Vec<CheckpointCommand<C>>,
+pub struct Checkpoint<'a, A, F> {
+    record: &'a mut Record<A, F>,
+    actions: Vec<CheckpointCommand<A>>,
 }
 
-impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
+impl<A: Action, F: FnMut(Signal)> Checkpoint<'_, A, F> {
     /// Calls the `apply` method.
-    pub fn apply(&mut self, target: &mut C::Target, command: C) -> Result<C> {
+    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let saved = self.record.saved;
-        let (_, tail) = self.record.__apply(target, command)?;
-        self.commands.push(CheckpointCommand::Apply(saved, tail));
+        let (_, tail) = self.record.__apply(target, action)?;
+        self.actions.push(CheckpointCommand::Apply(saved, tail));
         Ok(())
     }
 
     /// Calls the `undo` method.
-    pub fn undo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
         if self.record.can_undo() {
             self.record.undo(target)?;
-            self.commands.push(CheckpointCommand::Undo);
+            self.actions.push(CheckpointCommand::Undo);
         }
         Ok(())
     }
 
     /// Calls the `redo` method.
-    pub fn redo(&mut self, target: &mut C::Target) -> Result<C> {
+    pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
         if self.record.can_redo() {
             self.record.redo(target)?;
-            self.commands.push(CheckpointCommand::Redo);
+            self.actions.push(CheckpointCommand::Redo);
         }
         Ok(())
     }
@@ -652,10 +652,10 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     ///
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
-    /// and the remaining commands are not canceled.
-    pub fn cancel(self, target: &mut C::Target) -> Result<C> {
-        for command in self.commands.into_iter().rev() {
-            match command {
+    /// and the remaining actions are not canceled.
+    pub fn cancel(self, target: &mut A::Target) -> Result<A> {
+        for action in self.actions.into_iter().rev() {
+            match action {
                 CheckpointCommand::Apply(saved, mut entries) => {
                     self.record.undo(target)?;
                     self.record.entries.pop_back();
@@ -670,32 +670,32 @@ impl<C: Command, F: FnMut(Signal)> Checkpoint<'_, C, F> {
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<C, F> {
+    pub fn queue(&mut self) -> Queue<A, F> {
         self.record.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<C, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
         self.record.checkpoint()
     }
 }
 
-impl<'a, C, F> From<&'a mut Record<C, F>> for Checkpoint<'a, C, F> {
-    fn from(record: &'a mut Record<C, F>) -> Self {
+impl<'a, A, F> From<&'a mut Record<A, F>> for Checkpoint<'a, A, F> {
+    fn from(record: &'a mut Record<A, F>) -> Self {
         Checkpoint {
             record,
-            commands: Vec::new(),
+            actions: Vec::new(),
         }
     }
 }
 
 /// Configurable display formatting for the record.
-pub struct Display<'a, C, F> {
-    record: &'a Record<C, F>,
+pub struct Display<'a, A, F> {
+    record: &'a Record<A, F>,
     format: Format,
 }
 
-impl<C, F> Display<'_, C, F> {
+impl<A, F> Display<'_, A, F> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -717,21 +717,21 @@ impl<C, F> Display<'_, C, F> {
         self
     }
 
-    /// Show the position of the command (on by default).
+    /// Show the position of the action (on by default).
     pub fn position(&mut self, on: bool) -> &mut Self {
         self.format.position = on;
         self
     }
 
-    /// Show the saved command (on by default).
+    /// Show the saved action (on by default).
     pub fn saved(&mut self, on: bool) -> &mut Self {
         self.format.saved = on;
         self
     }
 }
 
-impl<C: fmt::Display, F> Display<'_, C, F> {
-    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<C>>) -> fmt::Result {
+impl<A: fmt::Display, F> Display<'_, A, F> {
+    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<A>>) -> fmt::Result {
         self.format.position(f, at, false)?;
 
         #[cfg(feature = "chrono")]
@@ -761,8 +761,8 @@ impl<C: fmt::Display, F> Display<'_, C, F> {
     }
 }
 
-impl<'a, C, F> From<&'a Record<C, F>> for Display<'a, C, F> {
-    fn from(record: &'a Record<C, F>) -> Self {
+impl<'a, A, F> From<&'a Record<A, F>> for Display<'a, A, F> {
+    fn from(record: &'a Record<A, F>) -> Self {
         Display {
             record,
             format: Format::default(),
@@ -770,7 +770,7 @@ impl<'a, C, F> From<&'a Record<C, F>> for Display<'a, C, F> {
     }
 }
 
-impl<C: fmt::Display, F> fmt::Display for Display<'_, C, F> {
+impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.record.entries.iter().enumerate().rev() {
             let at = At::new(0, i + 1);
@@ -787,7 +787,7 @@ mod tests {
 
     struct Add(char);
 
-    impl Command for Add {
+    impl Action for Add {
         type Target = String;
         type Error = &'static str;
 
