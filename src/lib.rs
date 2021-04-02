@@ -166,12 +166,8 @@ impl<F: FnMut(Signal)> Slot<F> {
 
     fn emit_if(&mut self, cond: bool, signal: Signal) {
         if cond {
-            self.emit(signal)
+            self.emit(signal);
         }
-    }
-
-    fn disable(&mut self) -> Slot<F> {
-        Slot { f: self.f.take() }
     }
 }
 

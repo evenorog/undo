@@ -286,7 +286,7 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Temporarily remove slot so they are not called each iteration.
-        let slot = self.slot.disable();
+        let slot = self.disconnect();
         // Decide if we need to undo or redo to reach current.
         let f = if current > self.current() {
             Record::redo
@@ -295,12 +295,12 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
         };
         while self.current() != current {
             if let Err(err) = f(self, target) {
-                self.slot = slot;
+                self.slot.f = slot;
                 return Some(Err(err));
             }
         }
         // Add slot back.
-        self.slot = slot;
+        self.slot.f = slot;
         let can_undo = self.can_undo();
         let can_redo = self.can_redo();
         let is_saved = self.is_saved();
