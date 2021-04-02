@@ -173,7 +173,7 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned.
     ///
-    /// [`apply`]: trait.Command.html#tymethod.apply
+    /// [`apply`]: trait.Action.html#tymethod.apply
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let at = self.at();
         let saved = self.record.saved.filter(|&saved| saved > at.current);
@@ -204,7 +204,7 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     /// # Errors
     /// If an error occur when executing [`undo`] the error is returned.
     ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
+    /// [`undo`]: trait.Action.html#tymethod.undo
     pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
         self.record.undo(target)
     }
@@ -215,7 +215,7 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     /// # Errors
     /// If an error occur when executing [`redo`] the error is returned.
     ///
-    /// [`redo`]: trait.Command.html#method.redo
+    /// [`redo`]: trait.Action.html#method.redo
     pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
         self.record.redo(target)
     }
@@ -225,8 +225,8 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     /// # Errors
     /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
     ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
-    /// [`redo`]: trait.Command.html#method.redo
+    /// [`undo`]: trait.Action.html#tymethod.undo
+    /// [`redo`]: trait.Action.html#method.redo
     pub fn go_to(
         &mut self,
         target: &mut A::Target,

@@ -7,14 +7,14 @@
 //!
 //! # Features
 //!
-//! * [Command](trait.Command.html) provides the base functionality for all actions.
-//! * [Record](struct.Record.html) provides basic undo-redo functionality.
-//! * [Timeline](struct.Timeline.html) provides basic undo-redo functionality using a fixed size.
-//! * [History](struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
+//! * [Action](trait.Action.html) provides the base functionality for all actions.
+//! * [Record](record/struct.Record.html) provides basic undo-redo functionality.
+//! * [Timeline](timeline/struct.Timeline.html) provides basic undo-redo functionality using a fixed size.
+//! * [History](history/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
 //! * Queues wraps a record or history and extends them with queue functionality.
 //! * Checkpoints wraps a record or history and extends them with checkpoint functionality.
 //! * Commands can be merged into a single action by implementing the
-//!   [merge](trait.Command.html#method.merge) method on the action.
+//!   [merge](trait.Action.html#method.merge) method on the action.
 //!   This allows smaller actions to be used to build more complex operations, or smaller incremental changes to be
 //!   merged into larger changes that can be undone and redone in a single step.
 //! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
@@ -82,7 +82,7 @@ pub trait Action {
     /// Reapplies the action on the target and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     ///
-    /// The default implementation uses the [`apply`](trait.Command.html#tymethod.apply) implementation.
+    /// The default implementation uses the [`apply`](trait.Action.html#tymethod.apply) implementation.
     fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
         self.apply(target)
     }

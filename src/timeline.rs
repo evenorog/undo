@@ -126,7 +126,7 @@ impl<A: Action, const LIMIT: usize> Timeline<A, LIMIT> {
     /// # Errors
     /// If an error occur when executing [`apply`] the error is returned.
     ///
-    /// [`apply`]: trait.Command.html#tymethod.apply
+    /// [`apply`]: trait.Action.html#tymethod.apply
     pub fn apply(&mut self, target: &mut A::Target, mut action: A) -> Result<A> {
         action.apply(target)?;
         let current = self.current();
@@ -166,7 +166,7 @@ impl<A: Action, const LIMIT: usize> Timeline<A, LIMIT> {
     /// # Errors
     /// If an error occur when executing [`undo`] the error is returned.
     ///
-    /// [`undo`]: ../trait.Command.html#tymethod.undo
+    /// [`undo`]: ../trait.Action.html#tymethod.undo
     pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
         if !self.can_undo() {
             return Ok(());
@@ -182,7 +182,7 @@ impl<A: Action, const LIMIT: usize> Timeline<A, LIMIT> {
     /// # Errors
     /// If an error occur when applying [`redo`] the error is returned.
     ///
-    /// [`redo`]: trait.Command.html#method.redo
+    /// [`redo`]: trait.Action.html#method.redo
     pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
         if !self.can_redo() {
             return Ok(());
@@ -197,8 +197,8 @@ impl<A: Action, const LIMIT: usize> Timeline<A, LIMIT> {
     /// # Errors
     /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
     ///
-    /// [`undo`]: trait.Command.html#tymethod.undo
-    /// [`redo`]: trait.Command.html#method.redo
+    /// [`undo`]: trait.Action.html#tymethod.undo
+    /// [`redo`]: trait.Action.html#method.redo
     pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<Result<A>> {
         if current > self.len() {
             return None;
