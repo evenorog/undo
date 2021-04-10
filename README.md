@@ -40,7 +40,7 @@ it is easy to apply, undo, and redo changes made to a target.
 ## Examples
 
 ```rust
-use undo::{Action, Record};
+use undo::{Action, History};
 
 struct Add(char);
 
@@ -61,18 +61,18 @@ impl Action for Add {
 
 fn main() -> undo::Result<Add> {
     let mut target = String::new();
-    let mut record = Record::new();
-    record.apply(&mut target, Add('a'))?;
-    record.apply(&mut target, Add('b'))?;
-    record.apply(&mut target, Add('c'))?;
+    let mut history = History::new();
+    history.apply(&mut target, Add('a'))?;
+    history.apply(&mut target, Add('b'))?;
+    history.apply(&mut target, Add('c'))?;
     assert_eq!(target, "abc");
-    record.undo(&mut target)?;
-    record.undo(&mut target)?;
-    record.undo(&mut target)?;
+    history.undo(&mut target)?;
+    history.undo(&mut target)?;
+    history.undo(&mut target)?;
     assert_eq!(target, "");
-    record.redo(&mut target)?;
-    record.redo(&mut target)?;
-    record.redo(&mut target)?;
+    history.redo(&mut target)?;
+    history.redo(&mut target)?;
+    history.redo(&mut target)?;
     assert_eq!(target, "abc");
     Ok(())
 }

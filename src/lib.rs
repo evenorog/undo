@@ -30,6 +30,47 @@
 //! * `chrono`: Enables time stamps and time travel.
 //! * `serde`: Enables serialization and deserialization.
 //! * `colored`: Enables colored output when visualizing the display structures.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use undo::{Action, History};
+//!
+//! struct Add(char);
+//!
+//! impl Action for Add {
+//!     type Target = String;
+//!     type Error = &'static str;
+//!
+//!     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
+//!         s.push(self.0);
+//!         Ok(())
+//!     }
+//!
+//!     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
+//!         self.0 = s.pop().ok_or("s is empty")?;
+//!         Ok(())
+//!     }
+//! }
+//!
+//! fn main() -> undo::Result<Add> {
+//!     let mut target = String::new();
+//!     let mut history = History::new();
+//!     history.apply(&mut target, Add('a'))?;
+//!     history.apply(&mut target, Add('b'))?;
+//!     history.apply(&mut target, Add('c'))?;
+//!     assert_eq!(target, "abc");
+//!     history.undo(&mut target)?;
+//!     history.undo(&mut target)?;
+//!     history.undo(&mut target)?;
+//!     assert_eq!(target, "");
+//!     history.redo(&mut target)?;
+//!     history.redo(&mut target)?;
+//!     history.redo(&mut target)?;
+//!     assert_eq!(target, "abc");
+//!     Ok(())
+//! }
+//! ```
 
 #![no_std]
 #![doc(html_root_url = "https://docs.rs/undo")]
