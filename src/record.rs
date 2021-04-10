@@ -238,9 +238,8 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
         let old = self.current();
         self.entries[self.current - 1].undo(target)?;
         self.current -= 1;
-        let len = self.len();
         let is_saved = self.is_saved();
-        self.slot.emit_if(old == len, Signal::Redo(true));
+        self.slot.emit_if(old == self.len(), Signal::Redo(true));
         self.slot.emit_if(old == 1, Signal::Undo(false));
         self.slot
             .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
@@ -262,9 +261,9 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
         let old = self.current();
         self.entries[self.current].redo(target)?;
         self.current += 1;
-        let len = self.len();
         let is_saved = self.is_saved();
-        self.slot.emit_if(old == len - 1, Signal::Redo(false));
+        self.slot
+            .emit_if(old == self.len() - 1, Signal::Redo(false));
         self.slot.emit_if(old == 0, Signal::Undo(true));
         self.slot
             .emit_if(was_saved != is_saved, Signal::Saved(is_saved));

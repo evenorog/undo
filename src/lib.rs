@@ -122,7 +122,7 @@ struct At {
 }
 
 impl At {
-    fn new(branch: usize, current: usize) -> At {
+    const fn new(branch: usize, current: usize) -> At {
         At { branch, current }
     }
 }
