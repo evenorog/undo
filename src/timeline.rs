@@ -445,7 +445,7 @@ impl<A: fmt::Display, F, const LIMIT: usize> fmt::Display for Display<'_, A, F, 
             let at = At::new(0, i + 1);
             self.fmt_list(f, at, Some(entry))?;
         }
-        self.fmt_list(f, At::new(0, 0), None)
+        self.fmt_list(f, At::ROOT, None)
     }
 }
 

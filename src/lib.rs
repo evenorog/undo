@@ -122,6 +122,8 @@ struct At {
 }
 
 impl At {
+    const ROOT: At = At::new(0, 0);
+
     const fn new(branch: usize, current: usize) -> At {
         At { branch, current }
     }
