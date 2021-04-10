@@ -28,6 +28,7 @@ use {
 /// # struct Add(char);
 /// # impl Action for Add {
 /// #     type Target = String;
+/// #     type Output = ();
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
 /// #         s.push(self.0);
@@ -45,13 +46,13 @@ use {
 /// timeline.apply(&mut target, Add('b'))?;
 /// timeline.apply(&mut target, Add('c'))?;
 /// assert_eq!(target, "abc");
-/// timeline.undo(&mut target)?;
-/// timeline.undo(&mut target)?;
-/// timeline.undo(&mut target)?;
+/// timeline.undo(&mut target).unwrap()?;
+/// timeline.undo(&mut target).unwrap()?;
+/// timeline.undo(&mut target).unwrap()?;
 /// assert_eq!(target, "");
-/// timeline.redo(&mut target)?;
-/// timeline.redo(&mut target)?;
-/// timeline.redo(&mut target)?;
+/// timeline.redo(&mut target).unwrap()?;
+/// timeline.redo(&mut target).unwrap()?;
+/// timeline.redo(&mut target).unwrap()?;
 /// assert_eq!(target, "abc");
 /// # Ok(())
 /// # }
@@ -147,7 +148,7 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
     ///
     /// [`apply`]: trait.Action.html#tymethod.apply
     pub fn apply(&mut self, target: &mut A::Target, mut action: A) -> Result<A> {
-        action.apply(target)?;
+        let output = action.apply(target)?;
         let current = self.current();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -181,7 +182,7 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
         self.slot.emit_if(could_redo, Signal::Redo(false));
         self.slot.emit_if(!could_undo, Signal::Undo(true));
         self.slot.emit_if(was_saved, Signal::Saved(false));
-        Ok(())
+        Ok(output)
     }
 
     /// Calls the [`undo`] method for the active action and sets
@@ -191,20 +192,19 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: ../trait.Action.html#tymethod.undo
-    pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
-        if !self.can_undo() {
-            return Ok(());
-        }
-        let was_saved = self.is_saved();
-        let old = self.current();
-        self.entries[self.current - 1].undo(target)?;
-        self.current -= 1;
-        let is_saved = self.is_saved();
-        self.slot.emit_if(old == self.len(), Signal::Redo(true));
-        self.slot.emit_if(old == 1, Signal::Undo(false));
-        self.slot
-            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-        Ok(())
+    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
+        self.can_undo().then(|| {
+            let was_saved = self.is_saved();
+            let old = self.current();
+            let output = self.entries[self.current - 1].undo(target)?;
+            self.current -= 1;
+            let is_saved = self.is_saved();
+            self.slot.emit_if(old == self.len(), Signal::Redo(true));
+            self.slot.emit_if(old == 1, Signal::Undo(false));
+            self.slot
+                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+            Ok(output)
+        })
     }
 
     /// Calls the [`redo`] method for the active action and sets
@@ -214,21 +214,50 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
     /// If an error occur when applying [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Action.html#method.redo
-    pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
-        if !self.can_redo() {
-            return Ok(());
-        }
+    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
+        self.can_redo().then(|| {
+            let was_saved = self.is_saved();
+            let old = self.current();
+            let output = self.entries[self.current].redo(target)?;
+            self.current += 1;
+            let is_saved = self.is_saved();
+            self.slot
+                .emit_if(old == self.len() - 1, Signal::Redo(false));
+            self.slot.emit_if(old == 0, Signal::Undo(true));
+            self.slot
+                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+            Ok(output)
+        })
+    }
+
+    /// Marks the target as currently being in a saved or unsaved state.
+    pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
-        let old = self.current();
-        self.entries[self.current].redo(target)?;
-        self.current += 1;
-        let is_saved = self.is_saved();
-        self.slot
-            .emit_if(old == self.len() - 1, Signal::Redo(false));
-        self.slot.emit_if(old == 0, Signal::Undo(true));
-        self.slot
-            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-        Ok(())
+        if saved {
+            self.saved = Some(self.current());
+            self.slot.emit_if(!was_saved, Signal::Saved(true));
+        } else {
+            self.saved = None;
+            self.slot.emit_if(was_saved, Signal::Saved(false));
+        }
+    }
+
+    /// Removes all actions from the timeline without undoing them.
+    pub fn clear(&mut self) {
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        self.entries.clear();
+        self.saved = self.is_saved().then(|| 0);
+        self.current = 0;
+        self.slot.emit_if(could_undo, Signal::Undo(false));
+        self.slot.emit_if(could_redo, Signal::Redo(false));
+    }
+}
+
+impl<A: Action<Output = ()>, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
+    /// Revert the changes done to the target since the saved state.
+    pub fn revert(&mut self, target: &mut A::Target) -> Option<Result<A>> {
+        self.saved.and_then(|saved| self.go_to(target, saved))
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the action at `current` is reached.
@@ -254,7 +283,7 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
             Timeline::undo
         };
         while self.current() != current {
-            if let Err(err) = f(self, target) {
+            if let Err(err) = f(self, target).unwrap() {
                 self.slot.f = slot;
                 return Some(Err(err));
             }
@@ -286,34 +315,6 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
             .binary_search_by(|e| e.timestamp.cmp(&to))
             .unwrap_or_else(identity);
         self.go_to(target, current)
-    }
-
-    /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
-        let was_saved = self.is_saved();
-        if saved {
-            self.saved = Some(self.current());
-            self.slot.emit_if(!was_saved, Signal::Saved(true));
-        } else {
-            self.saved = None;
-            self.slot.emit_if(was_saved, Signal::Saved(false));
-        }
-    }
-
-    /// Revert the changes done to the target since the saved state.
-    pub fn revert(&mut self, target: &mut A::Target) -> Option<Result<A>> {
-        self.saved.and_then(|saved| self.go_to(target, saved))
-    }
-
-    /// Removes all actions from the timeline without undoing them.
-    pub fn clear(&mut self) {
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
-        self.entries.clear();
-        self.saved = self.is_saved().then(|| 0);
-        self.current = 0;
-        self.slot.emit_if(could_undo, Signal::Undo(false));
-        self.slot.emit_if(could_redo, Signal::Redo(false));
     }
 }
 
@@ -506,6 +507,7 @@ mod tests {
 
     impl Action for Add {
         type Target = ArrayString<64>;
+        type Output = ();
         type Error = &'static str;
 
         fn apply(&mut self, s: &mut ArrayString<64>) -> Result<Add> {

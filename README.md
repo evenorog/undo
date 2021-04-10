@@ -46,6 +46,7 @@ struct Add(char);
 
 impl Action for Add {
     type Target = String;
+    type Output = ();
     type Error = &'static str;
 
     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {

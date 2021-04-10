@@ -40,6 +40,7 @@
 //!
 //! impl Action for Add {
 //!     type Target = String;
+//!     type Output = ();
 //!     type Error = &'static str;
 //!
 //!     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
@@ -60,13 +61,13 @@
 //!     history.apply(&mut target, Add('b'))?;
 //!     history.apply(&mut target, Add('c'))?;
 //!     assert_eq!(target, "abc");
-//!     history.undo(&mut target)?;
-//!     history.undo(&mut target)?;
-//!     history.undo(&mut target)?;
+//!     history.undo(&mut target).unwrap()?;
+//!     history.undo(&mut target).unwrap()?;
+//!     history.undo(&mut target).unwrap()?;
 //!     assert_eq!(target, "");
-//!     history.redo(&mut target)?;
-//!     history.redo(&mut target)?;
-//!     history.redo(&mut target)?;
+//!     history.redo(&mut target).unwrap()?;
+//!     history.redo(&mut target).unwrap()?;
+//!     history.redo(&mut target).unwrap()?;
 //!     assert_eq!(target, "abc");
 //!     Ok(())
 //! }
@@ -103,12 +104,14 @@ pub use self::timeline::Timeline;
 pub use self::{history::History, record::Record};
 
 /// A specialized Result type for undo-redo operations.
-pub type Result<A> = core::result::Result<(), <A as Action>::Error>;
+pub type Result<A> = core::result::Result<<A as Action>::Output, <A as Action>::Error>;
 
 /// Base functionality for all actions.
 pub trait Action {
     /// The target type.
     type Target;
+    /// The output type.
+    type Output;
     /// The error type.
     type Error;
 
@@ -259,6 +262,7 @@ impl<A> From<A> for Entry<A> {
 
 impl<A: Action> Action for Entry<A> {
     type Target = A::Target;
+    type Output = A::Output;
     type Error = A::Error;
 
     fn apply(&mut self, target: &mut Self::Target) -> Result<Self> {

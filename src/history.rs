@@ -26,6 +26,7 @@ use serde_crate::{Deserialize, Serialize};
 /// # struct Add(char);
 /// # impl Action for Add {
 /// #     type Target = String;
+/// #     type Output = ();
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
 /// #         s.push(self.0);
@@ -177,7 +178,7 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let at = self.at();
         let saved = self.record.saved.filter(|&saved| saved > at.current);
-        let (merged, tail) = self.record.__apply(target, action)?;
+        let (output, merged, tail) = self.record.__apply(target, action)?;
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -195,7 +196,7 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
                 .insert(at.branch, Branch::new(new, at.current, tail));
             self.set_root(new, at.current, saved);
         }
-        Ok(())
+        Ok(output)
     }
 
     /// Calls the [`undo`] method for the active action
@@ -205,7 +206,7 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Action.html#tymethod.undo
-    pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
+    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
         self.record.undo(target)
     }
 
@@ -216,61 +217,8 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Action.html#method.redo
-    pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
+    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
         self.record.redo(target)
-    }
-
-    /// Repeatedly calls [`undo`] or [`redo`] until the action in `branch` at `current` is reached.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
-    ///
-    /// [`undo`]: trait.Action.html#tymethod.undo
-    /// [`redo`]: trait.Action.html#method.redo
-    pub fn go_to(
-        &mut self,
-        target: &mut A::Target,
-        branch: usize,
-        current: usize,
-    ) -> Option<Result<A>> {
-        let root = self.root;
-        if root == branch {
-            return self.record.go_to(target, current);
-        }
-        // Walk the path from `root` to `branch`.
-        for (new, branch) in self.mk_path(branch)? {
-            // Walk to `branch.current` either by undoing or redoing.
-            if let Err(err) = self.record.go_to(target, branch.parent.current).unwrap() {
-                return Some(Err(err));
-            }
-            // Apply the actions in the branch and move older actions into their own branch.
-            for entry in branch.entries {
-                let current = self.current();
-                let saved = self.record.saved.filter(|&saved| saved > current);
-                let entries = match self.record.__apply(target, entry.action) {
-                    Ok((_, entries)) => entries,
-                    Err(err) => return Some(Err(err)),
-                };
-                if !entries.is_empty() {
-                    self.branches
-                        .insert(self.root, Branch::new(new, current, entries));
-                    self.set_root(new, current, saved);
-                }
-            }
-        }
-        self.record.go_to(target, current)
-    }
-
-    /// Go back or forward in the history to the action that was made closest to the datetime provided.
-    ///
-    /// This method does not jump across branches.
-    #[cfg(feature = "chrono")]
-    pub fn time_travel(
-        &mut self,
-        target: &mut A::Target,
-        to: &DateTime<impl TimeZone>,
-    ) -> Option<Result<A>> {
-        self.record.time_travel(target, to)
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
@@ -373,6 +321,61 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     }
 }
 
+impl<A: Action<Output = ()>, F: FnMut(Signal)> History<A, F> {
+    /// Repeatedly calls [`undo`] or [`redo`] until the action in `branch` at `current` is reached.
+    ///
+    /// # Errors
+    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
+    ///
+    /// [`undo`]: trait.Action.html#tymethod.undo
+    /// [`redo`]: trait.Action.html#method.redo
+    pub fn go_to(
+        &mut self,
+        target: &mut A::Target,
+        branch: usize,
+        current: usize,
+    ) -> Option<Result<A>> {
+        let root = self.root;
+        if root == branch {
+            return self.record.go_to(target, current);
+        }
+        // Walk the path from `root` to `branch`.
+        for (new, branch) in self.mk_path(branch)? {
+            // Walk to `branch.current` either by undoing or redoing.
+            if let Err(err) = self.record.go_to(target, branch.parent.current).unwrap() {
+                return Some(Err(err));
+            }
+            // Apply the actions in the branch and move older actions into their own branch.
+            for entry in branch.entries {
+                let current = self.current();
+                let saved = self.record.saved.filter(|&saved| saved > current);
+                let entries = match self.record.__apply(target, entry.action) {
+                    Ok((_, _, entries)) => entries,
+                    Err(err) => return Some(Err(err)),
+                };
+                if !entries.is_empty() {
+                    self.branches
+                        .insert(self.root, Branch::new(new, current, entries));
+                    self.set_root(new, current, saved);
+                }
+            }
+        }
+        self.record.go_to(target, current)
+    }
+
+    /// Go back or forward in the history to the action that was made closest to the datetime provided.
+    ///
+    /// This method does not jump across branches.
+    #[cfg(feature = "chrono")]
+    pub fn time_travel(
+        &mut self,
+        target: &mut A::Target,
+        to: &DateTime<impl TimeZone>,
+    ) -> Option<Result<A>> {
+        self.record.time_travel(target, to)
+    }
+}
+
 impl<A: ToString, F> History<A, F> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.History.html#method.undo).
@@ -446,6 +449,7 @@ impl<A> Branch<A> {
 /// # struct Add(char);
 /// # impl Action for Add {
 /// #     type Target = String;
+/// #     type Output = ();
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
 /// #         s.push(self.0);
@@ -510,7 +514,7 @@ impl Default for Builder {
 }
 
 #[derive(Debug)]
-enum QueueCommand<A> {
+enum QueueAction<A> {
     Apply(A),
     Undo,
     Redo,
@@ -524,6 +528,7 @@ enum QueueCommand<A> {
 /// # struct Add(char);
 /// # impl Action for Add {
 /// #     type Target = String;
+/// #     type Output = ();
 /// #     type Error = &'static str;
 /// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
 /// #         s.push(self.0);
@@ -542,7 +547,7 @@ enum QueueCommand<A> {
 /// queue.apply(Add('b'));
 /// queue.apply(Add('c'));
 /// assert_eq!(string, "");
-/// queue.commit(&mut string)?;
+/// queue.commit(&mut string).unwrap()?;
 /// assert_eq!(string, "abc");
 /// # Ok(())
 /// # }
@@ -550,38 +555,42 @@ enum QueueCommand<A> {
 #[derive(Debug)]
 pub struct Queue<'a, A, F> {
     history: &'a mut History<A, F>,
-    actions: Vec<QueueCommand<A>>,
+    actions: Vec<QueueAction<A>>,
 }
 
-impl<A: Action, F: FnMut(Signal)> Queue<'_, A, F> {
+impl<A: Action<Output = ()>, F: FnMut(Signal)> Queue<'_, A, F> {
     /// Queues an `apply` action.
     pub fn apply(&mut self, action: A) {
-        self.actions.push(QueueCommand::Apply(action));
+        self.actions.push(QueueAction::Apply(action));
     }
 
     /// Queues an `undo` action.
     pub fn undo(&mut self) {
-        self.actions.push(QueueCommand::Undo);
+        self.actions.push(QueueAction::Undo);
     }
 
     /// Queues a `redo` action.
     pub fn redo(&mut self) {
-        self.actions.push(QueueCommand::Redo);
+        self.actions.push(QueueAction::Redo);
     }
 
     /// Applies the queued actions.
     ///
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
-    pub fn commit(self, target: &mut A::Target) -> Result<A> {
+    pub fn commit(self, target: &mut A::Target) -> Option<Result<A>> {
         for action in self.actions {
-            match action {
-                QueueCommand::Apply(action) => self.history.apply(target, action)?,
-                QueueCommand::Undo => self.history.undo(target)?,
-                QueueCommand::Redo => self.history.redo(target)?,
+            let o = match action {
+                QueueAction::Apply(action) => Some(self.history.apply(target, action)),
+                QueueAction::Undo => self.history.undo(target),
+                QueueAction::Redo => self.history.redo(target),
+            };
+            match o {
+                Some(Ok(())) => (),
+                o @ Some(Err(_)) | o @ None => return o,
             }
         }
-        Ok(())
+        Some(Ok(()))
     }
 
     /// Cancels the queued actions.
@@ -608,7 +617,7 @@ impl<'a, A, F> From<&'a mut History<A, F>> for Queue<'a, A, F> {
 }
 
 #[derive(Debug)]
-enum CheckpointCommand {
+enum CheckpointAction {
     Apply(usize),
     Undo,
     Redo,
@@ -618,34 +627,38 @@ enum CheckpointCommand {
 #[derive(Debug)]
 pub struct Checkpoint<'a, A, F> {
     history: &'a mut History<A, F>,
-    actions: Vec<CheckpointCommand>,
+    actions: Vec<CheckpointAction>,
 }
 
-impl<A: Action, F: FnMut(Signal)> Checkpoint<'_, A, F> {
+impl<A: Action<Output = ()>, F: FnMut(Signal)> Checkpoint<'_, A, F> {
     /// Calls the `apply` method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let branch = self.history.branch();
         self.history.apply(target, action)?;
-        self.actions.push(CheckpointCommand::Apply(branch));
+        self.actions.push(CheckpointAction::Apply(branch));
         Ok(())
     }
 
     /// Calls the `undo` method.
-    pub fn undo(&mut self, target: &mut A::Target) -> Result<A> {
-        if self.history.can_undo() {
-            self.history.undo(target)?;
-            self.actions.push(CheckpointCommand::Undo);
+    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
+        match self.history.undo(target) {
+            o @ Some(Ok(())) => {
+                self.actions.push(CheckpointAction::Undo);
+                o
+            }
+            o => o,
         }
-        Ok(())
     }
 
     /// Calls the `redo` method.
-    pub fn redo(&mut self, target: &mut A::Target) -> Result<A> {
-        if self.history.can_redo() {
-            self.history.redo(target)?;
-            self.actions.push(CheckpointCommand::Redo);
+    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
+        match self.history.redo(target) {
+            o @ Some(Ok(())) => {
+                self.actions.push(CheckpointAction::Redo);
+                o
+            }
+            o => o,
         }
-        Ok(())
     }
 
     /// Commits the changes and consumes the checkpoint.
@@ -656,10 +669,10 @@ impl<A: Action, F: FnMut(Signal)> Checkpoint<'_, A, F> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining actions are not canceled.
-    pub fn cancel(self, target: &mut A::Target) -> Result<A> {
+    pub fn cancel(self, target: &mut A::Target) -> Option<Result<A>> {
         for action in self.actions.into_iter().rev() {
             match action {
-                CheckpointCommand::Apply(branch) => {
+                CheckpointAction::Apply(branch) => {
                     let root = self.history.branch();
                     self.history.jump_to(branch);
                     if root == branch {
@@ -668,11 +681,17 @@ impl<A: Action, F: FnMut(Signal)> Checkpoint<'_, A, F> {
                         self.history.branches.remove(&root).unwrap();
                     }
                 }
-                CheckpointCommand::Undo => self.history.redo(target)?,
-                CheckpointCommand::Redo => self.history.undo(target)?,
-            }
+                CheckpointAction::Undo => match self.history.redo(target) {
+                    Some(Ok(())) => (),
+                    o => return o,
+                },
+                CheckpointAction::Redo => match self.history.undo(target) {
+                    Some(Ok(())) => (),
+                    o => return o,
+                },
+            };
         }
-        Ok(())
+        Some(Ok(()))
     }
 
     /// Returns a queue.
@@ -838,6 +857,7 @@ mod tests {
 
     impl Action for Add {
         type Target = String;
+        type Output = ();
         type Error = &'static str;
 
         fn apply(&mut self, s: &mut String) -> Result<Add> {
@@ -876,24 +896,24 @@ mod tests {
         history.apply(&mut target, Add('d')).unwrap();
         history.apply(&mut target, Add('e')).unwrap();
         assert_eq!(target, "abcde");
-        history.undo(&mut target).unwrap();
-        history.undo(&mut target).unwrap();
+        history.undo(&mut target).unwrap().unwrap();
+        history.undo(&mut target).unwrap().unwrap();
         assert_eq!(target, "abc");
         let abcde = history.branch();
         history.apply(&mut target, Add('f')).unwrap();
         history.apply(&mut target, Add('g')).unwrap();
         assert_eq!(target, "abcfg");
-        history.undo(&mut target).unwrap();
+        history.undo(&mut target).unwrap().unwrap();
         let abcfg = history.branch();
         history.apply(&mut target, Add('h')).unwrap();
         history.apply(&mut target, Add('i')).unwrap();
         history.apply(&mut target, Add('j')).unwrap();
         assert_eq!(target, "abcfhij");
-        history.undo(&mut target).unwrap();
+        history.undo(&mut target).unwrap().unwrap();
         let abcfhij = history.branch();
         history.apply(&mut target, Add('k')).unwrap();
         assert_eq!(target, "abcfhik");
-        history.undo(&mut target).unwrap();
+        history.undo(&mut target).unwrap().unwrap();
         let abcfhik = history.branch();
         history.apply(&mut target, Add('l')).unwrap();
         assert_eq!(target, "abcfhil");
@@ -904,7 +924,7 @@ mod tests {
         history.apply(&mut target, Add('n')).unwrap();
         history.apply(&mut target, Add('o')).unwrap();
         assert_eq!(target, "abno");
-        history.undo(&mut target).unwrap();
+        history.undo(&mut target).unwrap().unwrap();
         let abno = history.branch();
         history.apply(&mut target, Add('p')).unwrap();
         history.apply(&mut target, Add('q')).unwrap();
