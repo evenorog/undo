@@ -1,6 +1,6 @@
 [package]
 name = "undo"
-version = "0.44.0"
+version = "0.45.0"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "Low-level undo-redo functionality."
 documentation = "https://docs.rs/undo"
