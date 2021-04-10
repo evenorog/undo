@@ -353,6 +353,54 @@ impl<A: fmt::Debug, F, const LIMIT: usize> fmt::Debug for Timeline<A, F, LIMIT> 
     }
 }
 
+/// Builder for a Record.
+#[derive(Debug)]
+pub struct Builder<F> {
+    saved: bool,
+    slot: Slot<F>,
+}
+
+impl<F> Builder<F> {
+    /// Returns a builder for a record.
+    pub fn new() -> Builder<F> {
+        Builder {
+            saved: true,
+            slot: Slot::default(),
+        }
+    }
+
+    /// Sets if the target is initially in a saved state.
+    /// By default the target is in a saved state.
+    pub fn saved(mut self, saved: bool) -> Builder<F> {
+        self.saved = saved;
+        self
+    }
+
+    /// Builds the record.
+    pub fn build<A, const LIMIT: usize>(self) -> Timeline<A, F, LIMIT> {
+        Timeline {
+            entries: ArrayVec::new(),
+            current: 0,
+            saved: self.saved.then(|| 0),
+            slot: self.slot,
+        }
+    }
+}
+
+impl<F: FnMut(Signal)> Builder<F> {
+    /// Connects the slot.
+    pub fn connect(mut self, f: F) -> Builder<F> {
+        self.slot = Slot::from(f);
+        self
+    }
+}
+
+impl Default for Builder<fn(Signal)> {
+    fn default() -> Self {
+        Builder::new()
+    }
+}
+
 /// Configurable display formatting for the timeline.
 #[cfg(feature = "alloc")]
 pub struct Display<'a, A, F, const LIMIT: usize> {

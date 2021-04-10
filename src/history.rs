@@ -462,6 +462,7 @@ impl<A> Branch<A> {
 ///     .connect(|s| { dbg!(s); })
 ///     .build::<Add>();
 /// ```
+#[derive(Debug)]
 pub struct Builder<F = Box<dyn FnMut(Signal)>>(RBuilder<F>);
 
 impl<F> Builder<F> {

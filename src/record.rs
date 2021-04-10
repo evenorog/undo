@@ -439,6 +439,7 @@ impl<A: fmt::Debug, F> fmt::Debug for Record<A, F> {
 ///     .connect(|s| { dbg!(s); })
 ///     .build::<Add>();
 /// ```
+#[derive(Debug)]
 pub struct Builder<F = Box<dyn FnMut(Signal)>> {
     capacity: usize,
     limit: NonZeroUsize,
@@ -485,7 +486,7 @@ impl<F> Builder<F> {
             entries: VecDeque::with_capacity(self.capacity),
             current: 0,
             limit: self.limit,
-            saved: if self.saved { Some(0) } else { None },
+            saved: self.saved.then(|| 0),
             slot: self.slot,
         }
     }
