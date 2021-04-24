@@ -132,7 +132,10 @@ pub trait Action {
     }
 
     /// Used for manual merging of actions.
-    fn merge(&mut self, _: &mut Self) -> Merged {
+    fn merge(&mut self, _: &mut Self) -> Merged
+    where
+        Self: Sized,
+    {
         Merged::No
     }
 }

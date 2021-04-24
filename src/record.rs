@@ -802,6 +802,7 @@ impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use alloc::boxed::Box;
     use alloc::string::String;
 
     struct Add(char);
@@ -952,5 +953,11 @@ mod tests {
         record.redo(&mut target).unwrap().unwrap();
         assert!(record.is_saved());
         assert_eq!(target, "abc");
+    }
+
+    #[test]
+    fn dyn_trait() {
+        let _: Box<dyn Action<Output = (), Error = &'static str, Target = String>> =
+            Box::new(Add('a'));
     }
 }
