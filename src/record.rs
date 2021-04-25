@@ -15,7 +15,7 @@ use core::{
 use serde_crate::{Deserialize, Serialize};
 #[cfg(feature = "chrono")]
 use {
-    chrono::{DateTime, TimeZone, Utc},
+    chrono::{DateTime, Utc},
     core::cmp::Ordering,
     core::convert::identity,
 };
@@ -180,6 +180,7 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
         self.__apply(target, action).map(|(output, _, _)| output)
     }
 
+    #[allow(clippy::type_complexity)]
     pub(crate) fn __apply(
         &mut self,
         target: &mut A::Target,
@@ -343,29 +344,24 @@ impl<A: Action<Output = ()>, F: FnMut(Signal)> Record<A, F> {
 
     /// Go back or forward in the record to the action that was made closest to the datetime provided.
     #[cfg(feature = "chrono")]
-    pub fn time_travel(
-        &mut self,
-        target: &mut A::Target,
-        to: &DateTime<impl TimeZone>,
-    ) -> Option<Result<A>> {
-        let to = to.with_timezone(&Utc);
+    pub fn time_travel(&mut self, target: &mut A::Target, to: &DateTime<Utc>) -> Option<Result<A>> {
         let current = match self.entries.as_slices() {
             ([], []) => return None,
             (head, []) => head
-                .binary_search_by(|e| e.timestamp.cmp(&to))
+                .binary_search_by(|e| e.timestamp.cmp(to))
                 .unwrap_or_else(identity),
             ([], tail) => tail
-                .binary_search_by(|e| e.timestamp.cmp(&to))
+                .binary_search_by(|e| e.timestamp.cmp(to))
                 .unwrap_or_else(identity),
-            (head, tail) => match head.last().unwrap().timestamp.cmp(&to) {
+            (head, tail) => match head.last().unwrap().timestamp.cmp(to) {
                 Ordering::Less => head
-                    .binary_search_by(|e| e.timestamp.cmp(&to))
+                    .binary_search_by(|e| e.timestamp.cmp(to))
                     .unwrap_or_else(identity),
                 Ordering::Equal => head.len(),
                 Ordering::Greater => {
                     head.len()
                         + tail
-                            .binary_search_by(|e| e.timestamp.cmp(&to))
+                            .binary_search_by(|e| e.timestamp.cmp(to))
                             .unwrap_or_else(identity)
                 }
             },

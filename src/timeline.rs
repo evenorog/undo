@@ -12,7 +12,7 @@ use {
 };
 #[cfg(feature = "chrono")]
 use {
-    chrono::{DateTime, TimeZone, Utc},
+    chrono::{DateTime, Utc},
     core::convert::identity,
 };
 
@@ -304,15 +304,10 @@ impl<A: Action<Output = ()>, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F
 
     /// Go back or forward in the record to the action that was made closest to the datetime provided.
     #[cfg(feature = "chrono")]
-    pub fn time_travel(
-        &mut self,
-        target: &mut A::Target,
-        to: &DateTime<impl TimeZone>,
-    ) -> Option<Result<A>> {
-        let to = to.with_timezone(&Utc);
+    pub fn time_travel(&mut self, target: &mut A::Target, to: &DateTime<Utc>) -> Option<Result<A>> {
         let current = self
             .entries
-            .binary_search_by(|e| e.timestamp.cmp(&to))
+            .binary_search_by(|e| e.timestamp.cmp(to))
             .unwrap_or_else(identity);
         self.go_to(target, current)
     }

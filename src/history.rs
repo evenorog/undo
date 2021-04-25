@@ -10,7 +10,7 @@ use alloc::{
     vec::Vec,
 };
 #[cfg(feature = "chrono")]
-use chrono::{DateTime, TimeZone};
+use chrono::{DateTime, Utc};
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
@@ -367,11 +367,7 @@ impl<A: Action<Output = ()>, F: FnMut(Signal)> History<A, F> {
     ///
     /// This method does not jump across branches.
     #[cfg(feature = "chrono")]
-    pub fn time_travel(
-        &mut self,
-        target: &mut A::Target,
-        to: &DateTime<impl TimeZone>,
-    ) -> Option<Result<A>> {
+    pub fn time_travel(&mut self, target: &mut A::Target, to: &DateTime<Utc>) -> Option<Result<A>> {
         self.record.time_travel(target, to)
     }
 }
