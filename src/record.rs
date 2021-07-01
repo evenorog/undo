@@ -204,6 +204,7 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
             Merged::Yes => true,
             Merged::Annul => {
                 self.entries.pop_back();
+                current -= 1;
                 true
             }
             // If actions are not merged or annulled push it onto the record.
