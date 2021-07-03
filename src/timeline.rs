@@ -166,6 +166,7 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
             Merged::Yes => (),
             Merged::Annul => {
                 self.entries.pop();
+                self.current -= 1;
             }
             // If actions are not merged or annulled push it onto the record.
             Merged::No => {

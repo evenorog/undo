@@ -802,6 +802,42 @@ mod tests {
     use alloc::boxed::Box;
     use alloc::string::String;
 
+    enum Edit {
+        Add(Add),
+        Del(Del),
+    }
+
+    impl Action for Edit {
+        type Target = String;
+        type Output = ();
+        type Error = &'static str;
+
+        fn apply(&mut self, s: &mut String) -> Result<Add> {
+            match self {
+                Edit::Add(add) => add.apply(s),
+                Edit::Del(del) => del.apply(s),
+            }
+        }
+
+        fn undo(&mut self, s: &mut String) -> Result<Add> {
+            match self {
+                Edit::Add(add) => add.undo(s),
+                Edit::Del(del) => del.undo(s),
+            }
+        }
+
+        fn merge(&mut self, edit: &mut Self) -> Merged
+        where
+            Self: Sized,
+        {
+            match (self, edit) {
+                (Edit::Add(_), Edit::Del(_)) => Merged::Annul,
+                (Edit::Del(Del(Some(a))), Edit::Add(Add(b))) if a == b => Merged::Annul,
+                _ => Merged::No,
+            }
+        }
+    }
+
     struct Add(char);
 
     impl Action for Add {
@@ -816,6 +852,26 @@ mod tests {
 
         fn undo(&mut self, s: &mut String) -> Result<Add> {
             self.0 = s.pop().ok_or("s is empty")?;
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct Del(Option<char>);
+
+    impl Action for Del {
+        type Target = String;
+        type Output = ();
+        type Error = &'static str;
+
+        fn apply(&mut self, s: &mut String) -> Result<Add> {
+            self.0 = s.pop();
+            Ok(())
+        }
+
+        fn undo(&mut self, s: &mut String) -> Result<Add> {
+            let ch = self.0.ok_or("s is empty")?;
+            s.push(ch);
             Ok(())
         }
     }
@@ -956,5 +1012,16 @@ mod tests {
     fn dyn_trait() {
         let _: Box<dyn Action<Output = (), Error = &'static str, Target = String>> =
             Box::new(Add('a'));
+    }
+
+    #[test]
+    fn annul() {
+        let mut target = String::new();
+        let mut record = Record::new();
+        record.apply(&mut target, Edit::Add(Add('a'))).unwrap();
+        record
+            .apply(&mut target, Edit::Del(Del::default()))
+            .unwrap();
+        record.apply(&mut target, Edit::Add(Add('b'))).unwrap();
     }
 }
