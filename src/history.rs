@@ -37,20 +37,19 @@ use serde_crate::{Deserialize, Serialize};
 /// #         Ok(())
 /// #     }
 /// # }
-/// # fn main() -> undo::Result<Add> {
+/// # fn main() {
 /// let mut target = String::new();
 /// let mut history = History::new();
-/// history.apply(&mut target, Add('a'))?;
-/// history.apply(&mut target, Add('b'))?;
-/// history.apply(&mut target, Add('c'))?;
+/// history.apply(&mut target, Add('a')).unwrap();
+/// history.apply(&mut target, Add('b')).unwrap();
+/// history.apply(&mut target, Add('c')).unwrap();
 /// let abc = history.branch();
-/// history.go_to(&mut target, abc, 1).unwrap()?;
-/// history.apply(&mut target, Add('f'))?;
-/// history.apply(&mut target, Add('g'))?;
+/// history.go_to(&mut target, abc, 1).unwrap().unwrap();
+/// history.apply(&mut target, Add('f')).unwrap();
+/// history.apply(&mut target, Add('g')).unwrap();
 /// assert_eq!(target, "afg");
-/// history.go_to(&mut target, abc, 3).unwrap()?;
+/// history.go_to(&mut target, abc, 3).unwrap().unwrap();
 /// assert_eq!(target, "abc");
-/// # Ok(())
 /// # }
 /// ```
 #[cfg_attr(
@@ -535,7 +534,7 @@ enum QueueAction<A> {
 /// #         Ok(())
 /// #     }
 /// # }
-/// # fn main() -> undo::Result<Add> {
+/// # fn main() {
 /// let mut string = String::new();
 /// let mut record = Record::new();
 /// let mut queue = record.queue();
@@ -543,9 +542,8 @@ enum QueueAction<A> {
 /// queue.apply(Add('b'));
 /// queue.apply(Add('c'));
 /// assert_eq!(string, "");
-/// queue.commit(&mut string).unwrap()?;
+/// queue.commit(&mut string).unwrap().unwrap();
 /// assert_eq!(string, "abc");
-/// # Ok(())
 /// # }
 /// ```
 #[derive(Debug)]

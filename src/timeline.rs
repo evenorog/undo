@@ -39,22 +39,21 @@ use {
 /// #         Ok(())
 /// #     }
 /// # }
-/// # fn main() -> undo::Result<Add> {
+/// # fn main() {
 /// let mut target = String::new();
 /// let mut timeline = Timeline::<_, _, 32>::new();
-/// timeline.apply(&mut target, Add('a'))?;
-/// timeline.apply(&mut target, Add('b'))?;
-/// timeline.apply(&mut target, Add('c'))?;
+/// timeline.apply(&mut target, Add('a')).unwrap();
+/// timeline.apply(&mut target, Add('b')).unwrap();
+/// timeline.apply(&mut target, Add('c')).unwrap();
 /// assert_eq!(target, "abc");
-/// timeline.undo(&mut target).unwrap()?;
-/// timeline.undo(&mut target).unwrap()?;
-/// timeline.undo(&mut target).unwrap()?;
+/// timeline.undo(&mut target).unwrap().unwrap();
+/// timeline.undo(&mut target).unwrap().unwrap();
+/// timeline.undo(&mut target).unwrap().unwrap();
 /// assert_eq!(target, "");
-/// timeline.redo(&mut target).unwrap()?;
-/// timeline.redo(&mut target).unwrap()?;
-/// timeline.redo(&mut target).unwrap()?;
+/// timeline.redo(&mut target).unwrap().unwrap();
+/// timeline.redo(&mut target).unwrap().unwrap();
+/// timeline.redo(&mut target).unwrap().unwrap();
 /// assert_eq!(target, "abc");
-/// # Ok(())
 /// # }
 /// ```
 #[cfg_attr(

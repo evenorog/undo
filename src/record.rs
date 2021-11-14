@@ -45,22 +45,21 @@ use {
 /// #         Ok(())
 /// #     }
 /// # }
-/// # fn main() -> undo::Result<Add> {
+/// # fn main() {
 /// let mut target = String::new();
 /// let mut record = Record::new();
-/// record.apply(&mut target, Add('a'))?;
-/// record.apply(&mut target, Add('b'))?;
-/// record.apply(&mut target, Add('c'))?;
+/// record.apply(&mut target, Add('a')).unwrap();
+/// record.apply(&mut target, Add('b')).unwrap();
+/// record.apply(&mut target, Add('c')).unwrap();
 /// assert_eq!(target, "abc");
-/// record.undo(&mut target).unwrap()?;
-/// record.undo(&mut target).unwrap()?;
-/// record.undo(&mut target).unwrap()?;
+/// record.undo(&mut target).unwrap().unwrap();
+/// record.undo(&mut target).unwrap().unwrap();
+/// record.undo(&mut target).unwrap().unwrap();
 /// assert_eq!(target, "");
-/// record.redo(&mut target).unwrap()?;
-/// record.redo(&mut target).unwrap()?;
-/// record.redo(&mut target).unwrap()?;
+/// record.redo(&mut target).unwrap().unwrap();
+/// record.redo(&mut target).unwrap().unwrap();
+/// record.redo(&mut target).unwrap().unwrap();
 /// assert_eq!(target, "abc");
-/// # Ok(())
 /// # }
 /// ```
 #[cfg_attr(
@@ -531,7 +530,7 @@ enum QueueAction<A> {
 /// #         Ok(())
 /// #     }
 /// # }
-/// # fn main() -> undo::Result<Add> {
+/// # fn main() {
 /// let mut string = String::new();
 /// let mut record = Record::new();
 /// let mut queue = record.queue();
@@ -539,9 +538,8 @@ enum QueueAction<A> {
 /// queue.apply(Add('b'));
 /// queue.apply(Add('c'));
 /// assert_eq!(string, "");
-/// queue.commit(&mut string).unwrap()?;
+/// queue.commit(&mut string).unwrap().unwrap();
 /// assert_eq!(string, "abc");
-/// # Ok(())
 /// # }
 /// ```
 #[derive(Debug)]

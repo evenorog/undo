@@ -1,4 +1,4 @@
-//! **Low-level undo-redo functionality.**
+//! **A undo-redo library.**
 //!
 //! It is an implementation of the action pattern, where all modifications are done
 //! by creating objects of actions that applies the modifications. All actions knows
@@ -54,22 +54,21 @@
 //!     }
 //! }
 //!
-//! fn main() -> undo::Result<Add> {
+//! fn main() {
 //!     let mut target = String::new();
 //!     let mut history = History::new();
-//!     history.apply(&mut target, Add('a'))?;
-//!     history.apply(&mut target, Add('b'))?;
-//!     history.apply(&mut target, Add('c'))?;
+//!     history.apply(&mut target, Add('a')).unwrap();
+//!     history.apply(&mut target, Add('b')).unwrap();
+//!     history.apply(&mut target, Add('c')).unwrap();
 //!     assert_eq!(target, "abc");
-//!     history.undo(&mut target).unwrap()?;
-//!     history.undo(&mut target).unwrap()?;
-//!     history.undo(&mut target).unwrap()?;
+//!     history.undo(&mut target).unwrap().unwrap();
+//!     history.undo(&mut target).unwrap().unwrap();
+//!     history.undo(&mut target).unwrap().unwrap();
 //!     assert_eq!(target, "");
-//!     history.redo(&mut target).unwrap()?;
-//!     history.redo(&mut target).unwrap()?;
-//!     history.redo(&mut target).unwrap()?;
+//!     history.redo(&mut target).unwrap().unwrap();
+//!     history.redo(&mut target).unwrap().unwrap();
+//!     history.redo(&mut target).unwrap().unwrap();
 //!     assert_eq!(target, "abc");
-//!     Ok(())
 //! }
 //! ```
 

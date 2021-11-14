@@ -1,6 +1,6 @@
 # undo
 
-**Low-level undo-redo functionality.**
+**A undo-redo library.**
 
 [![Travis](https://travis-ci.com/evenorog/undo.svg?branch=master)](https://travis-ci.com/evenorog/undo)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
@@ -60,22 +60,21 @@ impl Action for Add {
     }
 }
 
-fn main() -> undo::Result<Add> {
+fn main() {
     let mut target = String::new();
     let mut history = History::new();
-    history.apply(&mut target, Add('a'))?;
-    history.apply(&mut target, Add('b'))?;
-    history.apply(&mut target, Add('c'))?;
+    history.apply(&mut target, Add('a')).unwrap();
+    history.apply(&mut target, Add('b')).unwrap();
+    history.apply(&mut target, Add('c')).unwrap();
     assert_eq!(target, "abc");
-    history.undo(&mut target)?;
-    history.undo(&mut target)?;
-    history.undo(&mut target)?;
+    history.undo(&mut target).unwrap();
+    history.undo(&mut target).unwrap();
+    history.undo(&mut target).unwrap();
     assert_eq!(target, "");
-    history.redo(&mut target)?;
-    history.redo(&mut target)?;
-    history.redo(&mut target)?;
+    history.redo(&mut target).unwrap();
+    history.redo(&mut target).unwrap();
+    history.redo(&mut target).unwrap();
     assert_eq!(target, "abc");
-    Ok(())
 }
 ```
 
