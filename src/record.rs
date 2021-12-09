@@ -1008,8 +1008,13 @@ mod tests {
 
     #[test]
     fn dyn_trait() {
-        let _: Box<dyn Action<Output = (), Error = &'static str, Target = String>> =
+        let mut target = String::new();
+        let action: Box<dyn Action<Output = (), Error = &'static str, Target = String>> =
             Box::new(Add('a'));
+        let mut record: Record<
+            Box<dyn Action<Output = (), Error = &'static str, Target = String>>,
+        > = Record::default();
+        record.apply(&mut target, action).unwrap();
     }
 
     #[test]

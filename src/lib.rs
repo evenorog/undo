@@ -94,6 +94,7 @@ use crate::format::Format;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
 use core::fmt;
+use core::ops::DerefMut;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 
@@ -142,7 +143,7 @@ pub trait Action {
 impl<A, D> Action for D
 where
     A: Action + ?Sized,
-    D: core::ops::DerefMut<Target = A>
+    D: DerefMut<Target = A>,
 {
     type Target = A::Target;
     type Output = A::Output;
