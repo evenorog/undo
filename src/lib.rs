@@ -155,6 +155,10 @@ where
     fn undo(&mut self, target: &mut Self::Target) -> Result<Self> {
         self.deref_mut().undo(target)
     }
+
+    fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
+        self.deref_mut().redo(target)
+    }
 }
 
 /// Says if the action have been merged with another action.
