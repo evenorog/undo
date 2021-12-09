@@ -139,6 +139,24 @@ pub trait Action {
     }
 }
 
+impl<A, D> Action for D
+where
+    A: Action + ?Sized,
+    D: core::ops::DerefMut<Target = A>
+{
+    type Target = A::Target;
+    type Output = A::Output;
+    type Error = A::Error;
+
+    fn apply(&mut self, target: &mut Self::Target) -> Result<Self> {
+        self.deref_mut().apply(target)
+    }
+
+    fn undo(&mut self, target: &mut Self::Target) -> Result<Self> {
+        self.deref_mut().undo(target)
+    }
+}
+
 /// Says if the action have been merged with another action.
 #[cfg_attr(
     feature = "serde",
