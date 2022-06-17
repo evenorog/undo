@@ -2,7 +2,7 @@
 
 **A undo-redo library.**
 
-[![Travis](https://travis-ci.com/evenorog/undo.svg?branch=master)](https://travis-ci.com/evenorog/undo)
+[![Rust](https://github.com/evenorog/undo/actions/workflows/rust.yml/badge.svg)](https://github.com/evenorog/undo/actions/workflows/rust.yml)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 

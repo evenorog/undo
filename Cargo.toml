@@ -24,7 +24,6 @@ alloc = ["serde_crate/alloc"]
 serde = ["serde_crate", "chrono/serde", "arrayvec/serde"]
 
 [badges]
-travis-ci = { repository = "evenorog/undo" }
 maintenance = { status = "actively-developed" }
 
 [package.metadata.docs.rs]
