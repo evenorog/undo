@@ -17,8 +17,8 @@ it is easy to apply, undo, and redo changes made to a target.
 * [Record](https://docs.rs/undo/latest/undo/record/struct.Record.html) provides basic undo-redo functionality.
 * [Timeline](https://docs.rs/undo/latest/undo/timeline/struct.Timeline.html) provides basic undo-redo functionality using a fixed size.
 * [History](https://docs.rs/undo/latest/undo/history/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
-* Queues wraps a record or history and extends them with queue functionality.
-* Checkpoints wraps a record or history and extends them with checkpoint functionality.
+* A queue that wraps a record or history and extends them with queue functionality.
+* A checkpoint that wraps a record or history and extends them with checkpoint functionality.
 * Actions can be merged into a single action by implementing the
   [merge](https://docs.rs/undo/latest/undo.Action.html#method.merge) method on the action.
   This allows smaller actions to be used to build more complex operations, or smaller incremental changes to be

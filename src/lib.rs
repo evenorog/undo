@@ -11,8 +11,8 @@
 //! * [Record](record/struct.Record.html) provides basic undo-redo functionality.
 //! * [Timeline](timeline/struct.Timeline.html) provides basic undo-redo functionality using a fixed size.
 //! * [History](history/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
-//! * Queues wraps a record or history and extends them with queue functionality.
-//! * Checkpoints wraps a record or history and extends them with checkpoint functionality.
+//! * A queues that wraps a record or history and extends them with queue functionality.
+//! * A checkpoints that wraps a record or history and extends them with checkpoint functionality.
 //! * Actions can be merged into a single action by implementing the
 //!   [merge](trait.Action.html#method.merge) method on the action.
 //!   This allows smaller actions to be used to build more complex operations, or smaller incremental changes to be
