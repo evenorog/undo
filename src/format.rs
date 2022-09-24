@@ -176,7 +176,7 @@ impl Format {
         if self.colored {
             return write!(f, " {}", rfc2822.yellow());
         }
-        write!(f, " {}", rfc2822)
+        write!(f, " {rfc2822}")
     }
 }
 

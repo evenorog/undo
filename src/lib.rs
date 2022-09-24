@@ -96,7 +96,7 @@ use chrono::{DateTime, Utc};
 use core::fmt;
 use core::ops::DerefMut;
 #[cfg(feature = "serde")]
-use serde_crate::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "arrayvec")]
 pub use self::timeline::Timeline;
@@ -163,11 +163,7 @@ where
 }
 
 /// Says if the action have been merged with another action.
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Merged {
     /// The actions have been merged.
@@ -179,11 +175,7 @@ pub enum Merged {
 }
 
 /// A position in a history tree.
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq)]
 struct At {
     branch: usize,
@@ -202,11 +194,7 @@ impl At {
 ///
 /// For example, if the record can no longer redo any actions, it sends a `Redo(false)`
 /// signal to tell the user.
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the structures can undo.
@@ -217,11 +205,7 @@ pub enum Signal {
     Saved(bool),
 }
 
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone)]
 struct Slot<F> {
     #[cfg_attr(feature = "serde", serde(default = "Option::default", skip))]
@@ -263,11 +247,7 @@ impl<F> fmt::Debug for Slot<F> {
     }
 }
 
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct Entry<A> {
     action: A,

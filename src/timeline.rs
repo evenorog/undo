@@ -4,7 +4,7 @@ use crate::{Action, At, Entry, Merged, Result, Signal, Slot};
 use arrayvec::ArrayVec;
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
-use serde_crate::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "alloc")]
 use {
     crate::Format,
@@ -59,10 +59,7 @@ use {
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
-    serde(
-        crate = "serde_crate",
-        bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>")
-    )
+    serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
 )]
 #[derive(Clone)]
 pub struct Timeline<A, F, const LIMIT: usize> {

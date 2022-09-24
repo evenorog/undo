@@ -13,7 +13,7 @@ use alloc::{
 use chrono::{DateTime, Utc};
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
-use serde_crate::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// A history of actions.
 ///
@@ -55,10 +55,7 @@ use serde_crate::{Deserialize, Serialize};
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
-    serde(
-        crate = "serde_crate",
-        bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>")
-    )
+    serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
 )]
 #[derive(Clone)]
 pub struct History<A, F = Box<dyn FnMut(Signal)>> {
@@ -416,11 +413,7 @@ impl<A: fmt::Debug, F> fmt::Debug for History<A, F> {
 }
 
 /// A branch in the history.
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub(crate) struct Branch<A> {
     pub(crate) parent: At,
