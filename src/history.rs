@@ -9,8 +9,6 @@ use alloc::{
     vec,
     vec::Vec,
 };
-#[cfg(feature = "chrono")]
-use chrono::{DateTime, Utc};
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -344,14 +342,6 @@ impl<A: Action<Output = ()>, F: FnMut(Signal)> History<A, F> {
             }
         }
         self.record.go_to(target, current)
-    }
-
-    /// Go back or forward in the history to the action that was made closest to the datetime provided.
-    ///
-    /// This method does not jump across branches.
-    #[cfg(feature = "chrono")]
-    pub fn time_travel(&mut self, target: &mut A::Target, to: &DateTime<Utc>) -> Option<Result<A>> {
-        self.record.time_travel(target, to)
     }
 }
 
