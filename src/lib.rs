@@ -26,10 +26,9 @@
 //! # Cargo Feature Flags
 //!
 //! * `alloc`: Enables the use of the alloc crate, enabled by default.
-//! * `arrayvec`: Required for the timeline module, enabled by default.
+//! * `colored`: Enables colored output when visualizing the display structures, enabled by default.
 //! * `chrono`: Enables time stamps and time travel.
 //! * `serde`: Enables serialization and deserialization.
-//! * `colored`: Enables colored output when visualizing the display structures.
 //!
 //! # Examples
 //!
@@ -78,6 +77,10 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(feature = "alloc"), allow(dead_code))]
 
+#[doc = include_str!("../README.md")]
+#[cfg(doctest)]
+pub struct ReadmeDocTest;
+
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
@@ -87,7 +90,6 @@ mod format;
 pub mod history;
 #[cfg(feature = "alloc")]
 pub mod record;
-#[cfg(feature = "arrayvec")]
 pub mod timeline;
 
 use crate::format::Format;
@@ -98,7 +100,6 @@ use core::ops::DerefMut;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "arrayvec")]
 pub use self::timeline::Timeline;
 #[cfg(feature = "alloc")]
 pub use self::{history::History, record::Record};
