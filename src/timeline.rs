@@ -1,14 +1,15 @@
 //! A timeline of actions.
 
-use crate::{Action, At, Entry, Merged, Result, Signal, Slot};
+use crate::{Action, Entry, Merged, Result, Signal, Slot};
 use arrayvec::ArrayVec;
-use core::fmt::{self, Write};
+use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "alloc")]
 use {
-    crate::Format,
+    crate::{At, Format},
     alloc::string::{String, ToString},
+    core::fmt::Write,
 };
 #[cfg(feature = "chrono")]
 use {

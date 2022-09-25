@@ -92,6 +92,7 @@ pub mod history;
 pub mod record;
 pub mod timeline;
 
+#[cfg(feature = "alloc")]
 use crate::format::Format;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
