@@ -149,15 +149,15 @@ where
     type Output = A::Output;
     type Error = A::Error;
 
-    fn apply(&mut self, target: &mut Self::Target) -> Result<Self> {
+    fn apply(&mut self, target: &mut A::Target) -> Result<Self> {
         self.deref_mut().apply(target)
     }
 
-    fn undo(&mut self, target: &mut Self::Target) -> Result<Self> {
+    fn undo(&mut self, target: &mut A::Target) -> Result<Self> {
         self.deref_mut().undo(target)
     }
 
-    fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
+    fn redo(&mut self, target: &mut A::Target) -> Result<Self> {
         self.deref_mut().redo(target)
     }
 }

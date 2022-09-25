@@ -24,21 +24,8 @@ use {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Action, Timeline};
-/// # struct Add(char);
-/// # impl Action for Add {
-/// #     type Target = String;
-/// #     type Output = ();
-/// #     type Error = &'static str;
-/// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         s.push(self.0);
-/// #         Ok(())
-/// #     }
-/// #     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         self.0 = s.pop().ok_or("s is empty")?;
-/// #         Ok(())
-/// #     }
-/// # }
+/// # use undo::Timeline;
+/// # include!("../add.rs");
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut timeline = Timeline::<_, _, 32>::new();
@@ -346,7 +333,7 @@ impl<A: fmt::Debug, F, const LIMIT: usize> fmt::Debug for Timeline<A, F, LIMIT> 
     }
 }
 
-/// Builder for a Record.
+/// Builder for a Timeline.
 #[derive(Debug)]
 pub struct Builder<F> {
     saved: bool,

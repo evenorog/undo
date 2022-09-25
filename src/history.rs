@@ -22,21 +22,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples
 /// ```
-/// # use undo::{Action, History};
-/// # struct Add(char);
-/// # impl Action for Add {
-/// #     type Target = String;
-/// #     type Output = ();
-/// #     type Error = &'static str;
-/// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         s.push(self.0);
-/// #         Ok(())
-/// #     }
-/// #     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         self.0 = s.pop().ok_or("s is empty")?;
-/// #         Ok(())
-/// #     }
-/// # }
+/// # use undo::History;
+/// # include!("../add.rs");
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut history = History::new();
@@ -433,26 +420,15 @@ impl<A> Branch<A> {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Action, history::Builder, Record};
-/// # struct Add(char);
-/// # impl Action for Add {
-/// #     type Target = String;
-/// #     type Output = ();
-/// #     type Error = &'static str;
-/// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         s.push(self.0);
-/// #         Ok(())
-/// #     }
-/// #     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         self.0 = s.pop().ok_or("s is empty")?;
-/// #         Ok(())
-/// #     }
-/// # }
+/// # use undo::{history::Builder, Record};
+/// # include!("../add.rs");
+/// # fn main() {
 /// let _ = Builder::new()
 ///     .limit(100)
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
 ///     .build::<Add>();
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct Builder<F = Box<dyn FnMut(Signal)>>(RBuilder<F>);
@@ -512,21 +488,8 @@ enum QueueAction<A> {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Action, Record};
-/// # struct Add(char);
-/// # impl Action for Add {
-/// #     type Target = String;
-/// #     type Output = ();
-/// #     type Error = &'static str;
-/// #     fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         s.push(self.0);
-/// #         Ok(())
-/// #     }
-/// #     fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
-/// #         self.0 = s.pop().ok_or("s is empty")?;
-/// #         Ok(())
-/// #     }
-/// # }
+/// # use undo::{Record};
+/// # include!("../add.rs");
 /// # fn main() {
 /// let mut string = String::new();
 /// let mut record = Record::new();
