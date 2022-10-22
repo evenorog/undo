@@ -758,7 +758,6 @@ impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use alloc::boxed::Box;
     use alloc::string::String;
 
     enum Edit {
@@ -965,17 +964,6 @@ mod tests {
         record.redo(&mut target).unwrap().unwrap();
         assert!(record.is_saved());
         assert_eq!(target, "abc");
-    }
-
-    #[test]
-    fn dyn_trait() {
-        let mut target = String::new();
-        let action: Box<dyn Action<Output = (), Error = &'static str, Target = String>> =
-            Box::new(Add('a'));
-        let mut record: Record<
-            Box<dyn Action<Output = (), Error = &'static str, Target = String>>,
-        > = Record::default();
-        record.apply(&mut target, action).unwrap();
     }
 
     #[test]

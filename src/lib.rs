@@ -97,7 +97,6 @@ use crate::format::Format;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
 use core::fmt;
-use core::ops::DerefMut;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -139,28 +138,6 @@ pub trait Action {
         Self: Sized,
     {
         Merged::No
-    }
-}
-
-impl<A, D> Action for D
-where
-    A: Action + ?Sized,
-    D: DerefMut<Target = A>,
-{
-    type Target = A::Target;
-    type Output = A::Output;
-    type Error = A::Error;
-
-    fn apply(&mut self, target: &mut A::Target) -> Result<Self> {
-        self.deref_mut().apply(target)
-    }
-
-    fn undo(&mut self, target: &mut A::Target) -> Result<Self> {
-        self.deref_mut().undo(target)
-    }
-
-    fn redo(&mut self, target: &mut A::Target) -> Result<Self> {
-        self.deref_mut().redo(target)
     }
 }
 
