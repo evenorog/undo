@@ -226,6 +226,7 @@ impl<F> fmt::Debug for Slot<F> {
     }
 }
 
+/// Wrapper around an action that contains additional metadata.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct Entry<A> {
@@ -241,28 +242,6 @@ impl<A> From<A> for Entry<A> {
             #[cfg(feature = "chrono")]
             timestamp: Utc::now(),
         }
-    }
-}
-
-impl<A: Action> Action for Entry<A> {
-    type Target = A::Target;
-    type Output = A::Output;
-    type Error = A::Error;
-
-    fn apply(&mut self, target: &mut Self::Target) -> Result<Self> {
-        self.action.apply(target)
-    }
-
-    fn undo(&mut self, target: &mut Self::Target) -> Result<Self> {
-        self.action.undo(target)
-    }
-
-    fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
-        self.action.redo(target)
-    }
-
-    fn merge(&mut self, entry: &mut Self) -> Merged {
-        self.action.merge(&mut entry.action)
     }
 }
 

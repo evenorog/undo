@@ -220,7 +220,7 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
         self.can_undo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current();
-            let output = self.entries[self.current - 1].undo(target)?;
+            let output = self.entries[self.current - 1].action.undo(target)?;
             self.current -= 1;
             let is_saved = self.is_saved();
             self.slot.emit_if(old == self.len(), Signal::Redo(true));
@@ -242,7 +242,7 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
         self.can_redo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current();
-            let output = self.entries[self.current].redo(target)?;
+            let output = self.entries[self.current].action.redo(target)?;
             self.current += 1;
             let is_saved = self.is_saved();
             self.slot
