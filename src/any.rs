@@ -1,8 +1,10 @@
 use crate::Action;
 use alloc::boxed::Box;
+use core::fmt::{self, Debug, Formatter};
 
-/// An action that can be any type.
+/// Any action that shares the target, output, and error.
 pub struct AnyAction<T, O, E> {
+    id: i32,
     action: Box<dyn Action<Target = T, Output = O, Error = E>>,
 }
 
@@ -14,6 +16,7 @@ impl<T, O, E> AnyAction<T, O, E> {
         A: 'static,
     {
         AnyAction {
+            id: 0,
             action: Box::new(action),
         }
     }
@@ -34,6 +37,14 @@ impl<T, O, E> Action for AnyAction<T, O, E> {
 
     fn redo(&mut self, target: &mut Self::Target) -> crate::Result<Self> {
         self.action.redo(target)
+    }
+}
+
+impl<T, O, E> Debug for AnyAction<T, O, E> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("AnyAction")
+            .field("id", &self.id)
+            .finish_non_exhaustive()
     }
 }
 
