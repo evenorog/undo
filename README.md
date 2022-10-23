@@ -66,13 +66,13 @@ fn main() {
     history.apply(&mut target, Add('b')).unwrap();
     history.apply(&mut target, Add('c')).unwrap();
     assert_eq!(target, "abc");
-    history.undo(&mut target).unwrap();
-    history.undo(&mut target).unwrap();
-    history.undo(&mut target).unwrap();
+    history.undo(&mut target).unwrap().unwrap();
+    history.undo(&mut target).unwrap().unwrap();
+    history.undo(&mut target).unwrap().unwrap();
     assert_eq!(target, "");
-    history.redo(&mut target).unwrap();
-    history.redo(&mut target).unwrap();
-    history.redo(&mut target).unwrap();
+    history.redo(&mut target).unwrap().unwrap();
+    history.redo(&mut target).unwrap().unwrap();
+    history.redo(&mut target).unwrap().unwrap();
     assert_eq!(target, "abc");
 }
 ```

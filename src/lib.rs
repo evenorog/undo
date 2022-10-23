@@ -85,6 +85,8 @@ pub struct ReadmeDocTest;
 extern crate alloc;
 
 #[cfg(feature = "alloc")]
+mod any;
+#[cfg(feature = "alloc")]
 mod format;
 #[cfg(feature = "alloc")]
 pub mod history;
@@ -102,7 +104,7 @@ use serde::{Deserialize, Serialize};
 
 pub use self::timeline::Timeline;
 #[cfg(feature = "alloc")]
-pub use self::{history::History, record::Record};
+pub use self::{any::AnyAction, history::History, record::Record};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result<A> = core::result::Result<<A as Action>::Output, <A as Action>::Error>;
