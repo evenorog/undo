@@ -1,9 +1,8 @@
 use crate::Action;
 use alloc::boxed::Box;
-use core::convert::Infallible;
 
 /// An action that can be any type.
-pub struct AnyAction<T, O = (), E = Infallible> {
+pub struct AnyAction<T, O, E> {
     action: Box<dyn Action<Target = T, Output = O, Error = E>>,
 }
 
@@ -63,10 +62,13 @@ mod tests {
 
     #[test]
     fn any() {
-        let any = AnyAction::new(Add('a'));
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, any).unwrap();
+        record.apply(&mut target, AnyAction::new(Add('a'))).unwrap();
+        assert_eq!(target, "a");
+        record.undo(&mut target).unwrap().unwrap();
+        assert_eq!(target, "");
+        record.redo(&mut target).unwrap().unwrap();
         assert_eq!(target, "a");
     }
 }
