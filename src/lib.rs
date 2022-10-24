@@ -135,23 +135,37 @@ pub trait Action {
     }
 
     /// Used for manual merging of actions.
-    fn merge(&mut self, _: &mut Self) -> Merged
+    ///
+    /// You should return:
+    /// * `Yes` if you have merged the two commands.
+    /// The `other` command will not be added to the stack.
+    /// * `No` if you have not merged the two commands.
+    /// The `other` command will be added to the stack.
+    /// * `Annul` if the two commands cancels each other out.
+    /// This will removed both `self` and `other` from the stack.
+    fn merge(&mut self, other: Self) -> Merged<Self>
     where
         Self: Sized,
     {
-        Merged::No
+        Merged::No(other)
     }
 }
 
 /// Says if the action have been merged with another action.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub enum Merged {
+pub enum Merged<A> {
     /// The actions have been merged.
+    ///
+    /// This means that the `other` command will not be added to the stack.
     Yes,
     /// The actions have not been merged.
-    No,
+    ///
+    /// We need to return the `other` command so it can be added to the stack.
+    No(A),
     /// The two actions cancels each other out.
+    ///
+    /// This means that both commands will be removed from the stack.
     Annul,
 }
 

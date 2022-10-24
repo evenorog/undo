@@ -180,8 +180,8 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge actions unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
-            Some(last) if !was_saved => last.action.merge(&mut action),
-            _ => Merged::No,
+            Some(last) if !was_saved => last.action.merge(action),
+            _ => Merged::No(action),
         };
         let merged_or_annulled = match merged {
             Merged::Yes => true,
@@ -191,7 +191,7 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
                 true
             }
             // If actions are not merged or annulled push it onto the record.
-            Merged::No => {
+            Merged::No(action) => {
                 // If limit is reached, pop off the first action.
                 if self.limit() == self.current() {
                     self.entries.pop_front();
@@ -784,14 +784,14 @@ mod tests {
             }
         }
 
-        fn merge(&mut self, edit: &mut Self) -> Merged
+        fn merge(&mut self, edit: Self) -> Merged<Self>
         where
             Self: Sized,
         {
             match (self, edit) {
                 (Edit::Add(_), Edit::Del(_)) => Merged::Annul,
-                (Edit::Del(Del(Some(a))), Edit::Add(Add(b))) if a == b => Merged::Annul,
-                _ => Merged::No,
+                (Edit::Del(Del(Some(a))), Edit::Add(Add(b))) if a == &b => Merged::Annul,
+                (_, edit) => Merged::No(edit),
             }
         }
     }

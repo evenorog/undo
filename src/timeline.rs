@@ -143,8 +143,8 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
         self.saved = self.saved.filter(|&saved| saved <= current);
         // Try to merge actions unless the target is in a saved state.
         let merged = match self.entries.last_mut() {
-            Some(last) if !was_saved => last.action.merge(&mut action),
-            _ => Merged::No,
+            Some(last) if !was_saved => last.action.merge(action),
+            _ => Merged::No(action),
         };
         match merged {
             Merged::Yes => (),
@@ -153,7 +153,7 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
                 self.current -= 1;
             }
             // If actions are not merged or annulled push it onto the record.
-            Merged::No => {
+            Merged::No(action) => {
                 // If limit is reached, pop off the first action.
                 if LIMIT == self.current() {
                     self.entries.pop_at(0);
