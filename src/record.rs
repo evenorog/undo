@@ -271,7 +271,7 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         self.entries.clear();
-        self.saved = self.is_saved().then(|| 0);
+        self.saved = self.is_saved().then_some(0);
         self.current = 0;
         self.slot.emit_if(could_undo, Signal::Undo(false));
         self.slot.emit_if(could_redo, Signal::Redo(false));
@@ -458,7 +458,7 @@ impl<F> Builder<F> {
             entries: VecDeque::with_capacity(self.capacity),
             current: 0,
             limit: self.limit,
-            saved: self.saved.then(|| 0),
+            saved: self.saved.then_some(0),
             slot: self.slot,
         }
     }
