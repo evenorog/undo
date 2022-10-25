@@ -86,6 +86,7 @@ extern crate alloc;
 
 #[cfg(feature = "alloc")]
 mod any;
+mod entry;
 #[cfg(feature = "alloc")]
 mod format;
 #[cfg(feature = "alloc")]
@@ -96,9 +97,9 @@ pub mod timeline;
 
 #[cfg(feature = "alloc")]
 use crate::format::Format;
-#[cfg(feature = "chrono")]
-use chrono::{DateTime, Utc};
+
 use core::fmt;
+use entry::Entry;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -239,30 +240,5 @@ impl<F> fmt::Debug for Slot<F> {
             Some(_) => f.pad("Slot { .. }"),
             None => f.pad("Empty"),
         }
-    }
-}
-
-/// Wrapper around an action that contains additional metadata.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-struct Entry<A> {
-    action: A,
-    #[cfg(feature = "chrono")]
-    timestamp: DateTime<Utc>,
-}
-
-impl<A> From<A> for Entry<A> {
-    fn from(action: A) -> Self {
-        Entry {
-            action,
-            #[cfg(feature = "chrono")]
-            timestamp: Utc::now(),
-        }
-    }
-}
-
-impl<A: fmt::Display> fmt::Display for Entry<A> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.action as &dyn fmt::Display).fmt(f)
     }
 }
