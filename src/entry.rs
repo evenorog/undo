@@ -3,6 +3,8 @@ use crate::{Action, Merged, Result, Signal, Slot};
 use alloc::collections::VecDeque;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
+use core::cmp::Ordering;
+use core::convert::identity;
 use core::fmt;
 use core::num::NonZeroUsize;
 use core::ops::{Index, IndexMut};
@@ -34,14 +36,14 @@ impl<A: fmt::Display> fmt::Display for Entry<A> {
     }
 }
 
-pub struct Entries<T, F> {
-    entries: T,
+pub struct Stack<E, F> {
+    entries: E,
     current: usize,
     saved: Option<usize>,
     slot: Slot<F>,
 }
 
-impl<T: Buf, F> Entries<T, F> {
+impl<E: Entries, F> Stack<E, F> {
     pub fn can_undo(&self) -> bool {
         self.current > 0
     }
@@ -55,18 +57,18 @@ impl<T: Buf, F> Entries<T, F> {
     }
 }
 
-impl<T, F> Entries<T, F>
+impl<E, F> Stack<E, F>
 where
-    T: Buf,
-    T::Item: Action,
+    E: Entries,
+    E::Item: Action,
     F: FnMut(Signal),
 {
     #[allow(clippy::type_complexity)]
     pub fn apply(
         &mut self,
-        target: &mut <T::Item as Action>::Target,
-        mut action: T::Item,
-    ) -> core::result::Result<(<T::Item as Action>::Output, bool, T), <T::Item as Action>::Error>
+        target: &mut <E::Item as Action>::Target,
+        mut action: E::Item,
+    ) -> core::result::Result<(<E::Item as Action>::Output, bool, E), <E::Item as Action>::Error>
     {
         let output = action.apply(target)?;
         // We store the state of the stack before adding the entry.
@@ -109,7 +111,7 @@ where
         Ok((output, merged_or_annulled, tail))
     }
 
-    pub fn undo(&mut self, target: &mut <T::Item as Action>::Target) -> Option<Result<T::Item>> {
+    pub fn undo(&mut self, target: &mut <E::Item as Action>::Target) -> Option<Result<E::Item>> {
         self.can_undo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
@@ -125,7 +127,7 @@ where
         })
     }
 
-    pub fn redo(&mut self, target: &mut <T::Item as Action>::Target) -> Option<Result<T::Item>> {
+    pub fn redo(&mut self, target: &mut <E::Item as Action>::Target) -> Option<Result<E::Item>> {
         self.can_redo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
@@ -163,7 +165,26 @@ where
     }
 }
 
-pub trait Buf: IndexMut<usize, Output = Entry<Self::Item>> {
+impl<E, F> Stack<E, F>
+where
+    E: Entries,
+    E::Item: Action<Output = ()>,
+    F: FnMut(Signal),
+{
+    pub fn go_to(
+        &mut self,
+        target: &mut <E::Item as Action>::Target,
+        current: usize,
+    ) -> Option<Result<E::Item>> {
+        unimplemented!()
+    }
+
+    pub fn revert(&mut self, target: &mut <E::Item as Action>::Target) -> Option<Result<E::Item>> {
+        self.saved.and_then(|saved| self.go_to(target, saved))
+    }
+}
+
+pub trait Entries: IndexMut<usize, Output = Entry<Self::Item>> {
     type Item;
 
     fn limit(&self) -> usize;
@@ -199,7 +220,7 @@ impl<T> IndexMut<usize> for LimitDeque<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<T> Buf for LimitDeque<T> {
+impl<T> Entries for LimitDeque<T> {
     type Item = T;
 
     fn limit(&self) -> usize {
