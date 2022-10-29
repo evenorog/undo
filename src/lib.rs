@@ -209,6 +209,18 @@ struct Slot<F> {
 }
 
 impl<F: FnMut(Signal)> Slot<F> {
+    fn set(&mut self, f: Option<F>) {
+        self.f = f;
+    }
+
+    fn connect(&mut self, f: F) -> Option<F> {
+        self.f.replace(f)
+    }
+
+    fn disconnect(&mut self) -> Option<F> {
+        self.f.take()
+    }
+
     fn emit(&mut self, signal: Signal) {
         if let Some(ref mut f) = self.f {
             f(signal);

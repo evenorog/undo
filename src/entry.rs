@@ -3,9 +3,7 @@ use crate::{Action, Merged, Result, Signal, Slot};
 use alloc::collections::VecDeque;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
-use core::cmp::Ordering;
-use core::convert::identity;
-use core::fmt;
+use core::fmt::{self, Display, Formatter};
 use core::num::NonZeroUsize;
 use core::ops::{Index, IndexMut};
 #[cfg(feature = "serde")]
@@ -30,9 +28,9 @@ impl<A> From<A> for Entry<A> {
     }
 }
 
-impl<A: fmt::Display> fmt::Display for Entry<A> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (&self.action as &dyn fmt::Display).fmt(f)
+impl<A: Display> Display for Entry<A> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        (&self.action as &dyn Display).fmt(f)
     }
 }
 
@@ -176,7 +174,38 @@ where
         target: &mut <E::Item as Action>::Target,
         current: usize,
     ) -> Option<Result<E::Item>> {
-        unimplemented!()
+        if current > self.entries.len() {
+            return None;
+        }
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        let was_saved = self.is_saved();
+        // Temporarily remove slot so they are not called each iteration.
+        let f = self.slot.disconnect();
+        // Decide if we need to undo or redo to reach current.
+        let undo_or_redo = if current > self.current {
+            Stack::redo
+        } else {
+            Stack::undo
+        };
+        while self.current != current {
+            if let Some(Err(err)) = undo_or_redo(self, target) {
+                self.slot.set(f);
+                return Some(Err(err));
+            }
+        }
+        // Add slot back.
+        self.slot.set(f);
+        let can_undo = self.can_undo();
+        let can_redo = self.can_redo();
+        let is_saved = self.is_saved();
+        self.slot
+            .emit_if(could_undo != can_undo, Signal::Undo(can_undo));
+        self.slot
+            .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
+        self.slot
+            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+        Some(Ok(()))
     }
 
     pub fn revert(&mut self, target: &mut <E::Item as Action>::Target) -> Option<Result<E::Item>> {
