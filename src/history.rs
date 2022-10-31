@@ -39,11 +39,11 @@ use serde::{Deserialize, Serialize};
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct History<A, F = NoOp> {
+pub struct History<A, S = NoOp> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
-    pub(crate) timeline: Timeline<A, F>,
+    pub(crate) timeline: Timeline<A, S>,
     pub(crate) branches: BTreeMap<usize, Branch<A>>,
 }
 
@@ -54,7 +54,7 @@ impl<A> History<A> {
     }
 }
 
-impl<A, F> History<A, F> {
+impl<A, S> History<A, S> {
     /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics
@@ -89,12 +89,12 @@ impl<A, F> History<A, F> {
     }
 
     /// Sets how the signal should be handled when the state changes.
-    pub fn connect(&mut self, slot: F) -> Option<F> {
+    pub fn connect(&mut self, slot: S) -> Option<S> {
         self.timeline.connect(slot)
     }
 
     /// Removes and returns the slot if it exists.
-    pub fn disconnect(&mut self) -> Option<F> {
+    pub fn disconnect(&mut self) -> Option<S> {
         self.timeline.disconnect()
     }
 
@@ -124,17 +124,17 @@ impl<A, F> History<A, F> {
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, F> {
+    pub fn queue(&mut self) -> Queue<A, S> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
         Checkpoint::from(self)
     }
 
     /// Returns a structure for configurable formatting of the history.
-    pub fn display(&self) -> Display<A, F> {
+    pub fn display(&self) -> Display<A, S> {
         Display::from(self)
     }
 
@@ -143,7 +143,7 @@ impl<A, F> History<A, F> {
     }
 }
 
-impl<A: Action, F: Slot> History<A, F> {
+impl<A: Action, S: Slot> History<A, S> {
     /// Pushes the action to the top of the history and executes its [`apply`] method.
     ///
     /// # Errors
@@ -304,7 +304,7 @@ impl<A: Action, F: Slot> History<A, F> {
     }
 }
 
-impl<A: Action<Output = ()>, F: Slot> History<A, F> {
+impl<A: Action<Output = ()>, S: Slot> History<A, S> {
     /// Repeatedly calls [`undo`] or [`redo`] until the action in `branch` at `current` is reached.
     ///
     /// # Errors
@@ -347,7 +347,7 @@ impl<A: Action<Output = ()>, F: Slot> History<A, F> {
     }
 }
 
-impl<A: ToString, F> History<A, F> {
+impl<A: ToString, S> History<A, S> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.History.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
@@ -367,8 +367,8 @@ impl<A> Default for History<A> {
     }
 }
 
-impl<A, F> From<Timeline<A, F>> for History<A, F> {
-    fn from(timeline: Timeline<A, F>) -> Self {
+impl<A, S> From<Timeline<A, S>> for History<A, S> {
+    fn from(timeline: Timeline<A, S>) -> Self {
         History {
             root: 0,
             next: 1,
@@ -483,12 +483,12 @@ enum QueueAction<A> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Queue<'a, A, F> {
-    history: &'a mut History<A, F>,
+pub struct Queue<'a, A, S> {
+    history: &'a mut History<A, S>,
     actions: Vec<QueueAction<A>>,
 }
 
-impl<A: Action<Output = ()>, F: Slot> Queue<'_, A, F> {
+impl<A: Action<Output = ()>, S: Slot> Queue<'_, A, S> {
     /// Queues an `apply` action.
     pub fn apply(&mut self, action: A) {
         self.actions.push(QueueAction::Apply(action));
@@ -527,18 +527,18 @@ impl<A: Action<Output = ()>, F: Slot> Queue<'_, A, F> {
     pub fn cancel(self) {}
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, F> {
+    pub fn queue(&mut self) -> Queue<A, S> {
         self.history.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
         self.history.checkpoint()
     }
 }
 
-impl<'a, A, F> From<&'a mut History<A, F>> for Queue<'a, A, F> {
-    fn from(history: &'a mut History<A, F>) -> Self {
+impl<'a, A, S> From<&'a mut History<A, S>> for Queue<'a, A, S> {
+    fn from(history: &'a mut History<A, S>) -> Self {
         Queue {
             history,
             actions: Vec::new(),
@@ -555,12 +555,12 @@ enum CheckpointAction {
 
 /// Wraps a history and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, A, F> {
-    history: &'a mut History<A, F>,
+pub struct Checkpoint<'a, A, S> {
+    history: &'a mut History<A, S>,
     actions: Vec<CheckpointAction>,
 }
 
-impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
+impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     /// Calls the `apply` method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let branch = self.history.branch();
@@ -625,18 +625,18 @@ impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, F> {
+    pub fn queue(&mut self) -> Queue<A, S> {
         self.history.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
         self.history.checkpoint()
     }
 }
 
-impl<'a, A, F> From<&'a mut History<A, F>> for Checkpoint<'a, A, F> {
-    fn from(history: &'a mut History<A, F>) -> Self {
+impl<'a, A, S> From<&'a mut History<A, S>> for Checkpoint<'a, A, S> {
+    fn from(history: &'a mut History<A, S>) -> Self {
         Checkpoint {
             history,
             actions: Vec::new(),
@@ -645,12 +645,12 @@ impl<'a, A, F> From<&'a mut History<A, F>> for Checkpoint<'a, A, F> {
 }
 
 /// Configurable display formatting for the history.
-pub struct Display<'a, A, F> {
-    history: &'a History<A, F>,
+pub struct Display<'a, A, S> {
+    history: &'a History<A, S>,
     format: Format,
 }
 
-impl<A, F> Display<'_, A, F> {
+impl<A, S> Display<'_, A, S> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -685,7 +685,7 @@ impl<A, F> Display<'_, A, F> {
     }
 }
 
-impl<A: fmt::Display, F> Display<'_, A, F> {
+impl<A: fmt::Display, S> Display<'_, A, S> {
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
@@ -759,8 +759,8 @@ impl<A: fmt::Display, F> Display<'_, A, F> {
     }
 }
 
-impl<'a, A, F> From<&'a History<A, F>> for Display<'a, A, F> {
-    fn from(history: &'a History<A, F>) -> Self {
+impl<'a, A, S> From<&'a History<A, S>> for Display<'a, A, S> {
+    fn from(history: &'a History<A, S>) -> Self {
         Display {
             history,
             format: Format::default(),
@@ -768,7 +768,7 @@ impl<'a, A, F> From<&'a History<A, F>> for Display<'a, A, F> {
     }
 }
 
-impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
+impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let branch = self.history.branch();
         for (i, entry) in self

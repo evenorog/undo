@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// Trait for emitting signals.
 pub trait Slot {
-    /// Receives a signal that describes the state change done to
-    /// the data structures.
+    /// Receives a signal that describes the state change done to the data structures.
     fn emit(&mut self, signal: Signal);
 }
 
@@ -19,8 +18,8 @@ impl<F: FnMut(Signal)> Slot for F {
 
 /// The signal used for communicating state changes.
 ///
-/// For example, if the timeline can no longer redo any actions, it sends a `Redo(false)`
-/// signal to tell the user.
+/// For example, if the timeline can no longer redo any actions,
+/// it sends a `Redo(false)` signal to tell the user.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Signal {
