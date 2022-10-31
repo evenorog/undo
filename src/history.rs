@@ -1,8 +1,8 @@
 //! A history of actions.
 
-use crate::record::Builder as RBuilder;
 use crate::slot::{NoOp, Signal, Slot};
-use crate::{Action, At, Entry, Format, Record, Result};
+use crate::timeline::TimelineBuilder;
+use crate::{Action, At, Entry, Format, Result, Timeline};
 use alloc::{
     collections::{BTreeMap, VecDeque},
     string::{String, ToString},
@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 
 /// A history of actions.
 ///
-/// Unlike [Record](struct.Record.html) which maintains a linear undo history, History maintains an undo tree
-/// containing every edit made to the target.
+/// Unlike [Timeline](struct.Timeline.html) which maintains a linear undo history,
+/// History maintains an undo tree containing every edit made to the target.
 ///
 /// # Examples
 /// ```
@@ -43,74 +43,79 @@ pub struct History<A, F = NoOp> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
-    pub(crate) record: Record<A, F>,
+    pub(crate) timeline: Timeline<A, F>,
     pub(crate) branches: BTreeMap<usize, Branch<A>>,
 }
 
 impl<A> History<A> {
     /// Returns a new history.
     pub fn new() -> History<A> {
-        History::from(Record::new())
+        History::from(Timeline::new())
     }
 }
 
 impl<A, F> History<A, F> {
+    /// Returns a new builder for history.
+    pub fn builder() -> HistoryBuilder<F> {
+        HistoryBuilder::new()
+    }
+
     /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
     pub fn reserve(&mut self, additional: usize) {
-        self.record.reserve(additional);
+        self.timeline.reserve(additional);
     }
 
     /// Returns the capacity of the history.
     pub fn capacity(&self) -> usize {
-        self.record.capacity()
+        self.timeline.capacity()
     }
 
     /// Shrinks the capacity of the history as much as possible.
     pub fn shrink_to_fit(&mut self) {
-        self.record.shrink_to_fit();
+        self.timeline.shrink_to_fit();
     }
 
     /// Returns the number of actions in the current branch of the history.
     pub fn len(&self) -> usize {
-        self.record.len()
+        self.timeline.len()
     }
 
     /// Returns `true` if the current branch of the history is empty.
     pub fn is_empty(&self) -> bool {
-        self.record.is_empty()
+        self.timeline.is_empty()
     }
 
     /// Returns the limit of the history.
     pub fn limit(&self) -> usize {
-        self.record.limit()
+        self.timeline.limit()
     }
 
     /// Sets how the signal should be handled when the state changes.
     pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.record.connect(slot)
+        self.timeline.connect(slot)
     }
 
     /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<F> {
-        self.record.disconnect()
+        self.timeline.disconnect()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
     pub fn is_saved(&self) -> bool {
-        self.record.is_saved()
+        self.timeline.is_saved()
     }
 
     /// Returns `true` if the history can undo.
     pub fn can_undo(&self) -> bool {
-        self.record.can_undo()
+        self.timeline.can_undo()
     }
 
     /// Returns `true` if the history can redo.
     pub fn can_redo(&self) -> bool {
-        self.record.can_redo()
+        self.timeline.can_redo()
     }
 
     /// Returns the current branch.
@@ -120,7 +125,7 @@ impl<A, F> History<A, F> {
 
     /// Returns the position of the current action.
     pub fn current(&self) -> usize {
-        self.record.current()
+        self.timeline.current()
     }
 
     /// Returns a queue.
@@ -152,8 +157,12 @@ impl<A: Action, F: Slot> History<A, F> {
     /// [`apply`]: trait.Action.html#tymethod.apply
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let at = self.at();
-        let saved = self.record.stack.saved.filter(|&saved| saved > at.current);
-        let (output, merged, tail) = self.record.stack.apply(target, action)?;
+        let saved = self
+            .timeline
+            .stack
+            .saved
+            .filter(|&saved| saved > at.current);
+        let (output, merged, tail) = self.timeline.stack.apply(target, action)?;
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -182,7 +191,7 @@ impl<A: Action, F: Slot> History<A, F> {
     ///
     /// [`undo`]: trait.Action.html#tymethod.undo
     pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
-        self.record.undo(target)
+        self.timeline.undo(target)
     }
 
     /// Calls the [`redo`] method for the active action
@@ -193,13 +202,13 @@ impl<A: Action, F: Slot> History<A, F> {
     ///
     /// [`redo`]: trait.Action.html#method.redo
     pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
-        self.record.redo(target)
+        self.timeline.redo(target)
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
         self.saved = None;
-        self.record.set_saved(saved);
+        self.timeline.set_saved(saved);
     }
 
     /// Removes all actions from the history without undoing them.
@@ -207,7 +216,7 @@ impl<A: Action, F: Slot> History<A, F> {
         self.root = 0;
         self.next = 1;
         self.saved = None;
-        self.record.clear();
+        self.timeline.clear();
         self.branches.clear();
     }
 
@@ -215,9 +224,13 @@ impl<A: Action, F: Slot> History<A, F> {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.at());
         let current = self.current();
-        let saved = self.record.stack.saved.filter(|&saved| saved > current);
-        let tail = self.record.stack.entries.deque.split_off(current);
-        self.record.stack.entries.deque.append(&mut branch.entries);
+        let saved = self.timeline.stack.saved.filter(|&saved| saved > current);
+        let tail = self.timeline.stack.entries.deque.split_off(current);
+        self.timeline
+            .stack
+            .entries
+            .deque
+            .append(&mut branch.entries);
         self.branches
             .insert(self.root, Branch::new(root, current, tail));
         self.set_root(root, current, saved);
@@ -232,10 +245,10 @@ impl<A: Action, F: Slot> History<A, F> {
             .values_mut()
             .filter(|branch| branch.parent.branch == old && branch.parent.current <= current)
             .for_each(|branch| branch.parent.branch = root);
-        match (self.record.stack.saved, saved, self.saved) {
+        match (self.timeline.stack.saved, saved, self.saved) {
             (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(root, old, current),
             (None, Some(_), None) => {
-                self.record.stack.saved = saved;
+                self.timeline.stack.saved = saved;
                 self.swap_saved(old, root, current);
             }
             (None, None, None) => (),
@@ -250,12 +263,12 @@ impl<A: Action, F: Slot> History<A, F> {
             .filter(|at| at.branch == new && at.current <= current)
         {
             self.saved = None;
-            self.record.stack.saved = Some(saved);
-            self.record.stack.slot.emit(Signal::Saved(true));
-        } else if let Some(saved) = self.record.stack.saved {
+            self.timeline.stack.saved = Some(saved);
+            self.timeline.stack.slot.emit(Signal::Saved(true));
+        } else if let Some(saved) = self.timeline.stack.saved {
             self.saved = Some(At::new(old, saved));
-            self.record.stack.saved = None;
-            self.record.stack.slot.emit(Signal::Saved(false));
+            self.timeline.stack.saved = None;
+            self.timeline.stack.slot.emit(Signal::Saved(false));
         }
     }
 
@@ -312,19 +325,19 @@ impl<A: Action<Output = ()>, F: Slot> History<A, F> {
     ) -> Option<Result<A>> {
         let root = self.root;
         if root == branch {
-            return self.record.go_to(target, current);
+            return self.timeline.go_to(target, current);
         }
         // Walk the path from `root` to `branch`.
         for (new, branch) in self.mk_path(branch)? {
             // Walk to `branch.current` either by undoing or redoing.
-            if let Err(err) = self.record.go_to(target, branch.parent.current).unwrap() {
+            if let Err(err) = self.timeline.go_to(target, branch.parent.current).unwrap() {
                 return Some(Err(err));
             }
             // Apply the actions in the branch and move older actions into their own branch.
             for entry in branch.entries {
                 let current = self.current();
-                let saved = self.record.stack.saved.filter(|&saved| saved > current);
-                let entries = match self.record.stack.apply(target, entry.action) {
+                let saved = self.timeline.stack.saved.filter(|&saved| saved > current);
+                let entries = match self.timeline.stack.apply(target, entry.action) {
                     Ok((_, _, entries)) => entries,
                     Err(err) => return Some(Err(err)),
                 };
@@ -335,7 +348,7 @@ impl<A: Action<Output = ()>, F: Slot> History<A, F> {
                 }
             }
         }
-        self.record.go_to(target, current)
+        self.timeline.go_to(target, current)
     }
 }
 
@@ -343,13 +356,13 @@ impl<A: ToString, F> History<A, F> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.History.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
-        self.record.undo_text()
+        self.timeline.undo_text()
     }
 
     /// Returns the string of the action which will be redone
     /// in the next call to [`redo`](struct.History.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
-        self.record.redo_text()
+        self.timeline.redo_text()
     }
 }
 
@@ -359,13 +372,13 @@ impl<A> Default for History<A> {
     }
 }
 
-impl<A, F> From<Record<A, F>> for History<A, F> {
-    fn from(record: Record<A, F>) -> Self {
+impl<A, F> From<Timeline<A, F>> for History<A, F> {
+    fn from(timeline: Timeline<A, F>) -> Self {
         History {
             root: 0,
             next: 1,
             saved: None,
-            record,
+            timeline,
             branches: BTreeMap::new(),
         }
     }
@@ -392,10 +405,10 @@ impl<A> Branch<A> {
 ///
 /// # Examples
 /// ```
-/// # use undo::{history::Builder, Record};
+/// # use undo::{history::HistoryBuilder, Timeline};
 /// # include!("../add.rs");
 /// # fn main() {
-/// let _ = Builder::new()
+/// let _ = HistoryBuilder::new()
 ///     .limit(100)
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
@@ -403,31 +416,31 @@ impl<A> Branch<A> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<F = NoOp>(RBuilder<F>);
+pub struct HistoryBuilder<F = NoOp>(TimelineBuilder<F>);
 
-impl<F> Builder<F> {
+impl<F> HistoryBuilder<F> {
     /// Returns a builder for a history.
-    pub fn new() -> Builder<F> {
-        Builder(RBuilder::new())
+    pub fn new() -> HistoryBuilder<F> {
+        HistoryBuilder(TimelineBuilder::new())
     }
 
     /// Sets the capacity for the history.
-    pub fn capacity(self, capacity: usize) -> Builder<F> {
-        Builder(self.0.capacity(capacity))
+    pub fn capacity(self, capacity: usize) -> HistoryBuilder<F> {
+        HistoryBuilder(self.0.capacity(capacity))
     }
 
     /// Sets the `limit` for the history.
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(self, limit: usize) -> Builder<F> {
-        Builder(self.0.limit(limit))
+    pub fn limit(self, limit: usize) -> HistoryBuilder<F> {
+        HistoryBuilder(self.0.limit(limit))
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(self, saved: bool) -> Builder<F> {
-        Builder(self.0.saved(saved))
+    pub fn saved(self, saved: bool) -> HistoryBuilder<F> {
+        HistoryBuilder(self.0.saved(saved))
     }
 
     /// Builds the history.
@@ -436,16 +449,16 @@ impl<F> Builder<F> {
     }
 }
 
-impl<F: Slot> Builder<F> {
+impl<F: Slot> HistoryBuilder<F> {
     /// Connects the slot.
-    pub fn connect(self, f: F) -> Builder<F> {
-        Builder(self.0.connect(f))
+    pub fn connect(self, f: F) -> HistoryBuilder<F> {
+        HistoryBuilder(self.0.connect(f))
     }
 }
 
-impl Default for Builder {
+impl Default for HistoryBuilder {
     fn default() -> Self {
-        Builder::new()
+        HistoryBuilder::new()
     }
 }
 
@@ -456,16 +469,16 @@ enum QueueAction<A> {
     Redo,
 }
 
-/// Wraps a record and gives it batch queue functionality.
+/// Wraps a timeline and gives it batch queue functionality.
 ///
 /// # Examples
 /// ```
-/// # use undo::{Record};
+/// # use undo::{Timeline};
 /// # include!("../add.rs");
 /// # fn main() {
 /// let mut string = String::new();
-/// let mut record = Record::new();
-/// let mut queue = record.queue();
+/// let mut timeline = Timeline::new();
+/// let mut queue = timeline.queue();
 /// queue.apply(Add('a'));
 /// queue.apply(Add('b'));
 /// queue.apply(Add('c'));
@@ -598,7 +611,7 @@ impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
                     let root = self.history.branch();
                     self.history.jump_to(branch);
                     if root == branch {
-                        self.history.record.stack.entries.deque.pop_back();
+                        self.history.timeline.stack.entries.deque.pop_back();
                     } else {
                         self.history.branches.remove(&root).unwrap();
                     }
@@ -700,7 +713,7 @@ impl<A: fmt::Display, F> Display<'_, A, F> {
             at,
             At::new(self.history.branch(), self.history.current()),
             self.history
-                .record
+                .timeline
                 .stack
                 .saved
                 .map(|saved| At::new(self.history.branch(), saved))
@@ -765,7 +778,7 @@ impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
         let branch = self.history.branch();
         for (i, entry) in self
             .history
-            .record
+            .timeline
             .stack
             .entries
             .deque

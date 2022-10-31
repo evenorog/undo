@@ -74,7 +74,7 @@ where
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
-        // Pop off all elements after len from record.
+        // Pop off all elements after len from entries.
         let tail = self.entries.split_off(current);
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);

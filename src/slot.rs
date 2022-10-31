@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// The signal used for communicating state changes.
 ///
-/// For example, if the record can no longer redo any actions, it sends a `Redo(false)`
+/// For example, if the timeline can no longer redo any actions, it sends a `Redo(false)`
 /// signal to tell the user.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
