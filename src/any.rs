@@ -50,7 +50,7 @@ impl<T, O, E> Debug for AnyAction<T, O, E> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Action, AnyAction, Record, Result};
+    use crate::{Action, AnyAction, Result, Timeline};
     use alloc::string::String;
 
     struct Add(char);
@@ -74,12 +74,14 @@ mod tests {
     #[test]
     fn any() {
         let mut target = String::new();
-        let mut record = Record::new();
-        record.apply(&mut target, AnyAction::new(Add('a'))).unwrap();
+        let mut timeline = Timeline::new();
+        timeline
+            .apply(&mut target, AnyAction::new(Add('a')))
+            .unwrap();
         assert_eq!(target, "a");
-        record.undo(&mut target).unwrap().unwrap();
+        timeline.undo(&mut target).unwrap().unwrap();
         assert_eq!(target, "");
-        record.redo(&mut target).unwrap().unwrap();
+        timeline.redo(&mut target).unwrap().unwrap();
         assert_eq!(target, "a");
     }
 }
