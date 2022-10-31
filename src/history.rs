@@ -159,10 +159,10 @@ impl<A: Action, F: Slot> History<A, F> {
         let at = self.at();
         let saved = self
             .timeline
-            .stack
+            .record
             .saved
             .filter(|&saved| saved > at.current);
-        let (output, merged, tail) = self.timeline.stack.apply(target, action)?;
+        let (output, merged, tail) = self.timeline.record.apply(target, action)?;
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -224,10 +224,10 @@ impl<A: Action, F: Slot> History<A, F> {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.at());
         let current = self.current();
-        let saved = self.timeline.stack.saved.filter(|&saved| saved > current);
-        let tail = self.timeline.stack.entries.deque.split_off(current);
+        let saved = self.timeline.record.saved.filter(|&saved| saved > current);
+        let tail = self.timeline.record.entries.deque.split_off(current);
         self.timeline
-            .stack
+            .record
             .entries
             .deque
             .append(&mut branch.entries);
@@ -245,10 +245,10 @@ impl<A: Action, F: Slot> History<A, F> {
             .values_mut()
             .filter(|branch| branch.parent.branch == old && branch.parent.current <= current)
             .for_each(|branch| branch.parent.branch = root);
-        match (self.timeline.stack.saved, saved, self.saved) {
+        match (self.timeline.record.saved, saved, self.saved) {
             (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(root, old, current),
             (None, Some(_), None) => {
-                self.timeline.stack.saved = saved;
+                self.timeline.record.saved = saved;
                 self.swap_saved(old, root, current);
             }
             (None, None, None) => (),
@@ -263,12 +263,12 @@ impl<A: Action, F: Slot> History<A, F> {
             .filter(|at| at.branch == new && at.current <= current)
         {
             self.saved = None;
-            self.timeline.stack.saved = Some(saved);
-            self.timeline.stack.slot.emit(Signal::Saved(true));
-        } else if let Some(saved) = self.timeline.stack.saved {
+            self.timeline.record.saved = Some(saved);
+            self.timeline.record.slot.emit(Signal::Saved(true));
+        } else if let Some(saved) = self.timeline.record.saved {
             self.saved = Some(At::new(old, saved));
-            self.timeline.stack.saved = None;
-            self.timeline.stack.slot.emit(Signal::Saved(false));
+            self.timeline.record.saved = None;
+            self.timeline.record.slot.emit(Signal::Saved(false));
         }
     }
 
@@ -336,8 +336,8 @@ impl<A: Action<Output = ()>, F: Slot> History<A, F> {
             // Apply the actions in the branch and move older actions into their own branch.
             for entry in branch.entries {
                 let current = self.current();
-                let saved = self.timeline.stack.saved.filter(|&saved| saved > current);
-                let entries = match self.timeline.stack.apply(target, entry.action) {
+                let saved = self.timeline.record.saved.filter(|&saved| saved > current);
+                let entries = match self.timeline.record.apply(target, entry.action) {
                     Ok((_, _, entries)) => entries,
                     Err(err) => return Some(Err(err)),
                 };
@@ -611,7 +611,7 @@ impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
                     let root = self.history.branch();
                     self.history.jump_to(branch);
                     if root == branch {
-                        self.history.timeline.stack.entries.deque.pop_back();
+                        self.history.timeline.record.entries.deque.pop_back();
                     } else {
                         self.history.branches.remove(&root).unwrap();
                     }
@@ -714,7 +714,7 @@ impl<A: fmt::Display, F> Display<'_, A, F> {
             At::new(self.history.branch(), self.history.current()),
             self.history
                 .timeline
-                .stack
+                .record
                 .saved
                 .map(|saved| At::new(self.history.branch(), saved))
                 .or(self.history.saved),
@@ -779,7 +779,7 @@ impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
         for (i, entry) in self
             .history
             .timeline
-            .stack
+            .record
             .entries
             .deque
             .iter()

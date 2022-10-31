@@ -1,8 +1,8 @@
 //! A timeline of actions.
 
-use crate::entry::{Entries, Stack};
+use crate::entry::Entries;
 use crate::slot::{NoOp, Slot, SW};
-use crate::{Action, At, Entry, Format, History, Result};
+use crate::{Action, At, Entry, Format, History, Record, Result};
 use alloc::{
     collections::VecDeque,
     string::{String, ToString},
@@ -54,7 +54,7 @@ use {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Timeline<A, F = NoOp> {
-    pub(crate) stack: Stack<LimitDeque<A>, F>,
+    pub(crate) record: Record<LimitDeque<A>, F>,
 }
 
 impl<A> Timeline<A> {
@@ -75,62 +75,62 @@ impl<A, F> Timeline<A, F> {
     /// # Panics
     /// Panics if the new capacity overflows usize.
     pub fn reserve(&mut self, additional: usize) {
-        self.stack.entries.deque.reserve(additional);
+        self.record.entries.deque.reserve(additional);
     }
 
     /// Returns the capacity of the timeline.
     pub fn capacity(&self) -> usize {
-        self.stack.entries.deque.capacity()
+        self.record.entries.deque.capacity()
     }
 
     /// Shrinks the capacity of the timeline as much as possible.
     pub fn shrink_to_fit(&mut self) {
-        self.stack.entries.deque.shrink_to_fit();
+        self.record.entries.deque.shrink_to_fit();
     }
 
     /// Returns the number of actions in the timeline.
     pub fn len(&self) -> usize {
-        self.stack.entries.deque.len()
+        self.record.entries.deque.len()
     }
 
     /// Returns `true` if the timeline is empty.
     pub fn is_empty(&self) -> bool {
-        self.stack.entries.deque.is_empty()
+        self.record.entries.deque.is_empty()
     }
 
     /// Returns the limit of the timeline.
     pub fn limit(&self) -> usize {
-        self.stack.entries.limit.get()
+        self.record.entries.limit.get()
     }
 
     /// Sets how the signal should be handled when the state changes.
     pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.stack.slot.connect(Some(slot))
+        self.record.slot.connect(Some(slot))
     }
 
     /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<F> {
-        self.stack.slot.disconnect()
+        self.record.slot.disconnect()
     }
 
     /// Returns `true` if the timeline can undo.
     pub fn can_undo(&self) -> bool {
-        self.stack.can_undo()
+        self.record.can_undo()
     }
 
     /// Returns `true` if the timeline can redo.
     pub fn can_redo(&self) -> bool {
-        self.stack.can_redo()
+        self.record.can_redo()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
     pub fn is_saved(&self) -> bool {
-        self.stack.is_saved()
+        self.record.is_saved()
     }
 
     /// Returns the position of the current action.
     pub fn current(&self) -> usize {
-        self.stack.current
+        self.record.current
     }
 
     /// Returns a queue.
@@ -157,7 +157,7 @@ impl<A: Action, F: Slot> Timeline<A, F> {
     ///
     /// [`apply`]: trait.Action.html#tymethod.apply
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
-        self.stack
+        self.record
             .apply(target, action)
             .map(|(output, _, _)| output)
     }
@@ -170,7 +170,7 @@ impl<A: Action, F: Slot> Timeline<A, F> {
     ///
     /// [`undo`]: ../trait.Action.html#tymethod.undo
     pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
-        self.stack.undo(target)
+        self.record.undo(target)
     }
 
     /// Calls the [`redo`] method for the active action and sets
@@ -181,24 +181,24 @@ impl<A: Action, F: Slot> Timeline<A, F> {
     ///
     /// [`redo`]: trait.Action.html#method.redo
     pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
-        self.stack.redo(target)
+        self.record.redo(target)
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
-        self.stack.set_saved(saved)
+        self.record.set_saved(saved)
     }
 
     /// Removes all actions from the timeline without undoing them.
     pub fn clear(&mut self) {
-        self.stack.clear()
+        self.record.clear()
     }
 }
 
 impl<A: Action<Output = ()>, F: Slot> Timeline<A, F> {
     /// Revert the changes done to the target since the saved state.
     pub fn revert(&mut self, target: &mut A::Target) -> Option<Result<A>> {
-        self.stack.revert(target)
+        self.record.revert(target)
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the action at `current` is reached.
@@ -209,13 +209,13 @@ impl<A: Action<Output = ()>, F: Slot> Timeline<A, F> {
     /// [`undo`]: trait.Action.html#tymethod.undo
     /// [`redo`]: trait.Action.html#method.redo
     pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<Result<A>> {
-        self.stack.go_to(target, current)
+        self.record.go_to(target, current)
     }
 
     /// Go back or forward in the timeline to the action that was made closest to the datetime provided.
     #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, target: &mut A::Target, to: &DateTime<Utc>) -> Option<Result<A>> {
-        let current = match self.stack.entries.deque.as_slices() {
+        let current = match self.record.entries.deque.as_slices() {
             ([], []) => return None,
             (head, []) => head
                 .binary_search_by(|e| e.timestamp.cmp(to))
@@ -244,17 +244,20 @@ impl<A: ToString, F> Timeline<A, F> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.Timeline.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
-        self.stack.current.checked_sub(1).and_then(|i| self.text(i))
+        self.record
+            .current
+            .checked_sub(1)
+            .and_then(|i| self.text(i))
     }
 
     /// Returns the string of the action which will be redone
     /// in the next call to [`redo`](struct.Timeline.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
-        self.text(self.stack.current)
+        self.text(self.record.current)
     }
 
     fn text(&self, i: usize) -> Option<String> {
-        self.stack
+        self.record
             .entries
             .deque
             .get(i)
@@ -333,7 +336,7 @@ impl<F> TimelineBuilder<F> {
     /// Builds the timeline.
     pub fn build<A>(self) -> Timeline<A, F> {
         Timeline {
-            stack: Stack {
+            record: Record {
                 entries: LimitDeque {
                     deque: VecDeque::with_capacity(self.capacity),
                     limit: self.limit,
@@ -466,8 +469,8 @@ pub struct Checkpoint<'a, A, F> {
 impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
     /// Calls the `apply` method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
-        let saved = self.timeline.stack.saved;
-        let (_, _, tail) = self.timeline.stack.apply(target, action)?;
+        let saved = self.timeline.record.saved;
+        let (_, _, tail) = self.timeline.record.apply(target, action)?;
         self.actions
             .push(CheckpointAction::Apply(saved, tail.deque));
         Ok(())
@@ -508,9 +511,9 @@ impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
             match action {
                 CheckpointAction::Apply(saved, mut entries) => match self.timeline.undo(target) {
                     Some(Ok(())) => {
-                        self.timeline.stack.entries.deque.pop_back();
-                        self.timeline.stack.entries.deque.append(&mut entries);
-                        self.timeline.stack.saved = saved;
+                        self.timeline.record.entries.deque.pop_back();
+                        self.timeline.record.entries.deque.append(&mut entries);
+                        self.timeline.record.saved = saved;
                     }
                     o => return o,
                 },
@@ -603,7 +606,7 @@ impl<A: fmt::Display, F> Display<'_, A, F> {
             f,
             at,
             At::new(0, self.timeline.current()),
-            self.timeline.stack.saved.map(|saved| At::new(0, saved)),
+            self.timeline.record.saved.map(|saved| At::new(0, saved)),
         )?;
         if let Some(entry) = entry {
             if self.format.detailed {
@@ -630,7 +633,7 @@ impl<'a, A, F> From<&'a Timeline<A, F>> for Display<'a, A, F> {
 
 impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, entry) in self.timeline.stack.entries.deque.iter().enumerate().rev() {
+        for (i, entry) in self.timeline.record.entries.deque.iter().enumerate().rev() {
             let at = At::new(0, i + 1);
             self.fmt_list(f, at, Some(entry))?;
         }

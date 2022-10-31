@@ -90,6 +90,7 @@ mod entry;
 mod format;
 #[cfg(feature = "alloc")]
 pub mod history;
+mod record;
 pub mod slot;
 #[cfg(feature = "alloc")]
 pub mod timeline;
@@ -98,6 +99,7 @@ pub mod timeline;
 use crate::format::Format;
 
 use entry::Entry;
+use record::Record;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
