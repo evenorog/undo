@@ -65,11 +65,6 @@ impl<A> Timeline<A> {
 }
 
 impl<A, F> Timeline<A, F> {
-    /// Returns a new builder for a timeline.
-    pub fn builder() -> TimelineBuilder<F> {
-        TimelineBuilder::new()
-    }
-
     /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics

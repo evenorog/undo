@@ -55,11 +55,6 @@ impl<A> History<A> {
 }
 
 impl<A, F> History<A, F> {
-    /// Returns a new builder for history.
-    pub fn builder() -> HistoryBuilder<F> {
-        HistoryBuilder::new()
-    }
-
     /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics

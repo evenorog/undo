@@ -4,6 +4,19 @@ use core::mem;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+/// Trait for emitting signals.
+pub trait Slot {
+    /// Receives a signal that describes the state change done to
+    /// the data structures.
+    fn emit(&mut self, signal: Signal);
+}
+
+impl<F: FnMut(Signal)> Slot for F {
+    fn emit(&mut self, signal: Signal) {
+        self(signal)
+    }
+}
+
 /// The signal used for communicating state changes.
 ///
 /// For example, if the timeline can no longer redo any actions, it sends a `Redo(false)`
@@ -19,18 +32,6 @@ pub enum Signal {
     Saved(bool),
 }
 
-/// Trait for sending signals.
-pub trait Slot {
-    /// Implement this to send signals.
-    fn emit(&mut self, signal: Signal);
-}
-
-impl<F: FnMut(Signal)> Slot for F {
-    fn emit(&mut self, signal: Signal) {
-        self(signal)
-    }
-}
-
 /// Default slot that does nothing.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default)]
@@ -40,36 +41,34 @@ impl Slot for NoOp {
     fn emit(&mut self, _: Signal) {}
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
 #[derive(Clone, Debug)]
-pub(crate) struct SW<S> {
-    slot: Option<S>,
-}
+pub(crate) struct SW<S>(Option<S>);
 
 impl<S> SW<S> {
     pub const fn new(slot: S) -> SW<S> {
-        SW { slot: Some(slot) }
+        SW(Some(slot))
     }
 
     pub fn connect(&mut self, slot: Option<S>) -> Option<S> {
-        mem::replace(&mut self.slot, slot)
+        mem::replace(&mut self.0, slot)
     }
 
     pub fn disconnect(&mut self) -> Option<S> {
-        self.slot.take()
+        self.0.take()
     }
 }
 
 impl<S> Default for SW<S> {
     fn default() -> Self {
-        SW { slot: None }
+        SW(None)
     }
 }
 
 impl<S: Slot> SW<S> {
     pub fn emit(&mut self, signal: Signal) {
-        if let Some(slot) = &mut self.slot {
-            slot.emit(signal)
+        if let Some(slot) = &mut self.0 {
+            slot.emit(signal);
         }
     }
 
