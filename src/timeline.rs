@@ -1,6 +1,7 @@
 //! A timeline of actions.
 
-use crate::{Action, Entry, Merged, Result, Signal, Slot};
+use crate::slot::{NoOp, Signal, Slot, SW};
+use crate::{Action, Entry, Merged, Result};
 use arrayvec::ArrayVec;
 use core::fmt;
 #[cfg(feature = "serde")]
@@ -44,27 +45,23 @@ use {
 /// assert_eq!(target, "abc");
 /// # }
 /// ```
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
-)]
-#[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug)]
 pub struct Timeline<A, F, const LIMIT: usize> {
     entries: ArrayVec<Entry<A>, LIMIT>,
     current: usize,
     saved: Option<usize>,
-    slot: Slot<F>,
+    slot: SW<F>,
 }
 
-impl<A, const LIMIT: usize> Timeline<A, fn(Signal), LIMIT> {
+impl<A, const LIMIT: usize> Timeline<A, NoOp, LIMIT> {
     /// Returns a new timeline.
-    pub fn new() -> Timeline<A, fn(Signal), LIMIT> {
+    pub fn new() -> Timeline<A, NoOp, LIMIT> {
         Timeline {
             entries: ArrayVec::new(),
             current: 0,
             saved: Some(0),
-            slot: Slot::default(),
+            slot: SW::default(),
         }
     }
 }
@@ -89,12 +86,12 @@ impl<A, F, const LIMIT: usize> Timeline<A, F, LIMIT> {
     ///
     /// The previous slot is returned if it exists.
     pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.slot.f.replace(slot)
+        self.slot.connect(Some(slot))
     }
 
     /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<F> {
-        self.slot.f.take()
+        self.slot.disconnect()
     }
 
     /// Returns `true` if the timeline can undo.
@@ -124,7 +121,7 @@ impl<A, F, const LIMIT: usize> Timeline<A, F, LIMIT> {
     }
 }
 
-impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
+impl<A: Action, F: Slot, const LIMIT: usize> Timeline<A, F, LIMIT> {
     /// Pushes the action on top of the timeline and executes its [`apply`] method.
     ///
     /// # Errors
@@ -239,7 +236,7 @@ impl<A: Action, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
     }
 }
 
-impl<A: Action<Output = ()>, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F, LIMIT> {
+impl<A: Action<Output = ()>, F: Slot, const LIMIT: usize> Timeline<A, F, LIMIT> {
     /// Revert the changes done to the target since the saved state.
     pub fn revert(&mut self, target: &mut A::Target) -> Option<Result<A>> {
         self.saved.and_then(|saved| self.go_to(target, saved))
@@ -269,12 +266,12 @@ impl<A: Action<Output = ()>, F: FnMut(Signal), const LIMIT: usize> Timeline<A, F
         };
         while self.current() != current {
             if let Err(err) = f(self, target).unwrap() {
-                self.slot.f = slot;
+                self.slot.connect(slot);
                 return Some(Err(err));
             }
         }
         // Add slot back.
-        self.slot.f = slot;
+        self.slot.connect(slot);
         let can_undo = self.can_undo();
         let can_redo = self.can_redo();
         let is_saved = self.is_saved();
@@ -317,28 +314,17 @@ impl<A: ToString, F, const LIMIT: usize> Timeline<A, F, LIMIT> {
     }
 }
 
-impl<A, const LIMIT: usize> Default for Timeline<A, fn(Signal), LIMIT> {
-    fn default() -> Timeline<A, fn(Signal), LIMIT> {
+impl<A, const LIMIT: usize> Default for Timeline<A, NoOp, LIMIT> {
+    fn default() -> Timeline<A, NoOp, LIMIT> {
         Timeline::new()
-    }
-}
-
-impl<A: fmt::Debug, F, const LIMIT: usize> fmt::Debug for Timeline<A, F, LIMIT> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Timeline")
-            .field("entries", &self.entries)
-            .field("current", &self.current)
-            .field("saved", &self.saved)
-            .field("slot", &self.slot)
-            .finish()
     }
 }
 
 /// Builder for a Timeline.
 #[derive(Debug)]
-pub struct Builder<F> {
+pub struct Builder<F = NoOp> {
     saved: bool,
-    slot: Slot<F>,
+    slot: SW<F>,
 }
 
 impl<F> Builder<F> {
@@ -346,7 +332,7 @@ impl<F> Builder<F> {
     pub fn new() -> Builder<F> {
         Builder {
             saved: true,
-            slot: Slot::default(),
+            slot: SW::default(),
         }
     }
 
@@ -368,15 +354,15 @@ impl<F> Builder<F> {
     }
 }
 
-impl<F: FnMut(Signal)> Builder<F> {
+impl<F: Slot> Builder<F> {
     /// Connects the slot.
     pub fn connect(mut self, f: F) -> Builder<F> {
-        self.slot = Slot::from(f);
+        self.slot = SW::new(f);
         self
     }
 }
 
-impl Default for Builder<fn(Signal)> {
+impl Default for Builder {
     fn default() -> Self {
         Builder::new()
     }

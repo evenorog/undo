@@ -1,9 +1,9 @@
 //! A history of actions.
 
 use crate::record::Builder as RBuilder;
-use crate::{Action, At, Entry, Format, Record, Result, Signal};
+use crate::slot::{NoOp, Signal, Slot};
+use crate::{Action, At, Entry, Format, Record, Result};
 use alloc::{
-    boxed::Box,
     collections::{BTreeMap, VecDeque},
     string::{String, ToString},
     vec,
@@ -37,13 +37,9 @@ use serde::{Deserialize, Serialize};
 /// assert_eq!(target, "abc");
 /// # }
 /// ```
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
-)]
-#[derive(Clone)]
-pub struct History<A, F = Box<dyn FnMut(Signal)>> {
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug)]
+pub struct History<A, F = NoOp> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
@@ -93,8 +89,6 @@ impl<A, F> History<A, F> {
     }
 
     /// Sets how the signal should be handled when the state changes.
-    ///
-    /// The previous slot is returned if it exists.
     pub fn connect(&mut self, slot: F) -> Option<F> {
         self.record.connect(slot)
     }
@@ -149,7 +143,7 @@ impl<A, F> History<A, F> {
     }
 }
 
-impl<A: Action, F: FnMut(Signal)> History<A, F> {
+impl<A: Action, F: Slot> History<A, F> {
     /// Pushes the action to the top of the history and executes its [`apply`] method.
     ///
     /// # Errors
@@ -158,8 +152,8 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     /// [`apply`]: trait.Action.html#tymethod.apply
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let at = self.at();
-        let saved = self.record.saved.filter(|&saved| saved > at.current);
-        let (output, merged, tail) = self.record.__apply(target, action)?;
+        let saved = self.record.stack.saved.filter(|&saved| saved > at.current);
+        let (output, merged, tail) = self.record.stack.apply(target, action)?;
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -170,11 +164,11 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
                 .for_each(|branch| branch.parent.current -= 1);
         }
         // Handle new branch.
-        if !tail.is_empty() {
+        if !tail.deque.is_empty() {
             let new = self.next;
             self.next += 1;
             self.branches
-                .insert(at.branch, Branch::new(new, at.current, tail));
+                .insert(at.branch, Branch::new(new, at.current, tail.deque));
             self.set_root(new, at.current, saved);
         }
         Ok(output)
@@ -221,9 +215,9 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.at());
         let current = self.current();
-        let saved = self.record.saved.filter(|&saved| saved > current);
-        let tail = self.record.entries.split_off(current);
-        self.record.entries.append(&mut branch.entries);
+        let saved = self.record.stack.saved.filter(|&saved| saved > current);
+        let tail = self.record.stack.entries.deque.split_off(current);
+        self.record.stack.entries.deque.append(&mut branch.entries);
         self.branches
             .insert(self.root, Branch::new(root, current, tail));
         self.set_root(root, current, saved);
@@ -238,10 +232,10 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
             .values_mut()
             .filter(|branch| branch.parent.branch == old && branch.parent.current <= current)
             .for_each(|branch| branch.parent.branch = root);
-        match (self.record.saved, saved, self.saved) {
+        match (self.record.stack.saved, saved, self.saved) {
             (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(root, old, current),
             (None, Some(_), None) => {
-                self.record.saved = saved;
+                self.record.stack.saved = saved;
                 self.swap_saved(old, root, current);
             }
             (None, None, None) => (),
@@ -256,12 +250,12 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
             .filter(|at| at.branch == new && at.current <= current)
         {
             self.saved = None;
-            self.record.saved = Some(saved);
-            self.record.slot.emit(Signal::Saved(true));
-        } else if let Some(saved) = self.record.saved {
+            self.record.stack.saved = Some(saved);
+            self.record.stack.slot.emit(Signal::Saved(true));
+        } else if let Some(saved) = self.record.stack.saved {
             self.saved = Some(At::new(old, saved));
-            self.record.saved = None;
-            self.record.slot.emit(Signal::Saved(false));
+            self.record.stack.saved = None;
+            self.record.stack.slot.emit(Signal::Saved(false));
         }
     }
 
@@ -302,7 +296,7 @@ impl<A: Action, F: FnMut(Signal)> History<A, F> {
     }
 }
 
-impl<A: Action<Output = ()>, F: FnMut(Signal)> History<A, F> {
+impl<A: Action<Output = ()>, F: Slot> History<A, F> {
     /// Repeatedly calls [`undo`] or [`redo`] until the action in `branch` at `current` is reached.
     ///
     /// # Errors
@@ -329,14 +323,14 @@ impl<A: Action<Output = ()>, F: FnMut(Signal)> History<A, F> {
             // Apply the actions in the branch and move older actions into their own branch.
             for entry in branch.entries {
                 let current = self.current();
-                let saved = self.record.saved.filter(|&saved| saved > current);
-                let entries = match self.record.__apply(target, entry.action) {
+                let saved = self.record.stack.saved.filter(|&saved| saved > current);
+                let entries = match self.record.stack.apply(target, entry.action) {
                     Ok((_, _, entries)) => entries,
                     Err(err) => return Some(Err(err)),
                 };
-                if !entries.is_empty() {
+                if !entries.deque.is_empty() {
                     self.branches
-                        .insert(self.root, Branch::new(new, current, entries));
+                        .insert(self.root, Branch::new(new, current, entries.deque));
                     self.set_root(new, current, saved);
                 }
             }
@@ -377,18 +371,6 @@ impl<A, F> From<Record<A, F>> for History<A, F> {
     }
 }
 
-impl<A: fmt::Debug, F> fmt::Debug for History<A, F> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("History")
-            .field("root", &self.root)
-            .field("next", &self.next)
-            .field("saved", &self.saved)
-            .field("record", &self.record)
-            .field("branches", &self.branches)
-            .finish()
-    }
-}
-
 /// A branch in the history.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -421,7 +403,7 @@ impl<A> Branch<A> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<F = Box<dyn FnMut(Signal)>>(RBuilder<F>);
+pub struct Builder<F = NoOp>(RBuilder<F>);
 
 impl<F> Builder<F> {
     /// Returns a builder for a history.
@@ -454,7 +436,7 @@ impl<F> Builder<F> {
     }
 }
 
-impl<F: FnMut(Signal)> Builder<F> {
+impl<F: Slot> Builder<F> {
     /// Connects the slot.
     pub fn connect(self, f: F) -> Builder<F> {
         Builder(self.0.connect(f))
@@ -498,7 +480,7 @@ pub struct Queue<'a, A, F> {
     actions: Vec<QueueAction<A>>,
 }
 
-impl<A: Action<Output = ()>, F: FnMut(Signal)> Queue<'_, A, F> {
+impl<A: Action<Output = ()>, F: Slot> Queue<'_, A, F> {
     /// Queues an `apply` action.
     pub fn apply(&mut self, action: A) {
         self.actions.push(QueueAction::Apply(action));
@@ -570,7 +552,7 @@ pub struct Checkpoint<'a, A, F> {
     actions: Vec<CheckpointAction>,
 }
 
-impl<A: Action<Output = ()>, F: FnMut(Signal)> Checkpoint<'_, A, F> {
+impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
     /// Calls the `apply` method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let branch = self.history.branch();
@@ -616,7 +598,7 @@ impl<A: Action<Output = ()>, F: FnMut(Signal)> Checkpoint<'_, A, F> {
                     let root = self.history.branch();
                     self.history.jump_to(branch);
                     if root == branch {
-                        self.history.record.entries.pop_back();
+                        self.history.record.stack.entries.deque.pop_back();
                     } else {
                         self.history.branches.remove(&root).unwrap();
                     }
@@ -719,6 +701,7 @@ impl<A: fmt::Display, F> Display<'_, A, F> {
             At::new(self.history.branch(), self.history.current()),
             self.history
                 .record
+                .stack
                 .saved
                 .map(|saved| At::new(self.history.branch(), saved))
                 .or(self.history.saved),
@@ -780,7 +763,16 @@ impl<'a, A, F> From<&'a History<A, F>> for Display<'a, A, F> {
 impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let branch = self.history.branch();
-        for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
+        for (i, entry) in self
+            .history
+            .record
+            .stack
+            .entries
+            .deque
+            .iter()
+            .enumerate()
+            .rev()
+        {
             let at = At::new(branch, i + 1);
             self.fmt_graph(f, at, Some(entry), 0)?;
         }

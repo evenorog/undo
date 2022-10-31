@@ -93,12 +93,12 @@ mod format;
 pub mod history;
 #[cfg(feature = "alloc")]
 pub mod record;
+pub mod slot;
 pub mod timeline;
 
 #[cfg(feature = "alloc")]
 use crate::format::Format;
 
-use core::fmt;
 use entry::Entry;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -183,74 +183,5 @@ impl At {
 
     const fn new(branch: usize, current: usize) -> At {
         At { branch, current }
-    }
-}
-
-/// The signal used for communicating state changes.
-///
-/// For example, if the record can no longer redo any actions, it sends a `Redo(false)`
-/// signal to tell the user.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub enum Signal {
-    /// Says if the structures can undo.
-    Undo(bool),
-    /// Says if the structures can redo.
-    Redo(bool),
-    /// Says if the target is in a saved state.
-    Saved(bool),
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone)]
-struct Slot<F> {
-    #[cfg_attr(feature = "serde", serde(default = "Option::default", skip))]
-    f: Option<F>,
-}
-
-impl<F: FnMut(Signal)> Slot<F> {
-    fn set(&mut self, f: Option<F>) {
-        self.f = f;
-    }
-
-    fn connect(&mut self, f: F) -> Option<F> {
-        self.f.replace(f)
-    }
-
-    fn disconnect(&mut self) -> Option<F> {
-        self.f.take()
-    }
-
-    fn emit(&mut self, signal: Signal) {
-        if let Some(ref mut f) = self.f {
-            f(signal);
-        }
-    }
-
-    fn emit_if(&mut self, cond: bool, signal: Signal) {
-        if cond {
-            self.emit(signal);
-        }
-    }
-}
-
-impl<F> From<F> for Slot<F> {
-    fn from(f: F) -> Slot<F> {
-        Slot { f: Some(f) }
-    }
-}
-
-impl<F> Default for Slot<F> {
-    fn default() -> Self {
-        Slot { f: None }
-    }
-}
-
-impl<F> fmt::Debug for Slot<F> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.f {
-            Some(_) => f.pad("Slot { .. }"),
-            None => f.pad("Empty"),
-        }
     }
 }

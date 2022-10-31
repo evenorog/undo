@@ -1,12 +1,14 @@
 //! A record of actions.
 
-use crate::{Action, At, Entry, Format, History, Merged, Result, Signal, Slot};
+use crate::entry::{Entries, Stack};
+use crate::slot::{NoOp, Slot, SW};
+use crate::{Action, At, Entry, Format, History, Result};
 use alloc::{
-    boxed::Box,
     collections::VecDeque,
     string::{String, ToString},
     vec::Vec,
 };
+use core::ops::{Index, IndexMut};
 use core::{
     fmt::{self, Write},
     num::NonZeroUsize,
@@ -49,18 +51,10 @@ use {
 /// assert_eq!(target, "abc");
 /// # }
 /// ```
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(bound(serialize = "A: Serialize", deserialize = "A: Deserialize<'de>"))
-)]
-#[derive(Clone)]
-pub struct Record<A, F = Box<dyn FnMut(Signal)>> {
-    pub(crate) entries: VecDeque<Entry<A>>,
-    current: usize,
-    limit: NonZeroUsize,
-    pub(crate) saved: Option<usize>,
-    pub(crate) slot: Slot<F>,
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug)]
+pub struct Record<A, F = NoOp> {
+    pub(crate) stack: Stack<LimitDeque<A>, F>,
 }
 
 impl<A> Record<A> {
@@ -76,64 +70,62 @@ impl<A, F> Record<A, F> {
     /// # Panics
     /// Panics if the new capacity overflows usize.
     pub fn reserve(&mut self, additional: usize) {
-        self.entries.reserve(additional);
+        self.stack.entries.deque.reserve(additional);
     }
 
     /// Returns the capacity of the record.
     pub fn capacity(&self) -> usize {
-        self.entries.capacity()
+        self.stack.entries.deque.capacity()
     }
 
     /// Shrinks the capacity of the record as much as possible.
     pub fn shrink_to_fit(&mut self) {
-        self.entries.shrink_to_fit();
+        self.stack.entries.deque.shrink_to_fit();
     }
 
     /// Returns the number of actions in the record.
     pub fn len(&self) -> usize {
-        self.entries.len()
+        self.stack.entries.deque.len()
     }
 
     /// Returns `true` if the record is empty.
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.stack.entries.deque.is_empty()
     }
 
     /// Returns the limit of the record.
     pub fn limit(&self) -> usize {
-        self.limit.get()
+        self.stack.entries.limit.get()
     }
 
     /// Sets how the signal should be handled when the state changes.
-    ///
-    /// The previous slot is returned if it exists.
     pub fn connect(&mut self, slot: F) -> Option<F> {
-        self.slot.f.replace(slot)
+        self.stack.slot.connect(Some(slot))
     }
 
     /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<F> {
-        self.slot.f.take()
+        self.stack.slot.disconnect()
     }
 
     /// Returns `true` if the record can undo.
     pub fn can_undo(&self) -> bool {
-        self.current() > 0
+        self.stack.can_undo()
     }
 
     /// Returns `true` if the record can redo.
     pub fn can_redo(&self) -> bool {
-        self.current() < self.len()
+        self.stack.can_redo()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
     pub fn is_saved(&self) -> bool {
-        self.saved.map_or(false, |saved| saved == self.current())
+        self.stack.is_saved()
     }
 
     /// Returns the position of the current action.
     pub fn current(&self) -> usize {
-        self.current
+        self.stack.current
     }
 
     /// Returns a queue.
@@ -152,7 +144,7 @@ impl<A, F> Record<A, F> {
     }
 }
 
-impl<A: Action, F: FnMut(Signal)> Record<A, F> {
+impl<A: Action, F: Slot> Record<A, F> {
     /// Pushes the action on top of the record and executes its [`apply`] method.
     ///
     /// # Errors
@@ -160,53 +152,9 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
     ///
     /// [`apply`]: trait.Action.html#tymethod.apply
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
-        self.__apply(target, action).map(|(output, _, _)| output)
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub(crate) fn __apply(
-        &mut self,
-        target: &mut A::Target,
-        mut action: A,
-    ) -> core::result::Result<(A::Output, bool, VecDeque<Entry<A>>), A::Error> {
-        let output = action.apply(target)?;
-        let current = self.current();
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
-        let was_saved = self.is_saved();
-        // Pop off all elements after len from record.
-        let tail = self.entries.split_off(current);
-        // Check if the saved state was popped off.
-        self.saved = self.saved.filter(|&saved| saved <= current);
-        // Try to merge actions unless the target is in a saved state.
-        let merged = match self.entries.back_mut() {
-            Some(last) if !was_saved => last.action.merge(action),
-            _ => Merged::No(action),
-        };
-        let merged_or_annulled = match merged {
-            Merged::Yes => true,
-            Merged::Annul => {
-                self.entries.pop_back();
-                self.current -= 1;
-                true
-            }
-            // If actions are not merged or annulled push it onto the record.
-            Merged::No(action) => {
-                // If limit is reached, pop off the first action.
-                if self.limit() == self.current() {
-                    self.entries.pop_front();
-                    self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
-                } else {
-                    self.current += 1;
-                }
-                self.entries.push_back(Entry::from(action));
-                false
-            }
-        };
-        self.slot.emit_if(could_redo, Signal::Redo(false));
-        self.slot.emit_if(!could_undo, Signal::Undo(true));
-        self.slot.emit_if(was_saved, Signal::Saved(false));
-        Ok((output, merged_or_annulled, tail))
+        self.stack
+            .apply(target, action)
+            .map(|(output, _, _)| output)
     }
 
     /// Calls the [`undo`] method for the active action and sets
@@ -217,18 +165,7 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
     ///
     /// [`undo`]: ../trait.Action.html#tymethod.undo
     pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
-        self.can_undo().then(|| {
-            let was_saved = self.is_saved();
-            let old = self.current();
-            let output = self.entries[self.current - 1].action.undo(target)?;
-            self.current -= 1;
-            let is_saved = self.is_saved();
-            self.slot.emit_if(old == self.len(), Signal::Redo(true));
-            self.slot.emit_if(old == 1, Signal::Undo(false));
-            self.slot
-                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-            Ok(output)
-        })
+        self.stack.undo(target)
     }
 
     /// Calls the [`redo`] method for the active action and sets
@@ -239,49 +176,24 @@ impl<A: Action, F: FnMut(Signal)> Record<A, F> {
     ///
     /// [`redo`]: trait.Action.html#method.redo
     pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
-        self.can_redo().then(|| {
-            let was_saved = self.is_saved();
-            let old = self.current();
-            let output = self.entries[self.current].action.redo(target)?;
-            self.current += 1;
-            let is_saved = self.is_saved();
-            self.slot
-                .emit_if(old == self.len() - 1, Signal::Redo(false));
-            self.slot.emit_if(old == 0, Signal::Undo(true));
-            self.slot
-                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-            Ok(output)
-        })
+        self.stack.redo(target)
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
-        let was_saved = self.is_saved();
-        if saved {
-            self.saved = Some(self.current());
-            self.slot.emit_if(!was_saved, Signal::Saved(true));
-        } else {
-            self.saved = None;
-            self.slot.emit_if(was_saved, Signal::Saved(false));
-        }
+        self.stack.set_saved(saved)
     }
 
     /// Removes all actions from the record without undoing them.
     pub fn clear(&mut self) {
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
-        self.entries.clear();
-        self.saved = self.is_saved().then_some(0);
-        self.current = 0;
-        self.slot.emit_if(could_undo, Signal::Undo(false));
-        self.slot.emit_if(could_redo, Signal::Redo(false));
+        self.stack.clear()
     }
 }
 
-impl<A: Action<Output = ()>, F: FnMut(Signal)> Record<A, F> {
+impl<A: Action<Output = ()>, F: Slot> Record<A, F> {
     /// Revert the changes done to the target since the saved state.
     pub fn revert(&mut self, target: &mut A::Target) -> Option<Result<A>> {
-        self.saved.and_then(|saved| self.go_to(target, saved))
+        self.stack.revert(target)
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the action at `current` is reached.
@@ -292,44 +204,13 @@ impl<A: Action<Output = ()>, F: FnMut(Signal)> Record<A, F> {
     /// [`undo`]: trait.Action.html#tymethod.undo
     /// [`redo`]: trait.Action.html#method.redo
     pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<Result<A>> {
-        if current > self.len() {
-            return None;
-        }
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
-        let was_saved = self.is_saved();
-        // Temporarily remove slot so they are not called each iteration.
-        let slot = self.disconnect();
-        // Decide if we need to undo or redo to reach current.
-        let f = if current > self.current() {
-            Record::redo
-        } else {
-            Record::undo
-        };
-        while self.current() != current {
-            if let Some(Err(err)) = f(self, target) {
-                self.slot.f = slot;
-                return Some(Err(err));
-            }
-        }
-        // Add slot back.
-        self.slot.f = slot;
-        let can_undo = self.can_undo();
-        let can_redo = self.can_redo();
-        let is_saved = self.is_saved();
-        self.slot
-            .emit_if(could_undo != can_undo, Signal::Undo(can_undo));
-        self.slot
-            .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
-        self.slot
-            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-        Some(Ok(()))
+        self.stack.go_to(target, current)
     }
 
     /// Go back or forward in the record to the action that was made closest to the datetime provided.
     #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, target: &mut A::Target, to: &DateTime<Utc>) -> Option<Result<A>> {
-        let current = match self.entries.as_slices() {
+        let current = match self.stack.entries.deque.as_slices() {
             ([], []) => return None,
             (head, []) => head
                 .binary_search_by(|e| e.timestamp.cmp(to))
@@ -358,17 +239,21 @@ impl<A: ToString, F> Record<A, F> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.Record.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
-        self.current.checked_sub(1).and_then(|i| self.text(i))
+        self.stack.current.checked_sub(1).and_then(|i| self.text(i))
     }
 
     /// Returns the string of the action which will be redone
     /// in the next call to [`redo`](struct.Record.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
-        self.text(self.current)
+        self.text(self.stack.current)
     }
 
     fn text(&self, i: usize) -> Option<String> {
-        self.entries.get(i).map(|e| e.action.to_string())
+        self.stack
+            .entries
+            .deque
+            .get(i)
+            .map(|e| e.action.to_string())
     }
 }
 
@@ -381,18 +266,6 @@ impl<A> Default for Record<A> {
 impl<A, F> From<History<A, F>> for Record<A, F> {
     fn from(history: History<A, F>) -> Record<A, F> {
         history.record
-    }
-}
-
-impl<A: fmt::Debug, F> fmt::Debug for Record<A, F> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Record")
-            .field("entries", &self.entries)
-            .field("current", &self.current)
-            .field("limit", &self.limit)
-            .field("saved", &self.saved)
-            .field("slot", &self.slot)
-            .finish()
     }
 }
 
@@ -412,11 +285,11 @@ impl<A: fmt::Debug, F> fmt::Debug for Record<A, F> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<F = Box<dyn FnMut(Signal)>> {
+pub struct Builder<F = NoOp> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
-    slot: Slot<F>,
+    slot: SW<F>,
 }
 
 impl<F> Builder<F> {
@@ -426,7 +299,7 @@ impl<F> Builder<F> {
             capacity: 0,
             limit: NonZeroUsize::new(usize::MAX).unwrap(),
             saved: true,
-            slot: Slot::default(),
+            slot: SW::default(),
         }
     }
 
@@ -455,19 +328,23 @@ impl<F> Builder<F> {
     /// Builds the record.
     pub fn build<A>(self) -> Record<A, F> {
         Record {
-            entries: VecDeque::with_capacity(self.capacity),
-            current: 0,
-            limit: self.limit,
-            saved: self.saved.then_some(0),
-            slot: self.slot,
+            stack: Stack {
+                entries: LimitDeque {
+                    deque: VecDeque::with_capacity(self.capacity),
+                    limit: self.limit,
+                },
+                current: 0,
+                saved: self.saved.then_some(0),
+                slot: self.slot,
+            },
         }
     }
 }
 
-impl<F: FnMut(Signal)> Builder<F> {
+impl<F: Slot> Builder<F> {
     /// Connects the slot.
     pub fn connect(mut self, f: F) -> Builder<F> {
-        self.slot = Slot::from(f);
+        self.slot = SW::new(f);
         self
     }
 }
@@ -509,7 +386,7 @@ pub struct Queue<'a, A, F> {
     actions: Vec<QueueAction<A>>,
 }
 
-impl<A: Action<Output = ()>, F: FnMut(Signal)> Queue<'_, A, F> {
+impl<A: Action<Output = ()>, F: Slot> Queue<'_, A, F> {
     /// Queues an `apply` action.
     pub fn apply(&mut self, action: A) {
         self.actions.push(QueueAction::Apply(action));
@@ -581,12 +458,13 @@ pub struct Checkpoint<'a, A, F> {
     actions: Vec<CheckpointAction<A>>,
 }
 
-impl<A: Action<Output = ()>, F: FnMut(Signal)> Checkpoint<'_, A, F> {
+impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
     /// Calls the `apply` method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
-        let saved = self.record.saved;
-        let (_, _, tail) = self.record.__apply(target, action)?;
-        self.actions.push(CheckpointAction::Apply(saved, tail));
+        let saved = self.record.stack.saved;
+        let (_, _, tail) = self.record.stack.apply(target, action)?;
+        self.actions
+            .push(CheckpointAction::Apply(saved, tail.deque));
         Ok(())
     }
 
@@ -625,9 +503,9 @@ impl<A: Action<Output = ()>, F: FnMut(Signal)> Checkpoint<'_, A, F> {
             match action {
                 CheckpointAction::Apply(saved, mut entries) => match self.record.undo(target) {
                     Some(Ok(())) => {
-                        self.record.entries.pop_back();
-                        self.record.entries.append(&mut entries);
-                        self.record.saved = saved;
+                        self.record.stack.entries.deque.pop_back();
+                        self.record.stack.entries.deque.append(&mut entries);
+                        self.record.stack.saved = saved;
                     }
                     o => return o,
                 },
@@ -720,7 +598,7 @@ impl<A: fmt::Display, F> Display<'_, A, F> {
             f,
             at,
             At::new(0, self.record.current()),
-            self.record.saved.map(|saved| At::new(0, saved)),
+            self.record.stack.saved.map(|saved| At::new(0, saved)),
         )?;
         if let Some(entry) = entry {
             if self.format.detailed {
@@ -747,11 +625,71 @@ impl<'a, A, F> From<&'a Record<A, F>> for Display<'a, A, F> {
 
 impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, entry) in self.record.entries.iter().enumerate().rev() {
+        for (i, entry) in self.record.stack.entries.deque.iter().enumerate().rev() {
             let at = At::new(0, i + 1);
             self.fmt_list(f, at, Some(entry))?;
         }
         self.fmt_list(f, At::ROOT, None)
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug)]
+pub(crate) struct LimitDeque<T> {
+    pub deque: VecDeque<Entry<T>>,
+    pub limit: NonZeroUsize,
+}
+
+impl<T> Entries for LimitDeque<T> {
+    type Item = T;
+
+    fn limit(&self) -> usize {
+        self.limit.get()
+    }
+
+    fn len(&self) -> usize {
+        self.deque.len()
+    }
+
+    fn back_mut(&mut self) -> Option<&mut Entry<T>> {
+        self.deque.back_mut()
+    }
+
+    fn push_back(&mut self, t: Entry<T>) {
+        self.deque.push_back(t)
+    }
+
+    fn pop_front(&mut self) -> Option<Entry<T>> {
+        self.deque.pop_front()
+    }
+
+    fn pop_back(&mut self) -> Option<Entry<T>> {
+        self.deque.pop_back()
+    }
+
+    fn split_off(&mut self, at: usize) -> Self {
+        LimitDeque {
+            deque: self.deque.split_off(at),
+            limit: self.limit,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.deque.clear();
+    }
+}
+
+impl<T> Index<usize> for LimitDeque<T> {
+    type Output = Entry<T>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.deque.index(index)
+    }
+}
+
+impl<T> IndexMut<usize> for LimitDeque<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.deque.index_mut(index)
     }
 }
 

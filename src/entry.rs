@@ -1,11 +1,9 @@
-use crate::{Action, Merged, Result, Signal, Slot};
-#[cfg(feature = "alloc")]
-use alloc::collections::VecDeque;
+use crate::slot::{Signal, Slot, SW};
+use crate::{Action, Merged, Result};
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, Utc};
-use core::fmt::{self, Display, Formatter};
-use core::num::NonZeroUsize;
-use core::ops::{Index, IndexMut};
+use core::fmt::{self, Debug, Display, Formatter};
+use core::ops::IndexMut;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -34,11 +32,13 @@ impl<A: Display> Display for Entry<A> {
     }
 }
 
-pub struct Stack<E, F> {
-    entries: E,
-    current: usize,
-    saved: Option<usize>,
-    slot: Slot<F>,
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug)]
+pub(crate) struct Stack<E, F> {
+    pub entries: E,
+    pub current: usize,
+    pub saved: Option<usize>,
+    pub slot: SW<F>,
 }
 
 impl<E: Entries, F> Stack<E, F> {
@@ -59,7 +59,7 @@ impl<E, F> Stack<E, F>
 where
     E: Entries,
     E::Item: Action,
-    F: FnMut(Signal),
+    F: Slot,
 {
     #[allow(clippy::type_complexity)]
     pub fn apply(
@@ -167,7 +167,7 @@ impl<E, F> Stack<E, F>
 where
     E: Entries,
     E::Item: Action<Output = ()>,
-    F: FnMut(Signal),
+    F: Slot,
 {
     pub fn go_to(
         &mut self,
@@ -190,12 +190,12 @@ where
         };
         while self.current != current {
             if let Some(Err(err)) = undo_or_redo(self, target) {
-                self.slot.set(f);
+                self.slot.connect(f);
                 return Some(Err(err));
             }
         }
         // Add slot back.
-        self.slot.set(f);
+        self.slot.connect(f);
         let can_undo = self.can_undo();
         let can_redo = self.can_redo();
         let is_saved = self.is_saved();
@@ -224,66 +224,4 @@ pub trait Entries: IndexMut<usize, Output = Entry<Self::Item>> {
     fn pop_back(&mut self) -> Option<Entry<Self::Item>>;
     fn split_off(&mut self, at: usize) -> Self;
     fn clear(&mut self);
-}
-
-#[cfg(feature = "alloc")]
-struct LimitDeque<T> {
-    deque: VecDeque<Entry<T>>,
-    limit: NonZeroUsize,
-}
-
-#[cfg(feature = "alloc")]
-impl<T> Index<usize> for LimitDeque<T> {
-    type Output = Entry<T>;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        self.deque.index(index)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<T> IndexMut<usize> for LimitDeque<T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.deque.index_mut(index)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<T> Entries for LimitDeque<T> {
-    type Item = T;
-
-    fn limit(&self) -> usize {
-        self.limit.get()
-    }
-
-    fn len(&self) -> usize {
-        self.deque.len()
-    }
-
-    fn back_mut(&mut self) -> Option<&mut Entry<T>> {
-        self.deque.back_mut()
-    }
-
-    fn push_back(&mut self, t: Entry<T>) {
-        self.deque.push_back(t)
-    }
-
-    fn pop_front(&mut self) -> Option<Entry<T>> {
-        self.deque.pop_front()
-    }
-
-    fn pop_back(&mut self) -> Option<Entry<T>> {
-        self.deque.pop_back()
-    }
-
-    fn split_off(&mut self, at: usize) -> Self {
-        LimitDeque {
-            deque: self.deque.split_off(at),
-            limit: self.limit,
-        }
-    }
-
-    fn clear(&mut self) {
-        self.deque.clear();
-    }
 }
