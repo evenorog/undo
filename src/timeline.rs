@@ -384,12 +384,12 @@ enum QueueAction<A> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Queue<'a, A, F> {
-    timeline: &'a mut Timeline<A, F>,
+pub struct Queue<'a, A, S> {
+    timeline: &'a mut Timeline<A, S>,
     actions: Vec<QueueAction<A>>,
 }
 
-impl<A: Action<Output = ()>, F: Slot> Queue<'_, A, F> {
+impl<A: Action<Output = ()>, S: Slot> Queue<'_, A, S> {
     /// Queues an `apply` action.
     pub fn apply(&mut self, action: A) {
         self.actions.push(QueueAction::Apply(action));
@@ -428,18 +428,18 @@ impl<A: Action<Output = ()>, F: Slot> Queue<'_, A, F> {
     pub fn cancel(self) {}
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, F> {
+    pub fn queue(&mut self) -> Queue<A, S> {
         self.timeline.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
         self.timeline.checkpoint()
     }
 }
 
-impl<'a, A, F> From<&'a mut Timeline<A, F>> for Queue<'a, A, F> {
-    fn from(timeline: &'a mut Timeline<A, F>) -> Self {
+impl<'a, A, S> From<&'a mut Timeline<A, S>> for Queue<'a, A, S> {
+    fn from(timeline: &'a mut Timeline<A, S>) -> Self {
         Queue {
             timeline,
             actions: Vec::new(),
@@ -456,12 +456,12 @@ enum CheckpointAction<A> {
 
 /// Wraps a timeline and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, A, F> {
-    timeline: &'a mut Timeline<A, F>,
+pub struct Checkpoint<'a, A, S> {
+    timeline: &'a mut Timeline<A, S>,
     actions: Vec<CheckpointAction<A>>,
 }
 
-impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
+impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     /// Calls the `apply` method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
         let saved = self.timeline.record.saved;
@@ -526,18 +526,18 @@ impl<A: Action<Output = ()>, F: Slot> Checkpoint<'_, A, F> {
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, F> {
+    pub fn queue(&mut self) -> Queue<A, S> {
         self.timeline.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
         self.timeline.checkpoint()
     }
 }
 
-impl<'a, A, F> From<&'a mut Timeline<A, F>> for Checkpoint<'a, A, F> {
-    fn from(timeline: &'a mut Timeline<A, F>) -> Self {
+impl<'a, A, S> From<&'a mut Timeline<A, S>> for Checkpoint<'a, A, S> {
+    fn from(timeline: &'a mut Timeline<A, S>) -> Self {
         Checkpoint {
             timeline,
             actions: Vec::new(),
@@ -546,12 +546,12 @@ impl<'a, A, F> From<&'a mut Timeline<A, F>> for Checkpoint<'a, A, F> {
 }
 
 /// Configurable display formatting for the timeline.
-pub struct Display<'a, A, F> {
-    timeline: &'a Timeline<A, F>,
+pub struct Display<'a, A, S> {
+    timeline: &'a Timeline<A, S>,
     format: Format,
 }
 
-impl<A, F> Display<'_, A, F> {
+impl<A, S> Display<'_, A, S> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -586,7 +586,7 @@ impl<A, F> Display<'_, A, F> {
     }
 }
 
-impl<A: fmt::Display, F> Display<'_, A, F> {
+impl<A: fmt::Display, S> Display<'_, A, S> {
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<A>>) -> fmt::Result {
         self.format.position(f, at, false)?;
 
@@ -617,8 +617,8 @@ impl<A: fmt::Display, F> Display<'_, A, F> {
     }
 }
 
-impl<'a, A, F> From<&'a Timeline<A, F>> for Display<'a, A, F> {
-    fn from(timeline: &'a Timeline<A, F>) -> Self {
+impl<'a, A, S> From<&'a Timeline<A, S>> for Display<'a, A, S> {
+    fn from(timeline: &'a Timeline<A, S>) -> Self {
         Display {
             timeline,
             format: Format::default(),
@@ -626,7 +626,7 @@ impl<'a, A, F> From<&'a Timeline<A, F>> for Display<'a, A, F> {
     }
 }
 
-impl<A: fmt::Display, F> fmt::Display for Display<'_, A, F> {
+impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.timeline.record.entries.deque.iter().enumerate().rev() {
             let at = At::new(0, i + 1);

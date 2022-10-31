@@ -6,14 +6,14 @@ use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub(crate) struct Record<E, F> {
+pub(crate) struct Record<E, S> {
     pub entries: E,
     pub current: usize,
     pub saved: Option<usize>,
-    pub slot: SW<F>,
+    pub slot: SW<S>,
 }
 
-impl<E: Entries, F> Record<E, F> {
+impl<E: Entries, S> Record<E, S> {
     pub fn can_undo(&self) -> bool {
         self.current > 0
     }
@@ -27,11 +27,11 @@ impl<E: Entries, F> Record<E, F> {
     }
 }
 
-impl<E, F> Record<E, F>
+impl<E, S> Record<E, S>
 where
     E: Entries,
     E::Item: Action,
-    F: Slot,
+    S: Slot,
 {
     #[allow(clippy::type_complexity)]
     pub fn apply(
@@ -135,11 +135,11 @@ where
     }
 }
 
-impl<E, F> Record<E, F>
+impl<E, S> Record<E, S>
 where
     E: Entries,
     E::Item: Action<Output = ()>,
-    F: Slot,
+    S: Slot,
 {
     pub fn go_to(
         &mut self,
