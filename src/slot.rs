@@ -21,7 +21,7 @@ impl<F: FnMut(Signal)> Slot for F {
 /// For example, if the timeline can no longer redo any actions,
 /// it sends a `Redo(false)` signal to tell the user.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Signal {
     /// Says if the structures can undo.
     Undo(bool),
@@ -33,7 +33,7 @@ pub enum Signal {
 
 /// Default slot that does nothing.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct NoOp;
 
 impl Slot for NoOp {
