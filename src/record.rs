@@ -153,24 +153,25 @@ where
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Temporarily remove slot so they are not called each iteration.
-        let f = self.slot.disconnect();
+        let slot = self.slot.disconnect();
         // Decide if we need to undo or redo to reach current.
         let undo_or_redo = if current > self.current {
             Record::redo
         } else {
             Record::undo
         };
+
         while self.current != current {
             if let Some(Err(err)) = undo_or_redo(self, target) {
-                self.slot.connect(f);
+                self.slot.connect(slot);
                 return Some(Err(err));
             }
         }
-        // Add slot back.
-        self.slot.connect(f);
+
         let can_undo = self.can_undo();
         let can_redo = self.can_redo();
         let is_saved = self.is_saved();
+        self.slot.connect(slot);
         self.slot
             .emit_if(could_undo != can_undo, Signal::Undo(can_undo));
         self.slot
