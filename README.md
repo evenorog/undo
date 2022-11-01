@@ -40,19 +40,19 @@ it is easy to apply, undo, and redo changes made to a target.
 ```rust
 use undo::{Action, History};
 
-struct Add(char);
+struct Push(char);
 
-impl Action for Add {
+impl Action for Push {
     type Target = String;
     type Output = ();
     type Error = &'static str;
 
-    fn apply(&mut self, s: &mut String) -> undo::Result<Add> {
+    fn apply(&mut self, s: &mut String) -> undo::Result<Push> {
         s.push(self.0);
         Ok(())
     }
 
-    fn undo(&mut self, s: &mut String) -> undo::Result<Add> {
+    fn undo(&mut self, s: &mut String) -> undo::Result<Push> {
         self.0 = s.pop().ok_or("s is empty")?;
         Ok(())
     }
@@ -61,9 +61,9 @@ impl Action for Add {
 fn main() {
     let mut target = String::new();
     let mut history = History::new();
-    history.apply(&mut target, Add('a')).unwrap();
-    history.apply(&mut target, Add('b')).unwrap();
-    history.apply(&mut target, Add('c')).unwrap();
+    history.apply(&mut target, Push('a')).unwrap();
+    history.apply(&mut target, Push('b')).unwrap();
+    history.apply(&mut target, Push('c')).unwrap();
     assert_eq!(target, "abc");
     history.undo(&mut target).unwrap().unwrap();
     history.undo(&mut target).unwrap().unwrap();

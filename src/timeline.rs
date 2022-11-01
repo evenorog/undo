@@ -33,13 +33,13 @@ use {
 /// # Examples
 /// ```
 /// # use undo::Timeline;
-/// # include!("../add.rs");
+/// # include!("../push.rs");
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut timeline = Timeline::new();
-/// timeline.apply(&mut target, Add('a')).unwrap();
-/// timeline.apply(&mut target, Add('b')).unwrap();
-/// timeline.apply(&mut target, Add('c')).unwrap();
+/// timeline.apply(&mut target, Push('a')).unwrap();
+/// timeline.apply(&mut target, Push('b')).unwrap();
+/// timeline.apply(&mut target, Push('c')).unwrap();
 /// assert_eq!(target, "abc");
 /// timeline.undo(&mut target).unwrap().unwrap();
 /// timeline.undo(&mut target).unwrap().unwrap();
@@ -53,8 +53,8 @@ use {
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct Timeline<A, F = NoOp> {
-    pub(crate) record: Record<LimitDeque<A>, F>,
+pub struct Timeline<A, S = NoOp> {
+    pub(crate) record: Record<LimitDeque<A>, S>,
 }
 
 impl<A> Timeline<A> {
@@ -64,7 +64,7 @@ impl<A> Timeline<A> {
     }
 }
 
-impl<A, F> Timeline<A, F> {
+impl<A, S> Timeline<A, S> {
     /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics
@@ -99,12 +99,12 @@ impl<A, F> Timeline<A, F> {
     }
 
     /// Sets how the signal should be handled when the state changes.
-    pub fn connect(&mut self, slot: F) -> Option<F> {
+    pub fn connect(&mut self, slot: S) -> Option<S> {
         self.record.slot.connect(Some(slot))
     }
 
     /// Removes and returns the slot if it exists.
-    pub fn disconnect(&mut self) -> Option<F> {
+    pub fn disconnect(&mut self) -> Option<S> {
         self.record.slot.disconnect()
     }
 
@@ -129,22 +129,22 @@ impl<A, F> Timeline<A, F> {
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, F> {
+    pub fn queue(&mut self) -> Queue<A, S> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, F> {
+    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
         Checkpoint::from(self)
     }
 
     /// Returns a structure for configurable formatting of the timeline.
-    pub fn display(&self) -> Display<A, F> {
+    pub fn display(&self) -> Display<A, S> {
         Display::from(self)
     }
 }
 
-impl<A: Action, F: Slot> Timeline<A, F> {
+impl<A: Action, S: Slot> Timeline<A, S> {
     /// Pushes the action on top of the timeline and executes its [`apply`] method.
     ///
     /// # Errors
@@ -190,7 +190,7 @@ impl<A: Action, F: Slot> Timeline<A, F> {
     }
 }
 
-impl<A: Action<Output = ()>, F: Slot> Timeline<A, F> {
+impl<A: Action<Output = ()>, S: Slot> Timeline<A, S> {
     /// Revert the changes done to the target since the saved state.
     pub fn revert(&mut self, target: &mut A::Target) -> Option<Result<A>> {
         self.record.revert(target)
@@ -235,7 +235,7 @@ impl<A: Action<Output = ()>, F: Slot> Timeline<A, F> {
     }
 }
 
-impl<A: ToString, F> Timeline<A, F> {
+impl<A: ToString, S> Timeline<A, S> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.Timeline.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
@@ -276,7 +276,7 @@ impl<A, F> From<History<A, F>> for Timeline<A, F> {
 ///
 /// # Examples
 /// ```
-/// # include!("../add.rs");
+/// # include!("../push.rs");
 /// # fn main() {
 /// # use undo::{timeline::TimelineBuilder, Timeline};
 ///
@@ -284,20 +284,20 @@ impl<A, F> From<History<A, F>> for Timeline<A, F> {
 ///     .limit(100)
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
-///     .build::<Add>();
+///     .build::<Push>();
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct TimelineBuilder<F = NoOp> {
+pub struct TimelineBuilder<S = NoOp> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
-    slot: SW<F>,
+    slot: SW<S>,
 }
 
-impl<F> TimelineBuilder<F> {
+impl<S> TimelineBuilder<S> {
     /// Returns a builder for a timeline.
-    pub fn new() -> TimelineBuilder<F> {
+    pub fn new() -> TimelineBuilder<S> {
         TimelineBuilder {
             capacity: 0,
             limit: NonZeroUsize::new(usize::MAX).unwrap(),
@@ -307,7 +307,7 @@ impl<F> TimelineBuilder<F> {
     }
 
     /// Sets the capacity for the timeline.
-    pub fn capacity(mut self, capacity: usize) -> TimelineBuilder<F> {
+    pub fn capacity(mut self, capacity: usize) -> TimelineBuilder<S> {
         self.capacity = capacity;
         self
     }
@@ -316,20 +316,20 @@ impl<F> TimelineBuilder<F> {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(mut self, limit: usize) -> TimelineBuilder<F> {
+    pub fn limit(mut self, limit: usize) -> TimelineBuilder<S> {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(mut self, saved: bool) -> TimelineBuilder<F> {
+    pub fn saved(mut self, saved: bool) -> TimelineBuilder<S> {
         self.saved = saved;
         self
     }
 
     /// Builds the timeline.
-    pub fn build<A>(self) -> Timeline<A, F> {
+    pub fn build<A>(self) -> Timeline<A, S> {
         Timeline {
             record: Record {
                 entries: LimitDeque {
@@ -344,9 +344,9 @@ impl<F> TimelineBuilder<F> {
     }
 }
 
-impl<F: Slot> TimelineBuilder<F> {
+impl<S: Slot> TimelineBuilder<S> {
     /// Connects the slot.
-    pub fn connect(mut self, f: F) -> TimelineBuilder<F> {
+    pub fn connect(mut self, f: S) -> TimelineBuilder<S> {
         self.slot = SW::new(f);
         self
     }
@@ -370,14 +370,14 @@ enum QueueAction<A> {
 /// # Examples
 /// ```
 /// # use undo::{Timeline};
-/// # include!("../add.rs");
+/// # include!("../push.rs");
 /// # fn main() {
 /// let mut string = String::new();
 /// let mut timeline = Timeline::new();
 /// let mut queue = timeline.queue();
-/// queue.apply(Add('a'));
-/// queue.apply(Add('b'));
-/// queue.apply(Add('c'));
+/// queue.apply(Push('a'));
+/// queue.apply(Push('b'));
+/// queue.apply(Push('c'));
 /// assert_eq!(string, "");
 /// queue.commit(&mut string).unwrap().unwrap();
 /// assert_eq!(string, "abc");
@@ -702,8 +702,8 @@ mod tests {
     use alloc::string::String;
 
     enum Edit {
-        Add(Add),
-        Del(Del),
+        Push(Push),
+        Pop(Pop),
     }
 
     impl Action for Edit {
@@ -711,17 +711,17 @@ mod tests {
         type Output = ();
         type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<Add> {
+        fn apply(&mut self, s: &mut String) -> Result<Push> {
             match self {
-                Edit::Add(add) => add.apply(s),
-                Edit::Del(del) => del.apply(s),
+                Edit::Push(add) => add.apply(s),
+                Edit::Pop(del) => del.apply(s),
             }
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<Add> {
+        fn undo(&mut self, s: &mut String) -> Result<Push> {
             match self {
-                Edit::Add(add) => add.undo(s),
-                Edit::Del(del) => del.undo(s),
+                Edit::Push(add) => add.undo(s),
+                Edit::Pop(del) => del.undo(s),
             }
         }
 
@@ -730,45 +730,45 @@ mod tests {
             Self: Sized,
         {
             match (self, edit) {
-                (Edit::Add(_), Edit::Del(_)) => Merged::Annul,
-                (Edit::Del(Del(Some(a))), Edit::Add(Add(b))) if a == &b => Merged::Annul,
+                (Edit::Push(_), Edit::Pop(_)) => Merged::Annul,
+                (Edit::Pop(Pop(Some(a))), Edit::Push(Push(b))) if a == &b => Merged::Annul,
                 (_, edit) => Merged::No(edit),
             }
         }
     }
 
-    struct Add(char);
+    struct Push(char);
 
-    impl Action for Add {
+    impl Action for Push {
         type Target = String;
         type Output = ();
         type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<Add> {
+        fn apply(&mut self, s: &mut String) -> Result<Push> {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<Add> {
+        fn undo(&mut self, s: &mut String) -> Result<Push> {
             self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
     }
 
     #[derive(Default)]
-    struct Del(Option<char>);
+    struct Pop(Option<char>);
 
-    impl Action for Del {
+    impl Action for Pop {
         type Target = String;
         type Output = ();
         type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<Add> {
+        fn apply(&mut self, s: &mut String) -> Result<Push> {
             self.0 = s.pop();
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<Add> {
+        fn undo(&mut self, s: &mut String) -> Result<Push> {
             let ch = self.0.ok_or("s is empty")?;
             s.push(ch);
             Ok(())
@@ -779,11 +779,11 @@ mod tests {
     fn go_to() {
         let mut target = String::new();
         let mut timeline = Timeline::new();
-        timeline.apply(&mut target, Add('a')).unwrap();
-        timeline.apply(&mut target, Add('b')).unwrap();
-        timeline.apply(&mut target, Add('c')).unwrap();
-        timeline.apply(&mut target, Add('d')).unwrap();
-        timeline.apply(&mut target, Add('e')).unwrap();
+        timeline.apply(&mut target, Push('a')).unwrap();
+        timeline.apply(&mut target, Push('b')).unwrap();
+        timeline.apply(&mut target, Push('c')).unwrap();
+        timeline.apply(&mut target, Push('d')).unwrap();
+        timeline.apply(&mut target, Push('e')).unwrap();
 
         timeline.go_to(&mut target, 0).unwrap().unwrap();
         assert_eq!(timeline.current(), 0);
@@ -820,9 +820,9 @@ mod tests {
         q2.undo();
         q2.undo();
         let mut q3 = q2.queue();
-        q3.apply(Add('a'));
-        q3.apply(Add('b'));
-        q3.apply(Add('c'));
+        q3.apply(Push('a'));
+        q3.apply(Push('b'));
+        q3.apply(Push('c'));
         assert_eq!(target, "");
         q3.commit(&mut target).unwrap().unwrap();
         assert_eq!(target, "abc");
@@ -837,19 +837,19 @@ mod tests {
         let mut target = String::new();
         let mut timeline = Timeline::new();
         let mut cp1 = timeline.checkpoint();
-        cp1.apply(&mut target, Add('a')).unwrap();
-        cp1.apply(&mut target, Add('b')).unwrap();
-        cp1.apply(&mut target, Add('c')).unwrap();
+        cp1.apply(&mut target, Push('a')).unwrap();
+        cp1.apply(&mut target, Push('b')).unwrap();
+        cp1.apply(&mut target, Push('c')).unwrap();
         assert_eq!(target, "abc");
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(&mut target, Add('d')).unwrap();
-        cp2.apply(&mut target, Add('e')).unwrap();
-        cp2.apply(&mut target, Add('f')).unwrap();
+        cp2.apply(&mut target, Push('d')).unwrap();
+        cp2.apply(&mut target, Push('e')).unwrap();
+        cp2.apply(&mut target, Push('f')).unwrap();
         assert_eq!(target, "abcdef");
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(&mut target, Add('g')).unwrap();
-        cp3.apply(&mut target, Add('h')).unwrap();
-        cp3.apply(&mut target, Add('i')).unwrap();
+        cp3.apply(&mut target, Push('g')).unwrap();
+        cp3.apply(&mut target, Push('h')).unwrap();
+        cp3.apply(&mut target, Push('i')).unwrap();
         assert_eq!(target, "abcdefghi");
         cp3.commit();
         cp2.commit();
@@ -862,17 +862,17 @@ mod tests {
         let mut target = String::new();
         let mut timeline = Timeline::new();
         let mut cp1 = timeline.checkpoint();
-        cp1.apply(&mut target, Add('a')).unwrap();
-        cp1.apply(&mut target, Add('b')).unwrap();
-        cp1.apply(&mut target, Add('c')).unwrap();
+        cp1.apply(&mut target, Push('a')).unwrap();
+        cp1.apply(&mut target, Push('b')).unwrap();
+        cp1.apply(&mut target, Push('c')).unwrap();
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(&mut target, Add('d')).unwrap();
-        cp2.apply(&mut target, Add('e')).unwrap();
-        cp2.apply(&mut target, Add('f')).unwrap();
+        cp2.apply(&mut target, Push('d')).unwrap();
+        cp2.apply(&mut target, Push('e')).unwrap();
+        cp2.apply(&mut target, Push('f')).unwrap();
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(&mut target, Add('g')).unwrap();
-        cp3.apply(&mut target, Add('h')).unwrap();
-        cp3.apply(&mut target, Add('i')).unwrap();
+        cp3.apply(&mut target, Push('g')).unwrap();
+        cp3.apply(&mut target, Push('h')).unwrap();
+        cp3.apply(&mut target, Push('i')).unwrap();
         assert_eq!(target, "abcdefghi");
         cp3.cancel(&mut target).unwrap().unwrap();
         assert_eq!(target, "abcdef");
@@ -886,17 +886,17 @@ mod tests {
     fn checkpoint_saved() {
         let mut target = String::new();
         let mut timeline = Timeline::new();
-        timeline.apply(&mut target, Add('a')).unwrap();
-        timeline.apply(&mut target, Add('b')).unwrap();
-        timeline.apply(&mut target, Add('c')).unwrap();
+        timeline.apply(&mut target, Push('a')).unwrap();
+        timeline.apply(&mut target, Push('b')).unwrap();
+        timeline.apply(&mut target, Push('c')).unwrap();
         timeline.set_saved(true);
         timeline.undo(&mut target).unwrap().unwrap();
         timeline.undo(&mut target).unwrap().unwrap();
         timeline.undo(&mut target).unwrap().unwrap();
         let mut cp = timeline.checkpoint();
-        cp.apply(&mut target, Add('d')).unwrap();
-        cp.apply(&mut target, Add('e')).unwrap();
-        cp.apply(&mut target, Add('f')).unwrap();
+        cp.apply(&mut target, Push('d')).unwrap();
+        cp.apply(&mut target, Push('e')).unwrap();
+        cp.apply(&mut target, Push('f')).unwrap();
         assert_eq!(target, "def");
         cp.cancel(&mut target).unwrap().unwrap();
         assert_eq!(target, "");
@@ -911,11 +911,11 @@ mod tests {
     fn annul() {
         let mut target = String::new();
         let mut timeline = Timeline::new();
-        timeline.apply(&mut target, Edit::Add(Add('a'))).unwrap();
+        timeline.apply(&mut target, Edit::Push(Push('a'))).unwrap();
         timeline
-            .apply(&mut target, Edit::Del(Del::default()))
+            .apply(&mut target, Edit::Pop(Pop::default()))
             .unwrap();
-        timeline.apply(&mut target, Edit::Add(Add('b'))).unwrap();
+        timeline.apply(&mut target, Edit::Push(Push('b'))).unwrap();
         assert_eq!(timeline.len(), 1);
     }
 }

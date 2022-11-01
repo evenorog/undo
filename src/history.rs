@@ -21,17 +21,17 @@ use serde::{Deserialize, Serialize};
 /// # Examples
 /// ```
 /// # use undo::History;
-/// # include!("../add.rs");
+/// # include!("../push.rs");
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut history = History::new();
-/// history.apply(&mut target, Add('a')).unwrap();
-/// history.apply(&mut target, Add('b')).unwrap();
-/// history.apply(&mut target, Add('c')).unwrap();
+/// history.apply(&mut target, Push('a')).unwrap();
+/// history.apply(&mut target, Push('b')).unwrap();
+/// history.apply(&mut target, Push('c')).unwrap();
 /// let abc = history.branch();
 /// history.go_to(&mut target, abc, 1).unwrap().unwrap();
-/// history.apply(&mut target, Add('f')).unwrap();
-/// history.apply(&mut target, Add('g')).unwrap();
+/// history.apply(&mut target, Push('f')).unwrap();
+/// history.apply(&mut target, Push('g')).unwrap();
 /// assert_eq!(target, "afg");
 /// history.go_to(&mut target, abc, 3).unwrap().unwrap();
 /// assert_eq!(target, "abc");
@@ -401,13 +401,13 @@ impl<A> Branch<A> {
 /// # Examples
 /// ```
 /// # use undo::{history::HistoryBuilder, Timeline};
-/// # include!("../add.rs");
+/// # include!("../push.rs");
 /// # fn main() {
 /// let _ = HistoryBuilder::new()
 ///     .limit(100)
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
-///     .build::<Add>();
+///     .build::<Push>();
 /// # }
 /// ```
 #[derive(Debug)]
@@ -469,14 +469,14 @@ enum QueueAction<A> {
 /// # Examples
 /// ```
 /// # use undo::{Timeline};
-/// # include!("../add.rs");
+/// # include!("../push.rs");
 /// # fn main() {
 /// let mut string = String::new();
 /// let mut timeline = Timeline::new();
 /// let mut queue = timeline.queue();
-/// queue.apply(Add('a'));
-/// queue.apply(Add('b'));
-/// queue.apply(Add('c'));
+/// queue.apply(Push('a'));
+/// queue.apply(Push('b'));
+/// queue.apply(Push('c'));
 /// assert_eq!(string, "");
 /// queue.commit(&mut string).unwrap().unwrap();
 /// assert_eq!(string, "abc");
@@ -793,19 +793,19 @@ mod tests {
     use crate::*;
     use alloc::string::String;
 
-    struct Add(char);
+    struct Push(char);
 
-    impl Action for Add {
+    impl Action for Push {
         type Target = String;
         type Output = ();
         type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<Add> {
+        fn apply(&mut self, s: &mut String) -> Result<Push> {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<Add> {
+        fn undo(&mut self, s: &mut String) -> Result<Push> {
             self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }
@@ -830,44 +830,44 @@ mod tests {
         // a
         let mut target = String::new();
         let mut history = History::new();
-        history.apply(&mut target, Add('a')).unwrap();
-        history.apply(&mut target, Add('b')).unwrap();
-        history.apply(&mut target, Add('c')).unwrap();
-        history.apply(&mut target, Add('d')).unwrap();
-        history.apply(&mut target, Add('e')).unwrap();
+        history.apply(&mut target, Push('a')).unwrap();
+        history.apply(&mut target, Push('b')).unwrap();
+        history.apply(&mut target, Push('c')).unwrap();
+        history.apply(&mut target, Push('d')).unwrap();
+        history.apply(&mut target, Push('e')).unwrap();
         assert_eq!(target, "abcde");
         history.undo(&mut target).unwrap().unwrap();
         history.undo(&mut target).unwrap().unwrap();
         assert_eq!(target, "abc");
         let abcde = history.branch();
-        history.apply(&mut target, Add('f')).unwrap();
-        history.apply(&mut target, Add('g')).unwrap();
+        history.apply(&mut target, Push('f')).unwrap();
+        history.apply(&mut target, Push('g')).unwrap();
         assert_eq!(target, "abcfg");
         history.undo(&mut target).unwrap().unwrap();
         let abcfg = history.branch();
-        history.apply(&mut target, Add('h')).unwrap();
-        history.apply(&mut target, Add('i')).unwrap();
-        history.apply(&mut target, Add('j')).unwrap();
+        history.apply(&mut target, Push('h')).unwrap();
+        history.apply(&mut target, Push('i')).unwrap();
+        history.apply(&mut target, Push('j')).unwrap();
         assert_eq!(target, "abcfhij");
         history.undo(&mut target).unwrap().unwrap();
         let abcfhij = history.branch();
-        history.apply(&mut target, Add('k')).unwrap();
+        history.apply(&mut target, Push('k')).unwrap();
         assert_eq!(target, "abcfhik");
         history.undo(&mut target).unwrap().unwrap();
         let abcfhik = history.branch();
-        history.apply(&mut target, Add('l')).unwrap();
+        history.apply(&mut target, Push('l')).unwrap();
         assert_eq!(target, "abcfhil");
-        history.apply(&mut target, Add('m')).unwrap();
+        history.apply(&mut target, Push('m')).unwrap();
         assert_eq!(target, "abcfhilm");
         let abcfhilm = history.branch();
         history.go_to(&mut target, abcde, 2).unwrap().unwrap();
-        history.apply(&mut target, Add('n')).unwrap();
-        history.apply(&mut target, Add('o')).unwrap();
+        history.apply(&mut target, Push('n')).unwrap();
+        history.apply(&mut target, Push('o')).unwrap();
         assert_eq!(target, "abno");
         history.undo(&mut target).unwrap().unwrap();
         let abno = history.branch();
-        history.apply(&mut target, Add('p')).unwrap();
-        history.apply(&mut target, Add('q')).unwrap();
+        history.apply(&mut target, Push('p')).unwrap();
+        history.apply(&mut target, Push('q')).unwrap();
         assert_eq!(target, "abnpq");
 
         let abnpq = history.branch();

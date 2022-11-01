@@ -1,12 +1,12 @@
 use crate::entry::{Entries, Entry};
-use crate::slot::{Signal, Slot, SW};
+use crate::slot::{NoOp, Signal, Slot, SW};
 use crate::{Action, Merged, Result};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub(crate) struct Record<E, S> {
+pub(crate) struct Record<E, S = NoOp> {
     pub entries: E,
     pub current: usize,
     pub saved: Option<usize>,
