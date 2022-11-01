@@ -332,10 +332,7 @@ impl<S> TimelineBuilder<S> {
     pub fn build<A>(self) -> Timeline<A, S> {
         Timeline {
             record: Record {
-                entries: LimitDeque {
-                    deque: VecDeque::with_capacity(self.capacity),
-                    limit: self.limit,
-                },
+                entries: LimitDeque::new(self.capacity, self.limit),
                 current: 0,
                 saved: self.saved.then_some(0),
                 slot: self.slot,
@@ -636,11 +633,21 @@ impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
     }
 }
 
+/// A deque that holds a limit of how many items it can hold.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
 pub(crate) struct LimitDeque<T> {
     pub deque: VecDeque<Entry<T>>,
     pub limit: NonZeroUsize,
+}
+
+impl<T> LimitDeque<T> {
+    pub fn new(capacity: usize, limit: NonZeroUsize) -> LimitDeque<T> {
+        LimitDeque {
+            deque: VecDeque::with_capacity(capacity),
+            limit,
+        }
+    }
 }
 
 impl<T> Entries for LimitDeque<T> {
