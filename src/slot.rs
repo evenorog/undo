@@ -40,6 +40,7 @@ impl Slot for NoOp {
     fn emit(&mut self, _: Signal) {}
 }
 
+/// Slot wrapper that adds some additional functionality.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
 #[derive(Clone, Debug)]
 pub(crate) struct SW<S>(Option<S>);

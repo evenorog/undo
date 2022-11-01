@@ -2,9 +2,12 @@ use crate::Action;
 use alloc::boxed::Box;
 use core::fmt::{self, Debug, Formatter};
 
-/// Any action that shares the target, output, and error.
+/// Any action type.
+///
+/// This allows you to use multiple different actions in a timeline or history
+/// as long as they all share the same target, output, and error type.
 pub struct AnyAction<T, O, E> {
-    id: i64,
+    id: u64,
     action: Box<dyn Action<Target = T, Output = O, Error = E>>,
 }
 
@@ -19,6 +22,22 @@ impl<T, O, E> AnyAction<T, O, E> {
             id: 0,
             action: Box::new(action),
         }
+    }
+}
+
+impl<T, E> AnyAction<T, (), E>
+where
+    Self: 'static,
+{
+    /// Creates a new any action from `self` and `action`.
+    ///
+    /// `self` will be called first in `apply`.
+    pub fn join<A>(self, action: A) -> AnyAction<T, (), E>
+    where
+        A: Action<Target = T, Output = (), Error = E>,
+        A: 'static,
+    {
+        AnyAction::new(Merged { a: self, b: action })
     }
 }
 
@@ -45,6 +64,36 @@ impl<T, O, E> Debug for AnyAction<T, O, E> {
         f.debug_struct("AnyAction")
             .field("id", &self.id)
             .finish_non_exhaustive()
+    }
+}
+
+struct Merged<A, B> {
+    a: A,
+    b: B,
+}
+
+impl<A, B, T, E> Action for Merged<A, B>
+where
+    A: Action<Target = T, Output = (), Error = E>,
+    B: Action<Target = T, Output = (), Error = E>,
+{
+    type Target = T;
+    type Output = ();
+    type Error = E;
+
+    fn apply(&mut self, target: &mut T) -> crate::Result<Self> {
+        self.a.apply(target)?;
+        self.b.apply(target)
+    }
+
+    fn undo(&mut self, target: &mut T) -> crate::Result<Self> {
+        self.b.undo(target)?;
+        self.a.undo(target)
+    }
+
+    fn redo(&mut self, target: &mut T) -> crate::Result<Self> {
+        self.a.redo(target)?;
+        self.b.redo(target)
     }
 }
 
