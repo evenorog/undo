@@ -11,30 +11,6 @@ by creating objects that applies the modifications. All objects knows
 how to undo the changes it applies, and by using the provided data structures
 it is easy to apply, undo, and redo changes made to a target.
 
-## Features
-
-* [Action](https://docs.rs/undo/latest/undo/trait.Action.html) provides the base functionality for all actions.
-* [Timeline](https://docs.rs/undo/latest/undo/timeline/struct.Timeline.html) provides basic undo-redo functionality.
-* [History](https://docs.rs/undo/latest/undo/history/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
-* A queue that wraps a timeline or history and extends them with queue functionality.
-* A checkpoint that wraps a timeline or history and extends them with checkpoint functionality.
-* Actions can be merged into a single action by implementing the
-  [merge](https://docs.rs/undo/latest/undo.Action.html#method.merge) method on the action.
-  This allows smaller actions to be used to build more complex operations, or smaller incremental changes to be
-  merged into larger changes that can be undone and redone in a single step.
-* The target can be marked as being saved to disk and the data-structures can track the saved state and notify
-  when it changes.
-* The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
-* Configurable display formatting using the display structure.
-* The library can be used as `no_std`.
-
-## Cargo Feature Flags
-
-* `alloc`: Enables the use of the alloc crate, enabled by default.
-* `colored`: Enables colored output when visualizing the display structures, enabled by default.
-* `chrono`: Enables time stamps and time travel.
-* `serde`: Enables serialization and deserialization.
-
 ## Examples
 
 ```rust

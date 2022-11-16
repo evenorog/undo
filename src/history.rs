@@ -138,6 +138,11 @@ impl<A, S> History<A, S> {
         Display::from(self)
     }
 
+    /// Returns an iterator over the actions in the current branch.
+    pub fn actions(&self) -> impl Iterator + '_ {
+        self.timeline.actions()
+    }
+
     fn at(&self) -> At {
         At::new(self.branch(), self.current())
     }

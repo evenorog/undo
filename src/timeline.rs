@@ -18,7 +18,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "chrono")]
 use {
     chrono::{DateTime, Utc},
-    core::cmp::Ordering,
     core::convert::identity,
 };
 
@@ -142,6 +141,11 @@ impl<A, S> Timeline<A, S> {
     pub fn display(&self) -> Display<A, S> {
         Display::from(self)
     }
+
+    /// Returns an iterator over the actions.
+    pub fn actions(&self) -> impl Iterator + '_ {
+        self.record.entries.deque.iter().map(|e| &e.action)
+    }
 }
 
 impl<A: Action, S: Slot> Timeline<A, S> {
@@ -210,27 +214,12 @@ impl<A: Action<Output = ()>, S: Slot> Timeline<A, S> {
     /// Go back or forward in the timeline to the action that was made closest to the datetime provided.
     #[cfg(feature = "chrono")]
     pub fn time_travel(&mut self, target: &mut A::Target, to: &DateTime<Utc>) -> Option<Result<A>> {
-        let current = match self.record.entries.deque.as_slices() {
-            ([], []) => return None,
-            (head, []) => head
-                .binary_search_by(|e| e.timestamp.cmp(to))
-                .unwrap_or_else(identity),
-            ([], tail) => tail
-                .binary_search_by(|e| e.timestamp.cmp(to))
-                .unwrap_or_else(identity),
-            (head, tail) => match head.last().unwrap().timestamp.cmp(to) {
-                Ordering::Less => head
-                    .binary_search_by(|e| e.timestamp.cmp(to))
-                    .unwrap_or_else(identity),
-                Ordering::Equal => head.len(),
-                Ordering::Greater => {
-                    head.len()
-                        + tail
-                            .binary_search_by(|e| e.timestamp.cmp(to))
-                            .unwrap_or_else(identity)
-                }
-            },
-        };
+        let current = self
+            .record
+            .entries
+            .deque
+            .binary_search_by(|e| e.timestamp.cmp(to))
+            .unwrap_or_else(identity);
         self.go_to(target, current)
     }
 }
