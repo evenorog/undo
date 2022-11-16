@@ -20,7 +20,6 @@
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //! * Configurable display formatting using the display structure.
-//! * The library can be used as `no_std`.
 //!
 //! # Cargo Feature Flags
 //!
@@ -104,7 +103,7 @@ use record::Record;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "alloc")]
-pub use self::{any::AnyAction, history::History, timeline::Timeline};
+pub use self::{history::History, timeline::Timeline};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result<A> = core::result::Result<<A as Action>::Output, <A as Action>::Error>;

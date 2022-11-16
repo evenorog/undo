@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::Action;
 use alloc::boxed::Box;
 use core::fmt::{self, Debug, Formatter};
@@ -99,7 +101,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{Action, AnyAction, Result, Timeline};
+    use super::AnyAction;
+    use crate::{Action, Result, Timeline};
     use alloc::string::String;
 
     struct Push(char);
