@@ -39,7 +39,7 @@ where
         A: Action<Target = T, Output = (), Error = E>,
         A: 'static,
     {
-        AnyAction::new(Merged { a: self, b: action })
+        AnyAction::new(Join { a: self, b: action })
     }
 }
 
@@ -69,12 +69,12 @@ impl<T, O, E> Debug for AnyAction<T, O, E> {
     }
 }
 
-struct Merged<A, B> {
+struct Join<A, B> {
     a: A,
     b: B,
 }
 
-impl<A, B, T, E> Action for Merged<A, B>
+impl<A, B, T, E> Action for Join<A, B>
 where
     A: Action<Target = T, Output = (), Error = E>,
     B: Action<Target = T, Output = (), Error = E>,
