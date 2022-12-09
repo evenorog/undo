@@ -6,7 +6,7 @@ use core::fmt::{self, Debug, Formatter};
 
 /// Any action type.
 ///
-/// This allows you to use multiple different actions in a timeline or history
+/// This allows you to use multiple different actions in a record or history
 /// as long as they all share the same target, output, and error type.
 pub struct AnyAction<T, O, E> {
     id: u64,
@@ -102,7 +102,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::AnyAction;
-    use crate::{Action, Result, Timeline};
+    use crate::{Action, Record, Result};
     use alloc::string::String;
 
     struct Push(char);
@@ -126,14 +126,14 @@ mod tests {
     #[test]
     fn any() {
         let mut target = String::new();
-        let mut timeline = Timeline::new();
-        timeline
+        let mut record = Record::new();
+        record
             .apply(&mut target, AnyAction::new(Push('a')))
             .unwrap();
         assert_eq!(target, "a");
-        timeline.undo(&mut target).unwrap().unwrap();
+        record.undo(&mut target).unwrap().unwrap();
         assert_eq!(target, "");
-        timeline.redo(&mut target).unwrap().unwrap();
+        record.redo(&mut target).unwrap().unwrap();
         assert_eq!(target, "a");
     }
 }
