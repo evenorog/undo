@@ -151,7 +151,7 @@ impl<A, S> Record<A, S> {
     }
 
     /// Returns an iterator over the actions.
-    pub fn actions(&self) -> impl Iterator + '_ {
+    pub fn actions(&self) -> impl Iterator<Item = &A> {
         self.record.entries.deque.iter().map(|e| &e.action)
     }
 }
@@ -704,6 +704,7 @@ impl<T> IndexMut<usize> for LimitDeque<T> {
 mod tests {
     use crate::*;
     use alloc::string::String;
+    use alloc::vec::Vec;
 
     enum Edit {
         Push(Push),
@@ -741,6 +742,7 @@ mod tests {
         }
     }
 
+    #[derive(Debug, PartialEq)]
     struct Push(char);
 
     impl Action for Push {
@@ -921,5 +923,15 @@ mod tests {
             .unwrap();
         record.apply(&mut target, Edit::Push(Push('b'))).unwrap();
         assert_eq!(record.len(), 1);
+    }
+
+    #[test]
+    fn actions() {
+        let mut target = String::new();
+        let mut record = Record::new();
+        record.apply(&mut target, Push('a')).unwrap();
+        record.apply(&mut target, Push('b')).unwrap();
+        let collected = record.actions().collect::<Vec<_>>();
+        assert_eq!(&collected[..], &[&Push('a'), &Push('b')][..]);
     }
 }

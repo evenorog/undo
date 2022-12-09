@@ -147,7 +147,7 @@ impl<A, S> History<A, S> {
     }
 
     /// Returns an iterator over the actions in the current branch.
-    pub fn actions(&self) -> impl Iterator + '_ {
+    pub fn actions(&self) -> impl Iterator<Item = &A> {
         self.record.actions()
     }
 
