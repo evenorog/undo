@@ -8,10 +8,10 @@
 //! # Features
 //!
 //! * [Action](trait.Action.html) provides the base functionality for all actions.
-//! * [Timeline](timeline/struct.Timeline.html) provides basic undo-redo functionality.
+//! * [Record](record/struct.Record.html) provides basic undo-redo functionality.
 //! * [History](history/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
-//! * A queues that wraps a timeline or history and extends them with queue functionality.
-//! * A checkpoints that wraps a timeline or history and extends them with checkpoint functionality.
+//! * Queues that wraps a record or history and extends them with queue functionality.
+//! * Checkpoints that wraps a record or history and extends them with checkpoint functionality.
 //! * Actions can be merged into a single action by implementing the
 //!   [merge](trait.Action.html#method.merge) method on the action.
 //!   This allows smaller actions to be used to build more complex operations, or smaller incremental changes to be
@@ -89,21 +89,21 @@ mod entry;
 mod format;
 #[cfg(feature = "alloc")]
 pub mod history;
-mod record;
-pub mod slot;
 #[cfg(feature = "alloc")]
-pub mod timeline;
+pub mod record;
+pub mod slot;
+mod timeline;
 
 #[cfg(feature = "alloc")]
 use crate::format::Format;
 
 use entry::Entry;
-use record::Record;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use timeline::Timeline;
 
 #[cfg(feature = "alloc")]
-pub use self::{history::History, timeline::Timeline};
+pub use self::{history::History, record::Record};
 
 /// A specialized Result type for undo-redo operations.
 pub type Result<A> = core::result::Result<<A as Action>::Output, <A as Action>::Error>;
