@@ -701,7 +701,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         self.format.mark(f, level)?;
         self.format.position(f, at, true)?;
 
-        #[cfg(feature = "chrono")]
+        #[cfg(feature = "time")]
         if let Some(entry) = entry {
             if self.format.detailed {
                 self.format.timestamp(f, &entry.timestamp)?;

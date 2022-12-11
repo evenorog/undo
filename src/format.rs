@@ -2,9 +2,9 @@
 
 use crate::At;
 use alloc::string::ToString;
-#[cfg(feature = "chrono")]
-use chrono::{DateTime, Local, TimeZone};
 use core::fmt::{self, Write};
+#[cfg(feature = "time")]
+use time::{format_description::well_known::Rfc2822, OffsetDateTime};
 #[cfg(feature = "colored")]
 use {
     alloc::format,
@@ -165,13 +165,9 @@ impl Format {
         }
     }
 
-    #[cfg(feature = "chrono")]
-    pub fn timestamp(
-        self,
-        f: &mut fmt::Formatter,
-        timestamp: &DateTime<impl TimeZone>,
-    ) -> fmt::Result {
-        let rfc2822 = timestamp.with_timezone(&Local).to_rfc2822();
+    #[cfg(feature = "time")]
+    pub fn timestamp(self, f: &mut fmt::Formatter, timestamp: &OffsetDateTime) -> fmt::Result {
+        let rfc2822 = timestamp.format(&Rfc2822).unwrap();
         #[cfg(feature = "colored")]
         if self.colored {
             return write!(f, " {}", rfc2822.yellow());

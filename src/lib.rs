@@ -25,7 +25,7 @@
 //!
 //! * `alloc`: Enables the use of the alloc crate, enabled by default.
 //! * `colored`: Enables colored output when visualizing the display structures, enabled by default.
-//! * `chrono`: Enables time stamps and time travel.
+//! * `time`: Enables time stamps and time travel.
 //! * `serde`: Enables serialization and deserialization.
 //!
 //! # Examples
@@ -73,7 +73,7 @@
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
-#![cfg_attr(not(feature = "alloc"), allow(dead_code))]
+#![cfg_attr(not(feature = "alloc"), allow(dead_code, unused_imports))]
 
 #[doc = include_str!("../README.md")]
 #[cfg(doctest)]

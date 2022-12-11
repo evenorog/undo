@@ -16,11 +16,8 @@ use core::{
 };
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "chrono")]
-use {
-    chrono::{DateTime, Utc},
-    core::convert::identity,
-};
+#[cfg(feature = "time")]
+use {core::convert::identity, time::OffsetDateTime};
 
 /// A linear record of actions.
 ///
@@ -220,8 +217,12 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
     }
 
     /// Go back or forward in the record to the action that was made closest to the datetime provided.
-    #[cfg(feature = "chrono")]
-    pub fn time_travel(&mut self, target: &mut A::Target, to: &DateTime<Utc>) -> Option<Result<A>> {
+    #[cfg(feature = "time")]
+    pub fn time_travel(
+        &mut self,
+        target: &mut A::Target,
+        to: &OffsetDateTime,
+    ) -> Option<Result<A>> {
         let current = self
             .record
             .entries
@@ -584,7 +585,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
     fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<A>>) -> fmt::Result {
         self.format.position(f, at, false)?;
 
-        #[cfg(feature = "chrono")]
+        #[cfg(feature = "time")]
         if let Some(entry) = entry {
             if self.format.detailed {
                 self.format.timestamp(f, &entry.timestamp)?;
