@@ -3,17 +3,13 @@
 use crate::entry::Entries;
 use crate::slot::{NoOp, Slot, SW};
 use crate::{Action, At, Entry, Format, History, Timeline};
-use alloc::{
-    collections::VecDeque,
-    string::{String, ToString},
-    vec::Vec,
-};
-use core::convert::Infallible;
+use alloc::collections::VecDeque;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::fmt::{self, Write};
+use core::marker::PhantomData;
+use core::num::NonZeroUsize;
 use core::ops::{Index, IndexMut};
-use core::{
-    fmt::{self, Write},
-    num::NonZeroUsize,
-};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "time")]
@@ -54,13 +50,6 @@ pub struct Record<A, S = NoOp> {
     pub(crate) timeline: Timeline<LimitDeque<A>, S>,
 }
 
-impl Record<Infallible> {
-    /// Returns a new record builder.
-    pub fn builder<S>() -> Builder<S> {
-        Builder::new()
-    }
-}
-
 impl<A> Record<A> {
     /// Returns a new record.
     pub fn new() -> Record<A> {
@@ -69,6 +58,11 @@ impl<A> Record<A> {
 }
 
 impl<A, S> Record<A, S> {
+    /// Returns a new record builder.
+    pub fn builder() -> Builder<A, S> {
+        Builder::new()
+    }
+
     /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics
@@ -261,34 +255,36 @@ impl<A, F> From<History<A, F>> for Record<A, F> {
 /// # fn main() {
 /// # use undo::Record;
 ///
-/// let _ = Record::builder()
+/// let _ = Record::<Push, _>::builder()
 ///     .limit(100)
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
-///     .build::<Push>();
+///     .build();
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<S = NoOp> {
+pub struct Builder<A, S = NoOp> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
     slot: SW<S>,
+    pd: PhantomData<A>,
 }
 
-impl<S> Builder<S> {
+impl<A, S> Builder<A, S> {
     /// Returns a builder for a record.
-    pub fn new() -> Builder<S> {
+    pub fn new() -> Builder<A, S> {
         Builder {
             capacity: 0,
             limit: NonZeroUsize::new(usize::MAX).unwrap(),
             saved: true,
             slot: SW::default(),
+            pd: PhantomData,
         }
     }
 
     /// Sets the capacity for the record.
-    pub fn capacity(mut self, capacity: usize) -> Builder<S> {
+    pub fn capacity(mut self, capacity: usize) -> Builder<A, S> {
         self.capacity = capacity;
         self
     }
@@ -297,20 +293,20 @@ impl<S> Builder<S> {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(mut self, limit: usize) -> Builder<S> {
+    pub fn limit(mut self, limit: usize) -> Builder<A, S> {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(mut self, saved: bool) -> Builder<S> {
+    pub fn saved(mut self, saved: bool) -> Builder<A, S> {
         self.saved = saved;
         self
     }
 
     /// Builds the record.
-    pub fn build<A>(self) -> Record<A, S> {
+    pub fn build(self) -> Record<A, S> {
         Record {
             timeline: Timeline {
                 entries: LimitDeque::new(self.capacity, self.limit),
@@ -322,15 +318,15 @@ impl<S> Builder<S> {
     }
 }
 
-impl<S: Slot> Builder<S> {
+impl<A, S: Slot> Builder<A, S> {
     /// Connects the slot.
-    pub fn connect(mut self, f: S) -> Builder<S> {
+    pub fn connect(mut self, f: S) -> Builder<A, S> {
         self.slot = SW::new(f);
         self
     }
 }
 
-impl Default for Builder {
+impl<A> Default for Builder<A> {
     fn default() -> Self {
         Builder::new()
     }
