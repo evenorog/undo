@@ -159,9 +159,6 @@ impl<A, S> History<A, S> {
 impl<A: Action, S: Slot> History<A, S> {
     /// Pushes the action to the top of the history and executes its [`apply`] method.
     ///
-    /// # Errors
-    /// If an error occur when executing [`apply`] the error is returned.
-    ///
     /// [`apply`]: trait.Action.html#tymethod.apply
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
         let at = self.at();
@@ -194,9 +191,6 @@ impl<A: Action, S: Slot> History<A, S> {
     /// Calls the [`undo`] method for the active action
     /// and sets the previous one as the new active one.
     ///
-    /// # Errors
-    /// If an error occur when executing [`undo`] the error is returned.
-    ///
     /// [`undo`]: trait.Action.html#tymethod.undo
     pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
         self.record.undo(target)
@@ -204,9 +198,6 @@ impl<A: Action, S: Slot> History<A, S> {
 
     /// Calls the [`redo`] method for the active action
     /// and sets the next one as the new active one.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Action.html#method.redo
     pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
@@ -319,9 +310,6 @@ impl<A: Action, S: Slot> History<A, S> {
 
 impl<A: Action<Output = ()>, S: Slot> History<A, S> {
     /// Repeatedly calls [`undo`] or [`redo`] until the action in `branch` at `current` is reached.
-    ///
-    /// # Errors
-    /// If an error occur when executing [`undo`] or [`redo`] the error is returned.
     ///
     /// [`undo`]: trait.Action.html#tymethod.undo
     /// [`redo`]: trait.Action.html#method.redo
@@ -508,9 +496,6 @@ impl<A: Action<Output = ()>, S: Slot> Queue<'_, A, S> {
     }
 
     /// Applies the queued actions.
-    ///
-    /// # Errors
-    /// If an error occurs, it stops applying the actions and returns the error.
     pub fn commit(self, target: &mut A::Target) -> Option<()> {
         for action in self.actions {
             match action {
@@ -585,10 +570,6 @@ impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
-    ///
-    /// # Errors
-    /// If an error occur when canceling the changes, the error is returned
-    /// and the remaining actions are not canceled.
     pub fn cancel(self, target: &mut A::Target) -> Option<()> {
         for action in self.actions.into_iter().rev() {
             match action {

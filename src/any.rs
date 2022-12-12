@@ -7,7 +7,7 @@ use core::fmt::{self, Debug, Formatter};
 /// Any action type.
 ///
 /// This allows you to use multiple different actions in a record or history
-/// as long as they all share the same target, output, and error type.
+/// as long as they all share the same target and output type.
 pub struct AnyAction<T, O> {
     id: u64,
     action: Box<dyn Action<Target = T, Output = O>>,
