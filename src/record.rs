@@ -34,24 +34,24 @@ use {core::convert::identity, time::OffsetDateTime};
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut record = Record::new();
-/// record.apply(&mut target, Push('a')).unwrap();
-/// record.apply(&mut target, Push('b')).unwrap();
-/// record.apply(&mut target, Push('c')).unwrap();
+/// record.apply(&mut target, Push('a'));
+/// record.apply(&mut target, Push('b'));
+/// record.apply(&mut target, Push('c'));
 /// assert_eq!(target, "abc");
-/// record.undo(&mut target).unwrap().unwrap();
-/// record.undo(&mut target).unwrap().unwrap();
-/// record.undo(&mut target).unwrap().unwrap();
+/// record.undo(&mut target);
+/// record.undo(&mut target);
+/// record.undo(&mut target);
 /// assert_eq!(target, "");
-/// record.redo(&mut target).unwrap().unwrap();
-/// record.redo(&mut target).unwrap().unwrap();
-/// record.redo(&mut target).unwrap().unwrap();
+/// record.redo(&mut target);
+/// record.redo(&mut target);
+/// record.redo(&mut target);
 /// assert_eq!(target, "abc");
 /// # }
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Record<A, S = NoOp> {
-    pub(crate) record: Timeline<LimitDeque<A>, S>,
+    pub(crate) timeline: Timeline<LimitDeque<A>, S>,
 }
 
 impl Record<Infallible> {
@@ -74,62 +74,62 @@ impl<A, S> Record<A, S> {
     /// # Panics
     /// Panics if the new capacity overflows usize.
     pub fn reserve(&mut self, additional: usize) {
-        self.record.entries.deque.reserve(additional);
+        self.timeline.entries.deque.reserve(additional);
     }
 
     /// Returns the capacity of the record.
     pub fn capacity(&self) -> usize {
-        self.record.entries.deque.capacity()
+        self.timeline.entries.deque.capacity()
     }
 
     /// Shrinks the capacity of the record as much as possible.
     pub fn shrink_to_fit(&mut self) {
-        self.record.entries.deque.shrink_to_fit();
+        self.timeline.entries.deque.shrink_to_fit();
     }
 
     /// Returns the number of actions in the record.
     pub fn len(&self) -> usize {
-        self.record.entries.deque.len()
+        self.timeline.entries.deque.len()
     }
 
     /// Returns `true` if the record is empty.
     pub fn is_empty(&self) -> bool {
-        self.record.entries.deque.is_empty()
+        self.timeline.entries.deque.is_empty()
     }
 
     /// Returns the limit of the record.
     pub fn limit(&self) -> usize {
-        self.record.entries.limit.get()
+        self.timeline.entries.limit.get()
     }
 
     /// Sets how the signal should be handled when the state changes.
     pub fn connect(&mut self, slot: S) -> Option<S> {
-        self.record.slot.connect(Some(slot))
+        self.timeline.slot.connect(Some(slot))
     }
 
     /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<S> {
-        self.record.slot.disconnect()
+        self.timeline.slot.disconnect()
     }
 
     /// Returns `true` if the record can undo.
     pub fn can_undo(&self) -> bool {
-        self.record.can_undo()
+        self.timeline.can_undo()
     }
 
     /// Returns `true` if the record can redo.
     pub fn can_redo(&self) -> bool {
-        self.record.can_redo()
+        self.timeline.can_redo()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
     pub fn is_saved(&self) -> bool {
-        self.record.is_saved()
+        self.timeline.is_saved()
     }
 
     /// Returns the position of the current action.
     pub fn current(&self) -> usize {
-        self.record.current
+        self.timeline.current
     }
 
     /// Returns a queue.
@@ -149,7 +149,7 @@ impl<A, S> Record<A, S> {
 
     /// Returns an iterator over the actions.
     pub fn actions(&self) -> impl Iterator<Item = &A> {
-        self.record.entries.deque.iter().map(|e| &e.action)
+        self.timeline.entries.deque.iter().map(|e| &e.action)
     }
 }
 
@@ -160,10 +160,9 @@ impl<A: Action, S: Slot> Record<A, S> {
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Action.html#tymethod.apply
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A::Output, A::Error> {
-        self.record
-            .apply(target, action)
-            .map(|(output, _, _)| output)
+    pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
+        let (output, _, _) = self.timeline.apply(target, action);
+        output
     }
 
     /// Calls the [`undo`] method for the active action and sets
@@ -173,8 +172,8 @@ impl<A: Action, S: Slot> Record<A, S> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: ../trait.Action.html#tymethod.undo
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
-        self.record.undo(target)
+    pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+        self.timeline.undo(target)
     }
 
     /// Calls the [`redo`] method for the active action and sets
@@ -184,25 +183,25 @@ impl<A: Action, S: Slot> Record<A, S> {
     /// If an error occur when applying [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Action.html#method.redo
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
-        self.record.redo(target)
+    pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+        self.timeline.redo(target)
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
-        self.record.set_saved(saved)
+        self.timeline.set_saved(saved)
     }
 
     /// Removes all actions from the record without undoing them.
     pub fn clear(&mut self) {
-        self.record.clear()
+        self.timeline.clear()
     }
 }
 
 impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
     /// Revert the changes done to the target since the saved state.
-    pub fn revert(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
-        self.record.revert(target)
+    pub fn revert(&mut self, target: &mut A::Target) -> Option<()> {
+        self.timeline.revert(target)
     }
 
     /// Repeatedly calls [`undo`] or [`redo`] until the action at `current` is reached.
@@ -212,23 +211,15 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
     ///
     /// [`undo`]: trait.Action.html#tymethod.undo
     /// [`redo`]: trait.Action.html#method.redo
-    pub fn go_to(
-        &mut self,
-        target: &mut A::Target,
-        current: usize,
-    ) -> Option<Result<A::Output, A::Error>> {
-        self.record.go_to(target, current)
+    pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<()> {
+        self.timeline.go_to(target, current)
     }
 
     /// Go back or forward in the record to the action that was made closest to the datetime provided.
     #[cfg(feature = "time")]
-    pub fn time_travel(
-        &mut self,
-        target: &mut A::Target,
-        to: &OffsetDateTime,
-    ) -> Option<Result<A::Output, A::Error>> {
+    pub fn time_travel(&mut self, target: &mut A::Target, to: &OffsetDateTime) -> Option<()> {
         let current = self
-            .record
+            .timeline
             .entries
             .deque
             .binary_search_by(|e| e.timestamp.cmp(to))
@@ -241,7 +232,7 @@ impl<A: ToString, S> Record<A, S> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`undo`](struct.Timeline.html#method.undo).
     pub fn undo_text(&self) -> Option<String> {
-        self.record
+        self.timeline
             .current
             .checked_sub(1)
             .and_then(|i| self.text(i))
@@ -250,11 +241,11 @@ impl<A: ToString, S> Record<A, S> {
     /// Returns the string of the action which will be redone
     /// in the next call to [`redo`](struct.Timeline.html#method.redo).
     pub fn redo_text(&self) -> Option<String> {
-        self.text(self.record.current)
+        self.text(self.timeline.current)
     }
 
     fn text(&self, i: usize) -> Option<String> {
-        self.record
+        self.timeline
             .entries
             .deque
             .get(i)
@@ -333,7 +324,7 @@ impl<S> Builder<S> {
     /// Builds the record.
     pub fn build<A>(self) -> Record<A, S> {
         Record {
-            record: Timeline {
+            timeline: Timeline {
                 entries: LimitDeque::new(self.capacity, self.limit),
                 current: 0,
                 saved: self.saved.then_some(0),
@@ -378,7 +369,7 @@ enum QueueAction<A> {
 /// queue.apply(Push('b'));
 /// queue.apply(Push('c'));
 /// assert_eq!(string, "");
-/// queue.commit(&mut string).unwrap().unwrap();
+/// queue.commit(&mut string).unwrap();
 /// assert_eq!(string, "abc");
 /// # }
 /// ```
@@ -408,19 +399,15 @@ impl<A: Action<Output = ()>, S: Slot> Queue<'_, A, S> {
     ///
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
-    pub fn commit(self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
+    pub fn commit(self, target: &mut A::Target) -> Option<()> {
         for action in self.actions {
-            let r = match action {
-                QueueAction::Apply(action) => Some(self.record.apply(target, action)),
-                QueueAction::Undo => self.record.undo(target),
-                QueueAction::Redo => self.record.redo(target),
-            };
-            match r {
-                Some(Ok(_)) => (),
-                o @ Some(Err(_)) | o @ None => return o,
+            match action {
+                QueueAction::Apply(action) => self.record.apply(target, action),
+                QueueAction::Undo => self.record.undo(target)?,
+                QueueAction::Redo => self.record.redo(target)?,
             }
         }
-        Some(Ok(()))
+        Some(())
     }
 
     /// Cancels the queued actions.
@@ -462,34 +449,25 @@ pub struct Checkpoint<'a, A, S> {
 
 impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     /// Calls the `apply` method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A::Output, A::Error> {
-        let saved = self.record.record.saved;
-        let (_, _, tail) = self.record.record.apply(target, action)?;
+    pub fn apply(&mut self, target: &mut A::Target, action: A) {
+        let saved = self.record.timeline.saved;
+        let (_, _, tail) = self.record.timeline.apply(target, action);
         self.actions
             .push(CheckpointAction::Apply(saved, tail.deque));
-        Ok(())
     }
 
     /// Calls the `undo` method.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
-        match self.record.undo(target) {
-            o @ Some(Ok(())) => {
-                self.actions.push(CheckpointAction::Undo);
-                o
-            }
-            o => o,
-        }
+    pub fn undo(&mut self, target: &mut A::Target) -> Option<()> {
+        self.record.undo(target)?;
+        self.actions.push(CheckpointAction::Undo);
+        Some(())
     }
 
     /// Calls the `redo` method.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
-        match self.record.redo(target) {
-            o @ Some(Ok(())) => {
-                self.actions.push(CheckpointAction::Redo);
-                o
-            }
-            o => o,
-        }
+    pub fn redo(&mut self, target: &mut A::Target) -> Option<()> {
+        self.record.redo(target)?;
+        self.actions.push(CheckpointAction::Redo);
+        Some(())
     }
 
     /// Commits the changes and consumes the checkpoint.
@@ -500,28 +478,20 @@ impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining actions are not canceled.
-    pub fn cancel(self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
+    pub fn cancel(self, target: &mut A::Target) -> Option<()> {
         for action in self.actions.into_iter().rev() {
             match action {
-                CheckpointAction::Apply(saved, mut entries) => match self.record.undo(target) {
-                    Some(Ok(())) => {
-                        self.record.record.entries.deque.pop_back();
-                        self.record.record.entries.deque.append(&mut entries);
-                        self.record.record.saved = saved;
-                    }
-                    o => return o,
-                },
-                CheckpointAction::Undo => match self.record.redo(target) {
-                    Some(Ok(())) => (),
-                    o => return o,
-                },
-                CheckpointAction::Redo => match self.record.undo(target) {
-                    Some(Ok(())) => (),
-                    o => return o,
-                },
+                CheckpointAction::Apply(saved, mut entries) => {
+                    self.record.undo(target)?;
+                    self.record.timeline.entries.deque.pop_back();
+                    self.record.timeline.entries.deque.append(&mut entries);
+                    self.record.timeline.saved = saved;
+                }
+                CheckpointAction::Undo => self.record.redo(target)?,
+                CheckpointAction::Redo => self.record.undo(target)?,
             };
         }
-        Some(Ok(()))
+        Some(())
     }
 
     /// Returns a queue.
@@ -600,7 +570,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
             f,
             at,
             At::new(0, self.record.current()),
-            self.record.record.saved.map(|saved| At::new(0, saved)),
+            self.record.timeline.saved.map(|saved| At::new(0, saved)),
         )?;
         if let Some(entry) = entry {
             if self.format.detailed {
@@ -627,7 +597,7 @@ impl<'a, A, S> From<&'a Record<A, S>> for Display<'a, A, S> {
 
 impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, entry) in self.record.record.entries.deque.iter().enumerate().rev() {
+        for (i, entry) in self.record.timeline.entries.deque.iter().enumerate().rev() {
             let at = At::new(0, i + 1);
             self.fmt_list(f, at, Some(entry))?;
         }
@@ -719,16 +689,15 @@ mod tests {
     impl Action for Edit {
         type Target = String;
         type Output = ();
-        type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
+        fn apply(&mut self, s: &mut String) {
             match self {
                 Edit::Push(add) => add.apply(s),
                 Edit::Pop(del) => del.apply(s),
             }
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
+        fn undo(&mut self, s: &mut String) {
             match self {
                 Edit::Push(add) => add.undo(s),
                 Edit::Pop(del) => del.undo(s),
@@ -753,16 +722,13 @@ mod tests {
     impl Action for Push {
         type Target = String;
         type Output = ();
-        type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
+        fn apply(&mut self, s: &mut String) {
             s.push(self.0);
-            Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-            self.0 = s.pop().ok_or("s is empty")?;
-            Ok(())
+        fn undo(&mut self, s: &mut String) {
+            self.0 = s.pop().unwrap();
         }
     }
 
@@ -772,17 +738,14 @@ mod tests {
     impl Action for Pop {
         type Target = String;
         type Output = ();
-        type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
+        fn apply(&mut self, s: &mut String) {
             self.0 = s.pop();
-            Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-            let ch = self.0.ok_or("s is empty")?;
+        fn undo(&mut self, s: &mut String) {
+            let ch = self.0.unwrap();
             s.push(ch);
-            Ok(())
         }
     }
 
@@ -790,28 +753,28 @@ mod tests {
     fn go_to() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Push('a')).unwrap();
-        record.apply(&mut target, Push('b')).unwrap();
-        record.apply(&mut target, Push('c')).unwrap();
-        record.apply(&mut target, Push('d')).unwrap();
-        record.apply(&mut target, Push('e')).unwrap();
+        record.apply(&mut target, Push('a'));
+        record.apply(&mut target, Push('b'));
+        record.apply(&mut target, Push('c'));
+        record.apply(&mut target, Push('d'));
+        record.apply(&mut target, Push('e'));
 
-        record.go_to(&mut target, 0).unwrap().unwrap();
+        record.go_to(&mut target, 0).unwrap();
         assert_eq!(record.current(), 0);
         assert_eq!(target, "");
-        record.go_to(&mut target, 5).unwrap().unwrap();
+        record.go_to(&mut target, 5).unwrap();
         assert_eq!(record.current(), 5);
         assert_eq!(target, "abcde");
-        record.go_to(&mut target, 1).unwrap().unwrap();
+        record.go_to(&mut target, 1).unwrap();
         assert_eq!(record.current(), 1);
         assert_eq!(target, "a");
-        record.go_to(&mut target, 4).unwrap().unwrap();
+        record.go_to(&mut target, 4).unwrap();
         assert_eq!(record.current(), 4);
         assert_eq!(target, "abcd");
-        record.go_to(&mut target, 2).unwrap().unwrap();
+        record.go_to(&mut target, 2).unwrap();
         assert_eq!(record.current(), 2);
         assert_eq!(target, "ab");
-        record.go_to(&mut target, 3).unwrap().unwrap();
+        record.go_to(&mut target, 3).unwrap();
         assert_eq!(record.current(), 3);
         assert_eq!(target, "abc");
         assert!(record.go_to(&mut target, 6).is_none());
@@ -835,11 +798,11 @@ mod tests {
         q3.apply(Push('b'));
         q3.apply(Push('c'));
         assert_eq!(target, "");
-        q3.commit(&mut target).unwrap().unwrap();
+        q3.commit(&mut target).unwrap();
         assert_eq!(target, "abc");
-        q2.commit(&mut target).unwrap().unwrap();
+        q2.commit(&mut target).unwrap();
         assert_eq!(target, "");
-        q1.commit(&mut target).unwrap().unwrap();
+        q1.commit(&mut target).unwrap();
         assert_eq!(target, "abc");
     }
 
@@ -848,19 +811,19 @@ mod tests {
         let mut target = String::new();
         let mut record = Record::new();
         let mut cp1 = record.checkpoint();
-        cp1.apply(&mut target, Push('a')).unwrap();
-        cp1.apply(&mut target, Push('b')).unwrap();
-        cp1.apply(&mut target, Push('c')).unwrap();
+        cp1.apply(&mut target, Push('a'));
+        cp1.apply(&mut target, Push('b'));
+        cp1.apply(&mut target, Push('c'));
         assert_eq!(target, "abc");
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(&mut target, Push('d')).unwrap();
-        cp2.apply(&mut target, Push('e')).unwrap();
-        cp2.apply(&mut target, Push('f')).unwrap();
+        cp2.apply(&mut target, Push('d'));
+        cp2.apply(&mut target, Push('e'));
+        cp2.apply(&mut target, Push('f'));
         assert_eq!(target, "abcdef");
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(&mut target, Push('g')).unwrap();
-        cp3.apply(&mut target, Push('h')).unwrap();
-        cp3.apply(&mut target, Push('i')).unwrap();
+        cp3.apply(&mut target, Push('g'));
+        cp3.apply(&mut target, Push('h'));
+        cp3.apply(&mut target, Push('i'));
         assert_eq!(target, "abcdefghi");
         cp3.commit();
         cp2.commit();
@@ -873,23 +836,23 @@ mod tests {
         let mut target = String::new();
         let mut record = Record::new();
         let mut cp1 = record.checkpoint();
-        cp1.apply(&mut target, Push('a')).unwrap();
-        cp1.apply(&mut target, Push('b')).unwrap();
-        cp1.apply(&mut target, Push('c')).unwrap();
+        cp1.apply(&mut target, Push('a'));
+        cp1.apply(&mut target, Push('b'));
+        cp1.apply(&mut target, Push('c'));
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(&mut target, Push('d')).unwrap();
-        cp2.apply(&mut target, Push('e')).unwrap();
-        cp2.apply(&mut target, Push('f')).unwrap();
+        cp2.apply(&mut target, Push('d'));
+        cp2.apply(&mut target, Push('e'));
+        cp2.apply(&mut target, Push('f'));
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(&mut target, Push('g')).unwrap();
-        cp3.apply(&mut target, Push('h')).unwrap();
-        cp3.apply(&mut target, Push('i')).unwrap();
+        cp3.apply(&mut target, Push('g'));
+        cp3.apply(&mut target, Push('h'));
+        cp3.apply(&mut target, Push('i'));
         assert_eq!(target, "abcdefghi");
-        cp3.cancel(&mut target).unwrap().unwrap();
+        cp3.cancel(&mut target).unwrap();
         assert_eq!(target, "abcdef");
-        cp2.cancel(&mut target).unwrap().unwrap();
+        cp2.cancel(&mut target).unwrap();
         assert_eq!(target, "abc");
-        cp1.cancel(&mut target).unwrap().unwrap();
+        cp1.cancel(&mut target).unwrap();
         assert_eq!(target, "");
     }
 
@@ -897,23 +860,23 @@ mod tests {
     fn checkpoint_saved() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Push('a')).unwrap();
-        record.apply(&mut target, Push('b')).unwrap();
-        record.apply(&mut target, Push('c')).unwrap();
+        record.apply(&mut target, Push('a'));
+        record.apply(&mut target, Push('b'));
+        record.apply(&mut target, Push('c'));
         record.set_saved(true);
-        record.undo(&mut target).unwrap().unwrap();
-        record.undo(&mut target).unwrap().unwrap();
-        record.undo(&mut target).unwrap().unwrap();
+        record.undo(&mut target).unwrap();
+        record.undo(&mut target).unwrap();
+        record.undo(&mut target).unwrap();
         let mut cp = record.checkpoint();
-        cp.apply(&mut target, Push('d')).unwrap();
-        cp.apply(&mut target, Push('e')).unwrap();
-        cp.apply(&mut target, Push('f')).unwrap();
+        cp.apply(&mut target, Push('d'));
+        cp.apply(&mut target, Push('e'));
+        cp.apply(&mut target, Push('f'));
         assert_eq!(target, "def");
-        cp.cancel(&mut target).unwrap().unwrap();
+        cp.cancel(&mut target).unwrap();
         assert_eq!(target, "");
-        record.redo(&mut target).unwrap().unwrap();
-        record.redo(&mut target).unwrap().unwrap();
-        record.redo(&mut target).unwrap().unwrap();
+        record.redo(&mut target).unwrap();
+        record.redo(&mut target).unwrap();
+        record.redo(&mut target).unwrap();
         assert!(record.is_saved());
         assert_eq!(target, "abc");
     }
@@ -922,11 +885,9 @@ mod tests {
     fn annul() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Edit::Push(Push('a'))).unwrap();
-        record
-            .apply(&mut target, Edit::Pop(Pop::default()))
-            .unwrap();
-        record.apply(&mut target, Edit::Push(Push('b'))).unwrap();
+        record.apply(&mut target, Edit::Push(Push('a')));
+        record.apply(&mut target, Edit::Pop(Pop::default()));
+        record.apply(&mut target, Edit::Push(Push('b')));
         assert_eq!(record.len(), 1);
     }
 
@@ -934,8 +895,8 @@ mod tests {
     fn actions() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Push('a')).unwrap();
-        record.apply(&mut target, Push('b')).unwrap();
+        record.apply(&mut target, Push('a'));
+        record.apply(&mut target, Push('b'));
         let collected = record.actions().collect::<Vec<_>>();
         assert_eq!(&collected[..], &[&Push('a'), &Push('b')][..]);
     }
