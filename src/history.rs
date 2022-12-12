@@ -9,7 +9,6 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use core::convert::Infallible;
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -48,13 +47,6 @@ pub struct History<A, S = NoOp> {
     pub(crate) branches: BTreeMap<usize, Branch<A>>,
 }
 
-impl History<Infallible> {
-    /// Returns a new history builder.
-    pub fn builder<S>() -> Builder<S> {
-        Builder::new()
-    }
-}
-
 impl<A> History<A> {
     /// Returns a new history.
     pub fn new() -> History<A> {
@@ -63,6 +55,11 @@ impl<A> History<A> {
 }
 
 impl<A, S> History<A, S> {
+    /// Returns a new history builder.
+    pub fn builder() -> Builder<A, S> {
+        Builder::new()
+    }
+
     /// Reserves capacity for at least `additional` more actions.
     ///
     /// # Panics
@@ -394,24 +391,24 @@ impl<A> Branch<A> {
 /// # use undo::History;
 /// # include!("../push.rs");
 /// # fn main() {
-/// let _ = History::builder()
+/// let _ = History::<Push, _>::builder()
 ///     .limit(100)
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
-///     .build::<Push>();
+///     .build();
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<F = NoOp>(RecordBuilder<F>);
+pub struct Builder<A, F = NoOp>(RecordBuilder<A, F>);
 
-impl<F> Builder<F> {
+impl<A, F> Builder<A, F> {
     /// Returns a builder for a history.
-    pub fn new() -> Builder<F> {
+    pub fn new() -> Builder<A, F> {
         Builder(RecordBuilder::new())
     }
 
     /// Sets the capacity for the history.
-    pub fn capacity(self, capacity: usize) -> Builder<F> {
+    pub fn capacity(self, capacity: usize) -> Builder<A, F> {
         Builder(self.0.capacity(capacity))
     }
 
@@ -419,30 +416,30 @@ impl<F> Builder<F> {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(self, limit: usize) -> Builder<F> {
+    pub fn limit(self, limit: usize) -> Builder<A, F> {
         Builder(self.0.limit(limit))
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(self, saved: bool) -> Builder<F> {
+    pub fn saved(self, saved: bool) -> Builder<A, F> {
         Builder(self.0.saved(saved))
     }
 
     /// Builds the history.
-    pub fn build<A>(self) -> History<A, F> {
+    pub fn build(self) -> History<A, F> {
         History::from(self.0.build())
     }
 }
 
-impl<F: Slot> Builder<F> {
+impl<A, F: Slot> Builder<A, F> {
     /// Connects the slot.
-    pub fn connect(self, f: F) -> Builder<F> {
+    pub fn connect(self, f: F) -> Builder<A, F> {
         Builder(self.0.connect(f))
     }
 }
 
-impl Default for Builder {
+impl<A> Default for Builder<A> {
     fn default() -> Self {
         Builder::new()
     }
