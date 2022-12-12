@@ -25,4 +25,4 @@ serde = ["dep:serde", "time?/serde"]
 maintenance = { status = "actively-developed" }
 
 [package.metadata.docs.rs]
-features = ["time", "serde"]
+features = ["serde", "time"]
