@@ -33,13 +33,12 @@ where
     E::Item: Action,
     S: Slot,
 {
-    #[allow(clippy::type_complexity)]
     pub fn apply(
         &mut self,
         target: &mut <E::Item as Action>::Target,
         mut action: E::Item,
-    ) -> Result<(<E::Item as Action>::Output, bool, E), <E::Item as Action>::Error> {
-        let output = action.apply(target)?;
+    ) -> (<E::Item as Action>::Output, bool, E) {
+        let output = action.apply(target);
         // We store the state of the stack before adding the entry.
         let current = self.current;
         let could_undo = self.can_undo();
@@ -77,18 +76,17 @@ where
         self.slot.emit_if(could_redo, Signal::Redo(false));
         self.slot.emit_if(!could_undo, Signal::Undo(true));
         self.slot.emit_if(was_saved, Signal::Saved(false));
-        Ok((output, merged_or_annulled, tail))
+        (output, merged_or_annulled, tail)
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn undo(
         &mut self,
         target: &mut <E::Item as Action>::Target,
-    ) -> Option<Result<<E::Item as Action>::Output, <E::Item as Action>::Error>> {
+    ) -> Option<<E::Item as Action>::Output> {
         self.can_undo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
-            let output = self.entries[self.current - 1].action.undo(target)?;
+            let output = self.entries[self.current - 1].action.undo(target);
             self.current -= 1;
             let is_saved = self.is_saved();
             self.slot
@@ -96,19 +94,18 @@ where
             self.slot.emit_if(old == 1, Signal::Undo(false));
             self.slot
                 .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-            Ok(output)
+            output
         })
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn redo(
         &mut self,
         target: &mut <E::Item as Action>::Target,
-    ) -> Option<Result<<E::Item as Action>::Output, <E::Item as Action>::Error>> {
+    ) -> Option<<E::Item as Action>::Output> {
         self.can_redo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
-            let output = self.entries[self.current].action.redo(target)?;
+            let output = self.entries[self.current].action.redo(target);
             self.current += 1;
             let is_saved = self.is_saved();
             self.slot
@@ -116,7 +113,7 @@ where
             self.slot.emit_if(old == 0, Signal::Undo(true));
             self.slot
                 .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-            Ok(output)
+            output
         })
     }
 
@@ -148,12 +145,11 @@ where
     E::Item: Action<Output = ()>,
     S: Slot,
 {
-    #[allow(clippy::type_complexity)]
     pub fn go_to(
         &mut self,
         target: &mut <E::Item as Action>::Target,
         current: usize,
-    ) -> Option<Result<<E::Item as Action>::Output, <E::Item as Action>::Error>> {
+    ) -> Option<<E::Item as Action>::Output> {
         if current > self.entries.len() {
             return None;
         }
@@ -170,10 +166,7 @@ where
         };
 
         while self.current != current {
-            if let Some(Err(err)) = undo_or_redo(self, target) {
-                self.slot.connect(slot);
-                return Some(Err(err));
-            }
+            undo_or_redo(self, target);
         }
 
         let can_undo = self.can_undo();
@@ -186,14 +179,13 @@ where
             .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
         self.slot
             .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-        Some(Ok(()))
+        Some(())
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn revert(
         &mut self,
         target: &mut <E::Item as Action>::Target,
-    ) -> Option<Result<<E::Item as Action>::Output, <E::Item as Action>::Error>> {
+    ) -> Option<<E::Item as Action>::Output> {
         self.saved.and_then(|saved| self.go_to(target, saved))
     }
 }

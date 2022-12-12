@@ -21,33 +21,30 @@ struct Push(char);
 impl Action for Push {
     type Target = String;
     type Output = ();
-    type Error = &'static str;
 
-    fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
+    fn apply(&mut self, s: &mut String) {
         s.push(self.0);
-        Ok(())
     }
 
-    fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-        self.0 = s.pop().ok_or("s is empty")?;
-        Ok(())
+    fn undo(&mut self, s: &mut String) {
+        self.0 = s.pop().expect("s is empty");
     }
 }
 
 fn main() {
     let mut target = String::new();
     let mut history = History::new();
-    history.apply(&mut target, Push('a')).unwrap();
-    history.apply(&mut target, Push('b')).unwrap();
-    history.apply(&mut target, Push('c')).unwrap();
+    history.apply(&mut target, Push('a'));
+    history.apply(&mut target, Push('b'));
+    history.apply(&mut target, Push('c'));
     assert_eq!(target, "abc");
-    history.undo(&mut target).unwrap().unwrap();
-    history.undo(&mut target).unwrap().unwrap();
-    history.undo(&mut target).unwrap().unwrap();
+    history.undo(&mut target);
+    history.undo(&mut target);
+    history.undo(&mut target);
     assert_eq!(target, "");
-    history.redo(&mut target).unwrap().unwrap();
-    history.redo(&mut target).unwrap().unwrap();
-    history.redo(&mut target).unwrap().unwrap();
+    history.redo(&mut target);
+    history.redo(&mut target);
+    history.redo(&mut target);
     assert_eq!(target, "abc");
 }
 ```

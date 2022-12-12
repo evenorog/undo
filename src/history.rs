@@ -26,15 +26,15 @@ use serde::{Deserialize, Serialize};
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut history = History::new();
-/// history.apply(&mut target, Push('a')).unwrap();
-/// history.apply(&mut target, Push('b')).unwrap();
-/// history.apply(&mut target, Push('c')).unwrap();
+/// history.apply(&mut target, Push('a'));
+/// history.apply(&mut target, Push('b'));
+/// history.apply(&mut target, Push('c'));
 /// let abc = history.branch();
-/// history.go_to(&mut target, abc, 1).unwrap().unwrap();
-/// history.apply(&mut target, Push('f')).unwrap();
-/// history.apply(&mut target, Push('g')).unwrap();
+/// history.go_to(&mut target, abc, 1);
+/// history.apply(&mut target, Push('f'));
+/// history.apply(&mut target, Push('g'));
 /// assert_eq!(target, "afg");
-/// history.go_to(&mut target, abc, 3).unwrap().unwrap();
+/// history.go_to(&mut target, abc, 3);
 /// assert_eq!(target, "abc");
 /// # }
 /// ```
@@ -163,10 +163,14 @@ impl<A: Action, S: Slot> History<A, S> {
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Action.html#tymethod.apply
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A::Output, A::Error> {
+    pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
         let at = self.at();
-        let saved = self.record.record.saved.filter(|&saved| saved > at.current);
-        let (output, merged, tail) = self.record.record.apply(target, action)?;
+        let saved = self
+            .record
+            .timeline
+            .saved
+            .filter(|&saved| saved > at.current);
+        let (output, merged, tail) = self.record.timeline.apply(target, action);
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -184,7 +188,7 @@ impl<A: Action, S: Slot> History<A, S> {
                 .insert(at.branch, Branch::new(new, at.current, tail.deque));
             self.set_root(new, at.current, saved);
         }
-        Ok(output)
+        output
     }
 
     /// Calls the [`undo`] method for the active action
@@ -194,7 +198,7 @@ impl<A: Action, S: Slot> History<A, S> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Action.html#tymethod.undo
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
+    pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
         self.record.undo(target)
     }
 
@@ -205,7 +209,7 @@ impl<A: Action, S: Slot> History<A, S> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Action.html#method.redo
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
+    pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
         self.record.redo(target)
     }
 
@@ -228,9 +232,13 @@ impl<A: Action, S: Slot> History<A, S> {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.at());
         let current = self.current();
-        let saved = self.record.record.saved.filter(|&saved| saved > current);
-        let tail = self.record.record.entries.deque.split_off(current);
-        self.record.record.entries.deque.append(&mut branch.entries);
+        let saved = self.record.timeline.saved.filter(|&saved| saved > current);
+        let tail = self.record.timeline.entries.deque.split_off(current);
+        self.record
+            .timeline
+            .entries
+            .deque
+            .append(&mut branch.entries);
         self.branches
             .insert(self.root, Branch::new(root, current, tail));
         self.set_root(root, current, saved);
@@ -245,10 +253,10 @@ impl<A: Action, S: Slot> History<A, S> {
             .values_mut()
             .filter(|branch| branch.parent.branch == old && branch.parent.current <= current)
             .for_each(|branch| branch.parent.branch = root);
-        match (self.record.record.saved, saved, self.saved) {
+        match (self.record.timeline.saved, saved, self.saved) {
             (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(root, old, current),
             (None, Some(_), None) => {
-                self.record.record.saved = saved;
+                self.record.timeline.saved = saved;
                 self.swap_saved(old, root, current);
             }
             (None, None, None) => (),
@@ -263,12 +271,12 @@ impl<A: Action, S: Slot> History<A, S> {
             .filter(|at| at.branch == new && at.current <= current)
         {
             self.saved = None;
-            self.record.record.saved = Some(saved);
-            self.record.record.slot.emit(Signal::Saved(true));
-        } else if let Some(saved) = self.record.record.saved {
+            self.record.timeline.saved = Some(saved);
+            self.record.timeline.slot.emit(Signal::Saved(true));
+        } else if let Some(saved) = self.record.timeline.saved {
             self.saved = Some(At::new(old, saved));
-            self.record.record.saved = None;
-            self.record.record.slot.emit(Signal::Saved(false));
+            self.record.timeline.saved = None;
+            self.record.timeline.slot.emit(Signal::Saved(false));
         }
     }
 
@@ -317,12 +325,7 @@ impl<A: Action<Output = ()>, S: Slot> History<A, S> {
     ///
     /// [`undo`]: trait.Action.html#tymethod.undo
     /// [`redo`]: trait.Action.html#method.redo
-    pub fn go_to(
-        &mut self,
-        target: &mut A::Target,
-        branch: usize,
-        current: usize,
-    ) -> Option<Result<A::Output, A::Error>> {
+    pub fn go_to(&mut self, target: &mut A::Target, branch: usize, current: usize) -> Option<()> {
         let root = self.root;
         if root == branch {
             return self.record.go_to(target, current);
@@ -330,17 +333,12 @@ impl<A: Action<Output = ()>, S: Slot> History<A, S> {
         // Walk the path from `root` to `branch`.
         for (new, branch) in self.mk_path(branch)? {
             // Walk to `branch.current` either by undoing or redoing.
-            if let Err(err) = self.record.go_to(target, branch.parent.current).unwrap() {
-                return Some(Err(err));
-            }
+            self.record.go_to(target, branch.parent.current).unwrap();
             // Apply the actions in the branch and move older actions into their own branch.
             for entry in branch.entries {
                 let current = self.current();
-                let saved = self.record.record.saved.filter(|&saved| saved > current);
-                let entries = match self.record.record.apply(target, entry.action) {
-                    Ok((_, _, entries)) => entries,
-                    Err(err) => return Some(Err(err)),
-                };
+                let saved = self.record.timeline.saved.filter(|&saved| saved > current);
+                let (_, _, entries) = self.record.timeline.apply(target, entry.action);
                 if !entries.deque.is_empty() {
                     self.branches
                         .insert(self.root, Branch::new(new, current, entries.deque));
@@ -483,7 +481,7 @@ enum QueueAction<A> {
 /// queue.apply(Push('b'));
 /// queue.apply(Push('c'));
 /// assert_eq!(string, "");
-/// queue.commit(&mut string).unwrap().unwrap();
+/// queue.commit(&mut string).unwrap();
 /// assert_eq!(string, "abc");
 /// # }
 /// ```
@@ -513,19 +511,15 @@ impl<A: Action<Output = ()>, S: Slot> Queue<'_, A, S> {
     ///
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
-    pub fn commit(self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
+    pub fn commit(self, target: &mut A::Target) -> Option<()> {
         for action in self.actions {
-            let o = match action {
-                QueueAction::Apply(action) => Some(self.history.apply(target, action)),
-                QueueAction::Undo => self.history.undo(target),
-                QueueAction::Redo => self.history.redo(target),
-            };
-            match o {
-                Some(Ok(())) => (),
-                o @ Some(Err(_)) | o @ None => return o,
+            match action {
+                QueueAction::Apply(action) => self.history.apply(target, action),
+                QueueAction::Undo => self.history.undo(target)?,
+                QueueAction::Redo => self.history.redo(target)?,
             }
         }
-        Some(Ok(()))
+        Some(())
     }
 
     /// Cancels the queued actions.
@@ -567,33 +561,24 @@ pub struct Checkpoint<'a, A, S> {
 
 impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     /// Calls the `apply` method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A::Output, A::Error> {
+    pub fn apply(&mut self, target: &mut A::Target, action: A) {
         let branch = self.history.branch();
-        self.history.apply(target, action)?;
+        self.history.apply(target, action);
         self.actions.push(CheckpointAction::Apply(branch));
-        Ok(())
     }
 
     /// Calls the `undo` method.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
-        match self.history.undo(target) {
-            o @ Some(Ok(())) => {
-                self.actions.push(CheckpointAction::Undo);
-                o
-            }
-            o => o,
-        }
+    pub fn undo(&mut self, target: &mut A::Target) -> Option<()> {
+        self.history.undo(target)?;
+        self.actions.push(CheckpointAction::Undo);
+        Some(())
     }
 
     /// Calls the `redo` method.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
-        match self.history.redo(target) {
-            o @ Some(Ok(())) => {
-                self.actions.push(CheckpointAction::Redo);
-                o
-            }
-            o => o,
-        }
+    pub fn redo(&mut self, target: &mut A::Target) -> Option<()> {
+        self.history.redo(target)?;
+        self.actions.push(CheckpointAction::Redo);
+        Some(())
     }
 
     /// Commits the changes and consumes the checkpoint.
@@ -604,29 +589,23 @@ impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining actions are not canceled.
-    pub fn cancel(self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
+    pub fn cancel(self, target: &mut A::Target) -> Option<()> {
         for action in self.actions.into_iter().rev() {
             match action {
                 CheckpointAction::Apply(branch) => {
                     let root = self.history.branch();
                     self.history.jump_to(branch);
                     if root == branch {
-                        self.history.record.record.entries.deque.pop_back();
+                        self.history.record.timeline.entries.deque.pop_back();
                     } else {
                         self.history.branches.remove(&root).unwrap();
                     }
                 }
-                CheckpointAction::Undo => match self.history.redo(target) {
-                    Some(Ok(())) => (),
-                    o => return o,
-                },
-                CheckpointAction::Redo => match self.history.undo(target) {
-                    Some(Ok(())) => (),
-                    o => return o,
-                },
+                CheckpointAction::Undo => self.history.redo(target)?,
+                CheckpointAction::Redo => self.history.undo(target)?,
             };
         }
-        Some(Ok(()))
+        Some(())
     }
 
     /// Returns a queue.
@@ -714,7 +693,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
             At::new(self.history.branch(), self.history.current()),
             self.history
                 .record
-                .record
+                .timeline
                 .saved
                 .map(|saved| At::new(self.history.branch(), saved))
                 .or(self.history.saved),
@@ -779,7 +758,7 @@ impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
         for (i, entry) in self
             .history
             .record
-            .record
+            .timeline
             .entries
             .deque
             .iter()
@@ -803,16 +782,13 @@ mod tests {
     impl Action for Push {
         type Target = String;
         type Output = ();
-        type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
+        fn apply(&mut self, s: &mut String) {
             s.push(self.0);
-            Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-            self.0 = s.pop().ok_or("s is empty")?;
-            Ok(())
+        fn undo(&mut self, s: &mut String) {
+            self.0 = s.pop().unwrap();
         }
     }
 
@@ -835,60 +811,60 @@ mod tests {
         // a
         let mut target = String::new();
         let mut history = History::new();
-        history.apply(&mut target, Push('a')).unwrap();
-        history.apply(&mut target, Push('b')).unwrap();
-        history.apply(&mut target, Push('c')).unwrap();
-        history.apply(&mut target, Push('d')).unwrap();
-        history.apply(&mut target, Push('e')).unwrap();
+        history.apply(&mut target, Push('a'));
+        history.apply(&mut target, Push('b'));
+        history.apply(&mut target, Push('c'));
+        history.apply(&mut target, Push('d'));
+        history.apply(&mut target, Push('e'));
         assert_eq!(target, "abcde");
-        history.undo(&mut target).unwrap().unwrap();
-        history.undo(&mut target).unwrap().unwrap();
+        history.undo(&mut target).unwrap();
+        history.undo(&mut target).unwrap();
         assert_eq!(target, "abc");
         let abcde = history.branch();
-        history.apply(&mut target, Push('f')).unwrap();
-        history.apply(&mut target, Push('g')).unwrap();
+        history.apply(&mut target, Push('f'));
+        history.apply(&mut target, Push('g'));
         assert_eq!(target, "abcfg");
-        history.undo(&mut target).unwrap().unwrap();
+        history.undo(&mut target).unwrap();
         let abcfg = history.branch();
-        history.apply(&mut target, Push('h')).unwrap();
-        history.apply(&mut target, Push('i')).unwrap();
-        history.apply(&mut target, Push('j')).unwrap();
+        history.apply(&mut target, Push('h'));
+        history.apply(&mut target, Push('i'));
+        history.apply(&mut target, Push('j'));
         assert_eq!(target, "abcfhij");
-        history.undo(&mut target).unwrap().unwrap();
+        history.undo(&mut target).unwrap();
         let abcfhij = history.branch();
-        history.apply(&mut target, Push('k')).unwrap();
+        history.apply(&mut target, Push('k'));
         assert_eq!(target, "abcfhik");
-        history.undo(&mut target).unwrap().unwrap();
+        history.undo(&mut target).unwrap();
         let abcfhik = history.branch();
-        history.apply(&mut target, Push('l')).unwrap();
+        history.apply(&mut target, Push('l'));
         assert_eq!(target, "abcfhil");
-        history.apply(&mut target, Push('m')).unwrap();
+        history.apply(&mut target, Push('m'));
         assert_eq!(target, "abcfhilm");
         let abcfhilm = history.branch();
-        history.go_to(&mut target, abcde, 2).unwrap().unwrap();
-        history.apply(&mut target, Push('n')).unwrap();
-        history.apply(&mut target, Push('o')).unwrap();
+        history.go_to(&mut target, abcde, 2).unwrap();
+        history.apply(&mut target, Push('n'));
+        history.apply(&mut target, Push('o'));
         assert_eq!(target, "abno");
-        history.undo(&mut target).unwrap().unwrap();
+        history.undo(&mut target).unwrap();
         let abno = history.branch();
-        history.apply(&mut target, Push('p')).unwrap();
-        history.apply(&mut target, Push('q')).unwrap();
+        history.apply(&mut target, Push('p'));
+        history.apply(&mut target, Push('q'));
         assert_eq!(target, "abnpq");
 
         let abnpq = history.branch();
-        history.go_to(&mut target, abcde, 5).unwrap().unwrap();
+        history.go_to(&mut target, abcde, 5).unwrap();
         assert_eq!(target, "abcde");
-        history.go_to(&mut target, abcfg, 5).unwrap().unwrap();
+        history.go_to(&mut target, abcfg, 5).unwrap();
         assert_eq!(target, "abcfg");
-        history.go_to(&mut target, abcfhij, 7).unwrap().unwrap();
+        history.go_to(&mut target, abcfhij, 7).unwrap();
         assert_eq!(target, "abcfhij");
-        history.go_to(&mut target, abcfhik, 7).unwrap().unwrap();
+        history.go_to(&mut target, abcfhik, 7).unwrap();
         assert_eq!(target, "abcfhik");
-        history.go_to(&mut target, abcfhilm, 8).unwrap().unwrap();
+        history.go_to(&mut target, abcfhilm, 8).unwrap();
         assert_eq!(target, "abcfhilm");
-        history.go_to(&mut target, abno, 4).unwrap().unwrap();
+        history.go_to(&mut target, abno, 4).unwrap();
         assert_eq!(target, "abno");
-        history.go_to(&mut target, abnpq, 5).unwrap().unwrap();
+        history.go_to(&mut target, abnpq, 5).unwrap();
         assert_eq!(target, "abnpq");
     }
 }

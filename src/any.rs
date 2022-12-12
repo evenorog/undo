@@ -8,16 +8,16 @@ use core::fmt::{self, Debug, Formatter};
 ///
 /// This allows you to use multiple different actions in a record or history
 /// as long as they all share the same target, output, and error type.
-pub struct AnyAction<T, O, E> {
+pub struct AnyAction<T, O> {
     id: u64,
-    action: Box<dyn Action<Target = T, Output = O, Error = E>>,
+    action: Box<dyn Action<Target = T, Output = O>>,
 }
 
-impl<T, O, E> AnyAction<T, O, E> {
+impl<T, O> AnyAction<T, O> {
     /// Creates an `AnyAction` from the provided action.
-    pub fn new<A>(action: A) -> AnyAction<T, O, E>
+    pub fn new<A>(action: A) -> AnyAction<T, O>
     where
-        A: Action<Target = T, Output = O, Error = E>,
+        A: Action<Target = T, Output = O>,
         A: 'static,
     {
         AnyAction {
@@ -27,41 +27,40 @@ impl<T, O, E> AnyAction<T, O, E> {
     }
 }
 
-impl<T, E> AnyAction<T, (), E>
+impl<T> AnyAction<T, ()>
 where
     Self: 'static,
 {
     /// Creates a new any action from `self` and `action`.
     ///
     /// `self` will be called first in `apply`.
-    pub fn join<A>(self, action: A) -> AnyAction<T, (), E>
+    pub fn join<A>(self, action: A) -> AnyAction<T, ()>
     where
-        A: Action<Target = T, Output = (), Error = E>,
+        A: Action<Target = T, Output = ()>,
         A: 'static,
     {
         AnyAction::new(Join { a: self, b: action })
     }
 }
 
-impl<T, O, E> Action for AnyAction<T, O, E> {
+impl<T, O> Action for AnyAction<T, O> {
     type Target = T;
     type Output = O;
-    type Error = E;
 
-    fn apply(&mut self, target: &mut Self::Target) -> Result<Self::Output, Self::Error> {
+    fn apply(&mut self, target: &mut Self::Target) -> Self::Output {
         self.action.apply(target)
     }
 
-    fn undo(&mut self, target: &mut Self::Target) -> Result<Self::Output, Self::Error> {
+    fn undo(&mut self, target: &mut Self::Target) -> Self::Output {
         self.action.undo(target)
     }
 
-    fn redo(&mut self, target: &mut Self::Target) -> Result<Self::Output, Self::Error> {
+    fn redo(&mut self, target: &mut Self::Target) -> Self::Output {
         self.action.redo(target)
     }
 }
 
-impl<T, O, E> Debug for AnyAction<T, O, E> {
+impl<T, O> Debug for AnyAction<T, O> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("AnyAction")
             .field("id", &self.id)
@@ -74,28 +73,27 @@ struct Join<A, B> {
     b: B,
 }
 
-impl<A, B, T, E> Action for Join<A, B>
+impl<A, B, T> Action for Join<A, B>
 where
-    A: Action<Target = T, Output = (), Error = E>,
-    B: Action<Target = T, Output = (), Error = E>,
+    A: Action<Target = T, Output = ()>,
+    B: Action<Target = T, Output = ()>,
 {
     type Target = T;
     type Output = ();
-    type Error = E;
 
-    fn apply(&mut self, target: &mut T) -> Result<Self::Output, Self::Error> {
-        self.a.apply(target)?;
-        self.b.apply(target)
+    fn apply(&mut self, target: &mut T) {
+        self.a.apply(target);
+        self.b.apply(target);
     }
 
-    fn undo(&mut self, target: &mut T) -> Result<Self::Output, Self::Error> {
-        self.b.undo(target)?;
-        self.a.undo(target)
+    fn undo(&mut self, target: &mut T) {
+        self.b.undo(target);
+        self.a.undo(target);
     }
 
-    fn redo(&mut self, target: &mut T) -> Result<Self::Output, Self::Error> {
-        self.a.redo(target)?;
-        self.b.redo(target)
+    fn redo(&mut self, target: &mut T) {
+        self.a.redo(target);
+        self.b.redo(target);
     }
 }
 
@@ -110,16 +108,13 @@ mod tests {
     impl Action for Push {
         type Target = String;
         type Output = ();
-        type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
+        fn apply(&mut self, s: &mut String) {
             s.push(self.0);
-            Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
-            self.0 = s.pop().ok_or("s is empty")?;
-            Ok(())
+        fn undo(&mut self, s: &mut String) {
+            self.0 = s.pop().unwrap();
         }
     }
 
@@ -127,13 +122,11 @@ mod tests {
     fn any() {
         let mut target = String::new();
         let mut record = Record::new();
-        record
-            .apply(&mut target, AnyAction::new(Push('a')))
-            .unwrap();
+        record.apply(&mut target, AnyAction::new(Push('a')));
         assert_eq!(target, "a");
-        record.undo(&mut target).unwrap().unwrap();
+        record.undo(&mut target).unwrap();
         assert_eq!(target, "");
-        record.redo(&mut target).unwrap().unwrap();
+        record.redo(&mut target).unwrap();
         assert_eq!(target, "a");
     }
 }
