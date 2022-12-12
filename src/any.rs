@@ -48,15 +48,15 @@ impl<T, O, E> Action for AnyAction<T, O, E> {
     type Output = O;
     type Error = E;
 
-    fn apply(&mut self, target: &mut Self::Target) -> crate::Result<Self> {
+    fn apply(&mut self, target: &mut Self::Target) -> Result<Self::Output, Self::Error> {
         self.action.apply(target)
     }
 
-    fn undo(&mut self, target: &mut Self::Target) -> crate::Result<Self> {
+    fn undo(&mut self, target: &mut Self::Target) -> Result<Self::Output, Self::Error> {
         self.action.undo(target)
     }
 
-    fn redo(&mut self, target: &mut Self::Target) -> crate::Result<Self> {
+    fn redo(&mut self, target: &mut Self::Target) -> Result<Self::Output, Self::Error> {
         self.action.redo(target)
     }
 }
@@ -83,17 +83,17 @@ where
     type Output = ();
     type Error = E;
 
-    fn apply(&mut self, target: &mut T) -> crate::Result<Self> {
+    fn apply(&mut self, target: &mut T) -> Result<Self::Output, Self::Error> {
         self.a.apply(target)?;
         self.b.apply(target)
     }
 
-    fn undo(&mut self, target: &mut T) -> crate::Result<Self> {
+    fn undo(&mut self, target: &mut T) -> Result<Self::Output, Self::Error> {
         self.b.undo(target)?;
         self.a.undo(target)
     }
 
-    fn redo(&mut self, target: &mut T) -> crate::Result<Self> {
+    fn redo(&mut self, target: &mut T) -> Result<Self::Output, Self::Error> {
         self.a.redo(target)?;
         self.b.redo(target)
     }
@@ -102,7 +102,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::AnyAction;
-    use crate::{Action, Record, Result};
+    use crate::{Action, Record};
     use alloc::string::String;
 
     struct Push(char);
@@ -112,12 +112,12 @@ mod tests {
         type Output = ();
         type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<Push> {
+        fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<Push> {
+        fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
             self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }

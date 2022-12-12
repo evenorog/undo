@@ -40,12 +40,12 @@
 //!     type Output = ();
 //!     type Error = &'static str;
 //!
-//!     fn apply(&mut self, s: &mut String) -> undo::Result<Push> {
+//!     fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
 //!         s.push(self.0);
 //!         Ok(())
 //!     }
 //!
-//!     fn undo(&mut self, s: &mut String) -> undo::Result<Push> {
+//!     fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
 //!         self.0 = s.pop().ok_or("s is empty")?;
 //!         Ok(())
 //!     }
@@ -110,9 +110,6 @@ pub use self::{
     slot::{NoOp, Signal, Slot},
 };
 
-/// A specialized Result type for undo-redo operations.
-pub type Result<A> = core::result::Result<<A as Action>::Output, <A as Action>::Error>;
-
 /// Base functionality for all actions.
 pub trait Action {
     /// The target type.
@@ -124,17 +121,17 @@ pub trait Action {
 
     /// Applies the action on the target and returns `Ok` if everything went fine,
     /// and `Err` if something went wrong.
-    fn apply(&mut self, target: &mut Self::Target) -> Result<Self>;
+    fn apply(&mut self, target: &mut Self::Target) -> Result<Self::Output, Self::Error>;
 
     /// Restores the state of the target as it was before the action was applied
     /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
-    fn undo(&mut self, target: &mut Self::Target) -> Result<Self>;
+    fn undo(&mut self, target: &mut Self::Target) -> Result<Self::Output, Self::Error>;
 
     /// Reapplies the action on the target and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     ///
     /// The default implementation uses the [`apply`](trait.Action.html#tymethod.apply) implementation.
-    fn redo(&mut self, target: &mut Self::Target) -> Result<Self> {
+    fn redo(&mut self, target: &mut Self::Target) -> Result<Self::Output, Self::Error> {
         self.apply(target)
     }
 

@@ -23,12 +23,12 @@ impl Action for Push {
     type Output = ();
     type Error = &'static str;
 
-    fn apply(&mut self, s: &mut String) -> undo::Result<Push> {
+    fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
         s.push(self.0);
         Ok(())
     }
 
-    fn undo(&mut self, s: &mut String) -> undo::Result<Push> {
+    fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
         self.0 = s.pop().ok_or("s is empty")?;
         Ok(())
     }

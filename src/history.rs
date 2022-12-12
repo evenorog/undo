@@ -2,7 +2,7 @@
 
 use crate::record::Builder as RecordBuilder;
 use crate::slot::{NoOp, Signal, Slot};
-use crate::{Action, At, Entry, Format, Record, Result};
+use crate::{Action, At, Entry, Format, Record};
 use alloc::{
     collections::{BTreeMap, VecDeque},
     string::{String, ToString},
@@ -163,7 +163,7 @@ impl<A: Action, S: Slot> History<A, S> {
     /// If an error occur when executing [`apply`] the error is returned.
     ///
     /// [`apply`]: trait.Action.html#tymethod.apply
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
+    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A::Output, A::Error> {
         let at = self.at();
         let saved = self.record.record.saved.filter(|&saved| saved > at.current);
         let (output, merged, tail) = self.record.record.apply(target, action)?;
@@ -194,7 +194,7 @@ impl<A: Action, S: Slot> History<A, S> {
     /// If an error occur when executing [`undo`] the error is returned.
     ///
     /// [`undo`]: trait.Action.html#tymethod.undo
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
+    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
         self.record.undo(target)
     }
 
@@ -205,7 +205,7 @@ impl<A: Action, S: Slot> History<A, S> {
     /// If an error occur when executing [`redo`] the error is returned.
     ///
     /// [`redo`]: trait.Action.html#method.redo
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
+    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
         self.record.redo(target)
     }
 
@@ -322,7 +322,7 @@ impl<A: Action<Output = ()>, S: Slot> History<A, S> {
         target: &mut A::Target,
         branch: usize,
         current: usize,
-    ) -> Option<Result<A>> {
+    ) -> Option<Result<A::Output, A::Error>> {
         let root = self.root;
         if root == branch {
             return self.record.go_to(target, current);
@@ -513,7 +513,7 @@ impl<A: Action<Output = ()>, S: Slot> Queue<'_, A, S> {
     ///
     /// # Errors
     /// If an error occurs, it stops applying the actions and returns the error.
-    pub fn commit(self, target: &mut A::Target) -> Option<Result<A>> {
+    pub fn commit(self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
         for action in self.actions {
             let o = match action {
                 QueueAction::Apply(action) => Some(self.history.apply(target, action)),
@@ -567,7 +567,7 @@ pub struct Checkpoint<'a, A, S> {
 
 impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     /// Calls the `apply` method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A> {
+    pub fn apply(&mut self, target: &mut A::Target, action: A) -> Result<A::Output, A::Error> {
         let branch = self.history.branch();
         self.history.apply(target, action)?;
         self.actions.push(CheckpointAction::Apply(branch));
@@ -575,7 +575,7 @@ impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     }
 
     /// Calls the `undo` method.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
+    pub fn undo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
         match self.history.undo(target) {
             o @ Some(Ok(())) => {
                 self.actions.push(CheckpointAction::Undo);
@@ -586,7 +586,7 @@ impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     }
 
     /// Calls the `redo` method.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A>> {
+    pub fn redo(&mut self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
         match self.history.redo(target) {
             o @ Some(Ok(())) => {
                 self.actions.push(CheckpointAction::Redo);
@@ -604,7 +604,7 @@ impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     /// # Errors
     /// If an error occur when canceling the changes, the error is returned
     /// and the remaining actions are not canceled.
-    pub fn cancel(self, target: &mut A::Target) -> Option<Result<A>> {
+    pub fn cancel(self, target: &mut A::Target) -> Option<Result<A::Output, A::Error>> {
         for action in self.actions.into_iter().rev() {
             match action {
                 CheckpointAction::Apply(branch) => {
@@ -805,12 +805,12 @@ mod tests {
         type Output = ();
         type Error = &'static str;
 
-        fn apply(&mut self, s: &mut String) -> Result<Push> {
+        fn apply(&mut self, s: &mut String) -> Result<(), &'static str> {
             s.push(self.0);
             Ok(())
         }
 
-        fn undo(&mut self, s: &mut String) -> Result<Push> {
+        fn undo(&mut self, s: &mut String) -> Result<(), &'static str> {
             self.0 = s.pop().ok_or("s is empty")?;
             Ok(())
         }

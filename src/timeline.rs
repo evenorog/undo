@@ -1,6 +1,6 @@
 use crate::entry::{Entries, Entry};
 use crate::slot::{NoOp, Signal, Slot, SW};
-use crate::{Action, Merged, Result};
+use crate::{Action, Merged};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -38,8 +38,7 @@ where
         &mut self,
         target: &mut <E::Item as Action>::Target,
         mut action: E::Item,
-    ) -> core::result::Result<(<E::Item as Action>::Output, bool, E), <E::Item as Action>::Error>
-    {
+    ) -> Result<(<E::Item as Action>::Output, bool, E), <E::Item as Action>::Error> {
         let output = action.apply(target)?;
         // We store the state of the stack before adding the entry.
         let current = self.current;
@@ -81,7 +80,11 @@ where
         Ok((output, merged_or_annulled, tail))
     }
 
-    pub fn undo(&mut self, target: &mut <E::Item as Action>::Target) -> Option<Result<E::Item>> {
+    #[allow(clippy::type_complexity)]
+    pub fn undo(
+        &mut self,
+        target: &mut <E::Item as Action>::Target,
+    ) -> Option<Result<<E::Item as Action>::Output, <E::Item as Action>::Error>> {
         self.can_undo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
@@ -97,7 +100,11 @@ where
         })
     }
 
-    pub fn redo(&mut self, target: &mut <E::Item as Action>::Target) -> Option<Result<E::Item>> {
+    #[allow(clippy::type_complexity)]
+    pub fn redo(
+        &mut self,
+        target: &mut <E::Item as Action>::Target,
+    ) -> Option<Result<<E::Item as Action>::Output, <E::Item as Action>::Error>> {
         self.can_redo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
@@ -141,11 +148,12 @@ where
     E::Item: Action<Output = ()>,
     S: Slot,
 {
+    #[allow(clippy::type_complexity)]
     pub fn go_to(
         &mut self,
         target: &mut <E::Item as Action>::Target,
         current: usize,
-    ) -> Option<Result<E::Item>> {
+    ) -> Option<Result<<E::Item as Action>::Output, <E::Item as Action>::Error>> {
         if current > self.entries.len() {
             return None;
         }
@@ -181,7 +189,11 @@ where
         Some(Ok(()))
     }
 
-    pub fn revert(&mut self, target: &mut <E::Item as Action>::Target) -> Option<Result<E::Item>> {
+    #[allow(clippy::type_complexity)]
+    pub fn revert(
+        &mut self,
+        target: &mut <E::Item as Action>::Target,
+    ) -> Option<Result<<E::Item as Action>::Output, <E::Item as Action>::Error>> {
         self.saved.and_then(|saved| self.go_to(target, saved))
     }
 }
