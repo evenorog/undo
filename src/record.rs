@@ -1,7 +1,7 @@
 //! A record of actions.
 
 use crate::entry::Entries;
-use crate::slot::{NoOp, Slot, SW};
+use crate::slot::{NoOp, Slot, Socket};
 use crate::{Action, At, Entry, Format, History, Timeline};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
@@ -267,7 +267,7 @@ pub struct Builder<A, S = NoOp> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
-    slot: SW<S>,
+    slot: Socket<S>,
     pd: PhantomData<A>,
 }
 
@@ -278,7 +278,7 @@ impl<A, S> Builder<A, S> {
             capacity: 0,
             limit: NonZeroUsize::new(usize::MAX).unwrap(),
             saved: true,
-            slot: SW::default(),
+            slot: Socket::default(),
             pd: PhantomData,
         }
     }
@@ -321,7 +321,7 @@ impl<A, S> Builder<A, S> {
 impl<A, S: Slot> Builder<A, S> {
     /// Connects the slot.
     pub fn connect(mut self, f: S) -> Builder<A, S> {
-        self.slot = SW::new(f);
+        self.slot = Socket::new(f);
         self
     }
 }

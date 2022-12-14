@@ -1,5 +1,5 @@
 use crate::entry::{Entries, Entry};
-use crate::slot::{NoOp, Signal, Slot, SW};
+use crate::slot::{NoOp, Signal, Slot, Socket};
 use crate::{Action, Merged};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ pub(crate) struct Timeline<E, S = NoOp> {
     pub entries: E,
     pub current: usize,
     pub saved: Option<usize>,
-    pub slot: SW<S>,
+    pub slot: Socket<S>,
 }
 
 impl<E: Entries, S> Timeline<E, S> {
@@ -53,6 +53,7 @@ where
             Some(last) if !was_saved => last.action.merge(action),
             _ => Merged::No(action),
         };
+
         let merged_or_annulled = match merged {
             Merged::Yes => true,
             Merged::Annul => {
@@ -73,6 +74,7 @@ where
                 false
             }
         };
+
         self.slot.emit_if(could_redo, Signal::Redo(false));
         self.slot.emit_if(!could_undo, Signal::Undo(true));
         self.slot.emit_if(was_saved, Signal::Saved(false));
@@ -153,6 +155,7 @@ where
         if current > self.entries.len() {
             return None;
         }
+
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();

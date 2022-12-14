@@ -43,11 +43,11 @@ impl Slot for NoOp {
 /// Slot wrapper that adds some additional functionality.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
 #[derive(Clone, Debug)]
-pub(crate) struct SW<S>(Option<S>);
+pub(crate) struct Socket<S>(Option<S>);
 
-impl<S> SW<S> {
-    pub const fn new(slot: S) -> SW<S> {
-        SW(Some(slot))
+impl<S> Socket<S> {
+    pub const fn new(slot: S) -> Socket<S> {
+        Socket(Some(slot))
     }
 
     pub fn connect(&mut self, slot: Option<S>) -> Option<S> {
@@ -59,13 +59,13 @@ impl<S> SW<S> {
     }
 }
 
-impl<S> Default for SW<S> {
+impl<S> Default for Socket<S> {
     fn default() -> Self {
-        SW(None)
+        Socket(None)
     }
 }
 
-impl<S: Slot> SW<S> {
+impl<S: Slot> Socket<S> {
     pub fn emit(&mut self, signal: Signal) {
         if let Some(slot) = &mut self.0 {
             slot.emit(signal);
