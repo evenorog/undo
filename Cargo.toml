@@ -8,7 +8,7 @@ repository = "https://github.com/evenorog/undo"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["undo", "redo"]
-categories = ["data-structures", "rust-patterns", "no-std"]
+categories = ["data-structures"]
 edition = "2021"
 
 [dependencies]
