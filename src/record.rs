@@ -254,7 +254,6 @@ impl<A, F> From<History<A, F>> for Record<A, F> {
 /// # include!("../push.rs");
 /// # fn main() {
 /// # use undo::Record;
-///
 /// let _ = Record::<Push, _>::builder()
 ///     .limit(100)
 ///     .capacity(100)
@@ -320,8 +319,8 @@ impl<A, S> Builder<A, S> {
 
 impl<A, S: Slot> Builder<A, S> {
     /// Connects the slot.
-    pub fn connect(mut self, f: S) -> Builder<A, S> {
-        self.slot = Socket::new(f);
+    pub fn connect(mut self, slot: S) -> Builder<A, S> {
+        self.slot = Socket::new(slot);
         self
     }
 }

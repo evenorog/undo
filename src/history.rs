@@ -388,9 +388,9 @@ impl<A> Branch<A> {
 ///
 /// # Examples
 /// ```
-/// # use undo::History;
 /// # include!("../push.rs");
 /// # fn main() {
+/// # use undo::History;
 /// let _ = History::<Push, _>::builder()
 ///     .limit(100)
 ///     .capacity(100)
@@ -399,16 +399,16 @@ impl<A> Branch<A> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<A, F = NoOp>(RecordBuilder<A, F>);
+pub struct Builder<A, S = NoOp>(RecordBuilder<A, S>);
 
-impl<A, F> Builder<A, F> {
+impl<A, S> Builder<A, S> {
     /// Returns a builder for a history.
-    pub fn new() -> Builder<A, F> {
+    pub fn new() -> Builder<A, S> {
         Builder(RecordBuilder::new())
     }
 
     /// Sets the capacity for the history.
-    pub fn capacity(self, capacity: usize) -> Builder<A, F> {
+    pub fn capacity(self, capacity: usize) -> Builder<A, S> {
         Builder(self.0.capacity(capacity))
     }
 
@@ -416,26 +416,26 @@ impl<A, F> Builder<A, F> {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(self, limit: usize) -> Builder<A, F> {
+    pub fn limit(self, limit: usize) -> Builder<A, S> {
         Builder(self.0.limit(limit))
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(self, saved: bool) -> Builder<A, F> {
+    pub fn saved(self, saved: bool) -> Builder<A, S> {
         Builder(self.0.saved(saved))
     }
 
     /// Builds the history.
-    pub fn build(self) -> History<A, F> {
+    pub fn build(self) -> History<A, S> {
         History::from(self.0.build())
     }
 }
 
-impl<A, F: Slot> Builder<A, F> {
+impl<A, S: Slot> Builder<A, S> {
     /// Connects the slot.
-    pub fn connect(self, f: F) -> Builder<A, F> {
-        Builder(self.0.connect(f))
+    pub fn connect(self, slot: S) -> Builder<A, S> {
+        Builder(self.0.connect(slot))
     }
 }
 
