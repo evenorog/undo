@@ -23,10 +23,12 @@
 //!
 //! # Cargo Feature Flags
 //!
-//! * `alloc`: Enables the use of the alloc crate, enabled by default.
-//! * `colored`: Enables colored output when visualizing the display structures, enabled by default.
-//! * `time`: Enables time stamps and time travel.
-//! * `serde`: Enables serialization and deserialization.
+//! | Name    | Default | Description                                                     |
+//! |---------|---------|-----------------------------------------------------------------|
+//! | alloc   | ✓       | Enables the use of the alloc crate.                             |
+//! | colored | ✓       | Enables colored output when visualizing the display structures. |
+//! | time    |         | Enables time stamps and time travel.                            |
+//! | serde   |         | Enables serialization and deserialization.                      |
 //!
 //! # Examples
 //!
