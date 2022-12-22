@@ -133,11 +133,11 @@ pub trait Action {
     /// Used for manual merging of actions.
     ///
     /// You should return:
-    /// * `Yes` if you have merged the two commands.
-    /// The `other` command will not be added to the stack.
-    /// * `No` if you have not merged the two commands.
-    /// The `other` command will be added to the stack.
-    /// * `Annul` if the two commands cancels each other out.
+    /// * `Yes` if you have merged the two actions.
+    /// The `other` action will not be added to the stack.
+    /// * `No` if you have not merged the two actions.
+    /// The `other` action will be added to the stack.
+    /// * `Annul` if the two actions cancels each other out.
     /// This will removed both `self` and `other` from the stack.
     fn merge(&mut self, other: Self) -> Merged<Self>
     where
@@ -153,15 +153,15 @@ pub trait Action {
 pub enum Merged<A> {
     /// The actions have been merged.
     ///
-    /// This means that the `other` command will not be added to the stack.
+    /// This means that the `other` action will not be added to the stack.
     Yes,
     /// The actions have not been merged.
     ///
-    /// We need to return the `other` command so it can be added to the stack.
+    /// We need to return the `other` action so it can be added to the stack.
     No(A),
     /// The two actions cancels each other out.
     ///
-    /// This means that both commands will be removed from the stack.
+    /// This means that both action will be removed from the stack.
     Annul,
 }
 

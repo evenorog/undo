@@ -254,11 +254,13 @@ impl<A, F> From<History<A, F>> for Record<A, F> {
 /// # include!("../push.rs");
 /// # fn main() {
 /// # use undo::Record;
-/// let _ = Record::<Push, _>::builder()
+/// # let mut target = String::new();
+/// let mut record = Record::builder()
 ///     .limit(100)
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
 ///     .build();
+/// # record.apply(&mut target, Push('a'));
 /// # }
 /// ```
 #[derive(Debug)]

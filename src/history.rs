@@ -391,11 +391,13 @@ impl<A> Branch<A> {
 /// # include!("../push.rs");
 /// # fn main() {
 /// # use undo::History;
-/// let _ = History::<Push, _>::builder()
+/// # let mut target = String::new();
+/// let mut history = History::builder()
 ///     .limit(100)
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
 ///     .build();
+/// # history.apply(&mut target, Push('a'));
 /// # }
 /// ```
 #[derive(Debug)]
