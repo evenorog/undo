@@ -1,6 +1,6 @@
 //! A record of actions.
 
-use crate::entry::Entries;
+use crate::entry::LimitDeque;
 use crate::slot::{NoOp, Slot, Socket};
 use crate::{Action, At, Entry, Format, History, Timeline};
 use alloc::collections::VecDeque;
@@ -9,7 +9,6 @@ use alloc::vec::Vec;
 use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::num::NonZeroUsize;
-use core::ops::{Index, IndexMut};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "time")]
@@ -580,76 +579,6 @@ impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
             self.fmt_list(f, at, Some(entry))?;
         }
         self.fmt_list(f, At::ROOT, None)
-    }
-}
-
-/// A deque that holds a limit of how many items it can hold.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug)]
-pub(crate) struct LimitDeque<T> {
-    pub deque: VecDeque<Entry<T>>,
-    pub limit: NonZeroUsize,
-}
-
-impl<T> LimitDeque<T> {
-    pub fn new(capacity: usize, limit: NonZeroUsize) -> LimitDeque<T> {
-        LimitDeque {
-            deque: VecDeque::with_capacity(capacity),
-            limit,
-        }
-    }
-}
-
-impl<T> Entries for LimitDeque<T> {
-    type Item = T;
-
-    fn limit(&self) -> usize {
-        self.limit.get()
-    }
-
-    fn len(&self) -> usize {
-        self.deque.len()
-    }
-
-    fn back_mut(&mut self) -> Option<&mut Entry<T>> {
-        self.deque.back_mut()
-    }
-
-    fn push_back(&mut self, t: Entry<T>) {
-        self.deque.push_back(t)
-    }
-
-    fn pop_front(&mut self) -> Option<Entry<T>> {
-        self.deque.pop_front()
-    }
-
-    fn pop_back(&mut self) -> Option<Entry<T>> {
-        self.deque.pop_back()
-    }
-
-    fn split_off(&mut self, at: usize) -> Self {
-        LimitDeque {
-            deque: self.deque.split_off(at),
-            limit: self.limit,
-        }
-    }
-
-    fn clear(&mut self) {
-        self.deque.clear();
-    }
-}
-
-impl<T> Index<usize> for LimitDeque<T> {
-    type Output = Entry<T>;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        self.deque.index(index)
-    }
-}
-
-impl<T> IndexMut<usize> for LimitDeque<T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.deque.index_mut(index)
     }
 }
 
