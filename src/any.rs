@@ -30,8 +30,8 @@ impl<T> AnyAction<T, ()>
 where
     Self: 'static,
 {
-    /// Creates a new any action from a function.
-    pub(crate) fn from_fn<F>(f: F) -> AnyAction<T, ()>
+    /// Creates a new `AnyAction` from a function.
+    pub fn from_fn<F>(f: F) -> AnyAction<T, ()>
     where
         F: FnMut(&mut T),
         F: 'static,
@@ -40,7 +40,7 @@ where
         AnyAction::new(FromFn { f, target: None })
     }
 
-    /// Creates a new any action from `self` and `action`.
+    /// Creates a new `AnyAction` from `self` and `action`.
     ///
     /// `self` will be called first in `apply`.
     pub fn join<A>(self, action: A) -> AnyAction<T, ()>
@@ -56,8 +56,8 @@ impl<T, E> AnyAction<T, Result<(), E>>
 where
     Self: 'static,
 {
-    /// Creates a new any action from a function.
-    pub(crate) fn from_fn<F>(f: F) -> AnyAction<T, Result<(), E>>
+    /// Creates a new `AnyAction` from a function.
+    pub fn from_fn<F>(f: F) -> AnyAction<T, Result<(), E>>
     where
         F: FnMut(&mut T) -> Result<(), E>,
         F: 'static,
@@ -66,7 +66,7 @@ where
         AnyAction::new(TryFromFn { f, target: None })
     }
 
-    /// Creates a new any action from `self` and `action`.
+    /// Creates a new `AnyAction` from `self` and `action`.
     ///
     /// `self` will be called first in `apply`.
     pub fn join<A>(self, action: A) -> AnyAction<T, Result<(), E>>
