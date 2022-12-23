@@ -218,3 +218,36 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{AnyAction, Record};
+    use alloc::string::String;
+
+    #[test]
+    fn from_fn() {
+        let mut target = String::new();
+        let mut record = Record::new();
+        record.apply(
+            &mut target,
+            AnyAction::<String, ()>::from_fn(|s| s.push('a')),
+        );
+        record.apply(
+            &mut target,
+            AnyAction::<String, ()>::from_fn(|s| s.push('b')),
+        );
+        record.apply(
+            &mut target,
+            AnyAction::<String, ()>::from_fn(|s| s.push('c')),
+        );
+        assert_eq!(target, "abc");
+        record.undo(&mut target).unwrap();
+        record.undo(&mut target).unwrap();
+        record.undo(&mut target).unwrap();
+        assert_eq!(target, "");
+        record.redo(&mut target).unwrap();
+        record.redo(&mut target).unwrap();
+        record.redo(&mut target).unwrap();
+        assert_eq!(target, "abc");
+    }
+}
