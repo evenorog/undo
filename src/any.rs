@@ -225,6 +225,22 @@ mod tests {
     use alloc::string::String;
 
     #[test]
+    fn join() {
+        let mut target = String::new();
+        let mut record = Record::new();
+        let a = AnyAction::<String, ()>::from_fn(|s| s.push('a'));
+        let b = AnyAction::<String, ()>::from_fn(|s| s.push('b'));
+        let c = AnyAction::<String, ()>::from_fn(|s| s.push('c'));
+        let joined = a.join(b).join(c);
+        record.apply(&mut target, joined);
+        assert_eq!(target, "abc");
+        record.undo(&mut target).unwrap();
+        assert_eq!(target, "");
+        record.redo(&mut target).unwrap();
+        assert_eq!(target, "abc");
+    }
+
+    #[test]
     fn from_fn() {
         let mut target = String::new();
         let mut record = Record::new();
