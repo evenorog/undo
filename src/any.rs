@@ -3,6 +3,7 @@
 use crate::Action;
 use alloc::boxed::Box;
 use core::fmt::{self, Debug, Formatter};
+use core::mem;
 
 /// Any action type.
 ///
@@ -29,6 +30,16 @@ impl<T> AnyAction<T, ()>
 where
     Self: 'static,
 {
+    /// Creates a new any action from a function.
+    pub(crate) fn from_fn<F>(f: F) -> AnyAction<T, ()>
+    where
+        F: FnMut(&mut T),
+        F: 'static,
+        T: Clone,
+    {
+        AnyAction::new(FromFn { f, target: None })
+    }
+
     /// Creates a new any action from `self` and `action`.
     ///
     /// `self` will be called first in `apply`.
@@ -45,6 +56,16 @@ impl<T, E> AnyAction<T, Result<(), E>>
 where
     Self: 'static,
 {
+    /// Creates a new any action from a function.
+    pub(crate) fn from_fn<F>(f: F) -> AnyAction<T, Result<(), E>>
+    where
+        F: FnMut(&mut T) -> Result<(), E>,
+        F: 'static,
+        T: Clone,
+    {
+        AnyAction::new(TryFromFn { f, target: None })
+    }
+
     /// Creates a new any action from `self` and `action`.
     ///
     /// `self` will be called first in `apply`.
@@ -135,5 +156,65 @@ where
     fn redo(&mut self, target: &mut T) -> Self::Output {
         self.a.redo(target)?;
         self.b.redo(target)
+    }
+}
+
+struct FromFn<F, T> {
+    f: F,
+    target: Option<T>,
+}
+
+impl<F, T> Action for FromFn<F, T>
+where
+    F: FnMut(&mut T),
+    T: Clone,
+{
+    type Target = T;
+    type Output = ();
+
+    fn apply(&mut self, target: &mut Self::Target) {
+        self.target = Some(target.clone());
+        (self.f)(target)
+    }
+
+    fn undo(&mut self, target: &mut Self::Target) {
+        let old = self.target.as_mut().unwrap();
+        mem::swap(old, target);
+    }
+
+    fn redo(&mut self, target: &mut Self::Target) {
+        let new = self.target.as_mut().unwrap();
+        mem::swap(new, target);
+    }
+}
+
+struct TryFromFn<F, T> {
+    f: F,
+    target: Option<T>,
+}
+
+impl<F, T, E> Action for TryFromFn<F, T>
+where
+    F: FnMut(&mut T) -> Result<(), E>,
+    T: Clone,
+{
+    type Target = T;
+    type Output = Result<(), E>;
+
+    fn apply(&mut self, target: &mut Self::Target) -> Self::Output {
+        self.target = Some(target.clone());
+        (self.f)(target)
+    }
+
+    fn undo(&mut self, target: &mut Self::Target) -> Self::Output {
+        let old = self.target.as_mut().unwrap();
+        mem::swap(old, target);
+        Ok(())
+    }
+
+    fn redo(&mut self, target: &mut Self::Target) -> Self::Output {
+        let new = self.target.as_mut().unwrap();
+        mem::swap(new, target);
+        Ok(())
     }
 }
