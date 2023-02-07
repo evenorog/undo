@@ -25,18 +25,21 @@ use {core::convert::identity, time::OffsetDateTime};
 /// # Examples
 /// ```
 /// # use undo::Record;
-/// # include!("../push.rs");
+/// # include!("./doctest_setup.rs");
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut record = Record::new();
+///
 /// record.apply(&mut target, Push('a'));
 /// record.apply(&mut target, Push('b'));
 /// record.apply(&mut target, Push('c'));
 /// assert_eq!(target, "abc");
+///
 /// record.undo(&mut target);
 /// record.undo(&mut target);
 /// record.undo(&mut target);
 /// assert_eq!(target, "");
+///
 /// record.redo(&mut target);
 /// record.redo(&mut target);
 /// record.redo(&mut target);
@@ -250,7 +253,7 @@ impl<A, F> From<History<A, F>> for Record<A, F> {
 ///
 /// # Examples
 /// ```
-/// # include!("../push.rs");
+/// # include!("./doctest_setup.rs");
 /// # fn main() {
 /// # use undo::Record;
 /// # let mut target = String::new();
@@ -344,15 +347,17 @@ enum QueueAction<A> {
 /// # Examples
 /// ```
 /// # use undo::{Record};
-/// # include!("../push.rs");
+/// # include!("./doctest_setup.rs");
 /// # fn main() {
 /// let mut string = String::new();
 /// let mut record = Record::new();
 /// let mut queue = record.queue();
+///
 /// queue.apply(Push('a'));
 /// queue.apply(Push('b'));
 /// queue.apply(Push('c'));
 /// assert_eq!(string, "");
+///
 /// queue.commit(&mut string).unwrap();
 /// assert_eq!(string, "abc");
 /// # }
