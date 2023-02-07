@@ -127,7 +127,7 @@ pub trait Action {
     /// Reapplies the action on the target and return `Ok` if everything went fine,
     /// and `Err` if something went wrong.
     ///
-    /// The default implementation uses the [`apply`](trait.Action.html#tymethod.apply) implementation.
+    /// The default implementation uses the [`Action::apply`] implementation.
     fn redo(&mut self, target: &mut Self::Target) -> Self::Output {
         self.apply(target)
     }
