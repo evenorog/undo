@@ -147,9 +147,7 @@ impl<A, S> History<A, S> {
 }
 
 impl<A: Action, S: Slot> History<A, S> {
-    /// Pushes the action to the top of the history and executes its [`apply`] method.
-    ///
-    /// [`apply`]: trait.Action.html#tymethod.apply
+    /// Pushes the [`Action`] to the top of the history and executes its [`apply`](Action::apply) method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
         let at = self.at();
         let saved = self
@@ -178,18 +176,14 @@ impl<A: Action, S: Slot> History<A, S> {
         output
     }
 
-    /// Calls the [`undo`] method for the active action
+    /// Calls the [`Action::undo`] method for the active action
     /// and sets the previous one as the new active one.
-    ///
-    /// [`undo`]: trait.Action.html#tymethod.undo
     pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
         self.record.undo(target)
     }
 
-    /// Calls the [`redo`] method for the active action
+    /// Calls the [`Action::redo`] method for the active action
     /// and sets the next one as the new active one.
-    ///
-    /// [`redo`]: trait.Action.html#method.redo
     pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
         self.record.redo(target)
     }
@@ -299,10 +293,7 @@ impl<A: Action, S: Slot> History<A, S> {
 }
 
 impl<A: Action<Output = ()>, S: Slot> History<A, S> {
-    /// Repeatedly calls [`undo`] or [`redo`] until the action in `branch` at `current` is reached.
-    ///
-    /// [`undo`]: trait.Action.html#tymethod.undo
-    /// [`redo`]: trait.Action.html#method.redo
+    /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action in `branch` at `current` is reached.
     pub fn go_to(&mut self, target: &mut A::Target, branch: usize, current: usize) -> Option<()> {
         let root = self.root;
         if root == branch {
@@ -340,13 +331,13 @@ impl<A: Action<Output = ()>, S: Slot> History<A, S> {
 
 impl<A: ToString, S> History<A, S> {
     /// Returns the string of the action which will be undone
-    /// in the next call to [`undo`](struct.History.html#method.undo).
+    /// in the next call to [`History::undo`].
     pub fn undo_text(&self) -> Option<String> {
         self.record.undo_text()
     }
 
     /// Returns the string of the action which will be redone
-    /// in the next call to [`redo`](struct.History.html#method.redo).
+    /// in the next call to [`History::redo`].
     pub fn redo_text(&self) -> Option<String> {
         self.record.redo_text()
     }

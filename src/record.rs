@@ -20,7 +20,7 @@ use {core::convert::identity, time::OffsetDateTime};
 /// the undo and redo methods. In addition, the record can notify the user
 /// about changes to the stack or the target through [signal](enum.Signal.html).
 /// The user can give the record a function that is called each time the state
-/// changes by using the [`builder`](struct.RecordBuilder.html).
+/// changes by using the [`record::Builder`](self::Builder).
 ///
 /// # Examples
 /// ```
@@ -140,26 +140,20 @@ impl<A, S> Record<A, S> {
 }
 
 impl<A: Action, S: Slot> Record<A, S> {
-    /// Pushes the action on top of the record and executes its [`apply`] method.
-    ///
-    /// [`apply`]: trait.Action.html#tymethod.apply
+    /// Pushes the action on top of the record and executes its [`Action::apply`] method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
         let (output, _, _) = self.timeline.apply(target, action);
         output
     }
 
-    /// Calls the [`undo`] method for the active action and sets
+    /// Calls the [`Action::undo`] method for the active action and sets
     /// the previous one as the new active one.
-    ///
-    /// [`undo`]: ../trait.Action.html#tymethod.undo
     pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
         self.timeline.undo(target)
     }
 
-    /// Calls the [`redo`] method for the active action and sets
+    /// Calls the [`Action::redo`] method for the active action and sets
     /// the next one as the new active one.
-    ///
-    /// [`redo`]: trait.Action.html#method.redo
     pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
         self.timeline.redo(target)
     }
@@ -181,10 +175,8 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
         self.timeline.revert(target)
     }
 
-    /// Repeatedly calls [`undo`] or [`redo`] until the action at `current` is reached.
+    /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action at `current` is reached.
     ///
-    /// [`undo`]: trait.Action.html#tymethod.undo
-    /// [`redo`]: trait.Action.html#method.redo
     pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<()> {
         self.timeline.go_to(target, current)
     }
@@ -214,7 +206,7 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
 
 impl<A: ToString, S> Record<A, S> {
     /// Returns the string of the action which will be undone
-    /// in the next call to [`undo`](struct.Timeline.html#method.undo).
+    /// in the next call to [`Record::undo`].
     pub fn undo_text(&self) -> Option<String> {
         self.timeline
             .current
@@ -223,7 +215,7 @@ impl<A: ToString, S> Record<A, S> {
     }
 
     /// Returns the string of the action which will be redone
-    /// in the next call to [`redo`](struct.Timeline.html#method.redo).
+    /// in the next call to [`Record::redo`].
     pub fn redo_text(&self) -> Option<String> {
         self.text(self.timeline.current)
     }
