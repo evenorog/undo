@@ -34,14 +34,17 @@ impl Action for Push {
 fn main() {
     let mut target = String::new();
     let mut history = History::new();
+
     history.apply(&mut target, Push('a'));
     history.apply(&mut target, Push('b'));
     history.apply(&mut target, Push('c'));
     assert_eq!(target, "abc");
+
     history.undo(&mut target);
     history.undo(&mut target);
     history.undo(&mut target);
     assert_eq!(target, "");
+
     history.redo(&mut target);
     history.redo(&mut target);
     history.redo(&mut target);
@@ -53,8 +56,8 @@ fn main() {
 
 Licensed under either of
 
-* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-* MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+-   Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+-   MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
 

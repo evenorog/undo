@@ -21,18 +21,21 @@ use serde::{Deserialize, Serialize};
 /// # Examples
 /// ```
 /// # use undo::History;
-/// # include!("../push.rs");
+/// # include!("./doctest_setup.rs");
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut history = History::new();
+///
 /// history.apply(&mut target, Push('a'));
 /// history.apply(&mut target, Push('b'));
 /// history.apply(&mut target, Push('c'));
 /// let abc = history.branch();
+///
 /// history.go_to(&mut target, abc, 1);
 /// history.apply(&mut target, Push('f'));
 /// history.apply(&mut target, Push('g'));
 /// assert_eq!(target, "afg");
+///
 /// history.go_to(&mut target, abc, 3);
 /// assert_eq!(target, "abc");
 /// # }
@@ -388,7 +391,7 @@ impl<A> Branch<A> {
 ///
 /// # Examples
 /// ```
-/// # include!("../push.rs");
+/// # include!("./doctest_setup.rs");
 /// # fn main() {
 /// # use undo::History;
 /// # let mut target = String::new();
@@ -459,15 +462,17 @@ enum QueueAction<A> {
 /// # Examples
 /// ```
 /// # use undo::{Record};
-/// # include!("../push.rs");
+/// # include!("./doctest_setup.rs");
 /// # fn main() {
 /// let mut string = String::new();
 /// let mut record = Record::new();
 /// let mut queue = record.queue();
+///
 /// queue.apply(Push('a'));
 /// queue.apply(Push('b'));
 /// queue.apply(Push('c'));
 /// assert_eq!(string, "");
+///
 /// queue.commit(&mut string).unwrap();
 /// assert_eq!(string, "abc");
 /// # }
