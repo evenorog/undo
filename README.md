@@ -14,7 +14,7 @@ it is easy to apply, undo, and redo changes made to a target.
 ## Examples
 
 ```rust
-use undo::{Action, History};
+use undo::{Action, Record};
 
 struct Push(char);
 
@@ -22,32 +22,34 @@ impl Action for Push {
     type Target = String;
     type Output = ();
 
-    fn apply(&mut self, s: &mut String) {
-        s.push(self.0);
+    fn apply(&mut self, string: &mut String) {
+        string.push(self.0);
     }
 
-    fn undo(&mut self, s: &mut String) {
-        self.0 = s.pop().expect("s is empty");
+    fn undo(&mut self, string: &mut String) {
+        self.0 = string
+            .pop()
+            .expect("cannot remove more characters than have been added");
     }
 }
 
 fn main() {
     let mut target = String::new();
-    let mut history = History::new();
+    let mut record = Record::new();
 
-    history.apply(&mut target, Push('a'));
-    history.apply(&mut target, Push('b'));
-    history.apply(&mut target, Push('c'));
+    record.apply(&mut target, Push('a'));
+    record.apply(&mut target, Push('b'));
+    record.apply(&mut target, Push('c'));
     assert_eq!(target, "abc");
 
-    history.undo(&mut target);
-    history.undo(&mut target);
-    history.undo(&mut target);
+    record.undo(&mut target);
+    record.undo(&mut target);
+    record.undo(&mut target);
     assert_eq!(target, "");
 
-    history.redo(&mut target);
-    history.redo(&mut target);
-    history.redo(&mut target);
+    record.redo(&mut target);
+    record.redo(&mut target);
+    record.redo(&mut target);
     assert_eq!(target, "abc");
 }
 ```

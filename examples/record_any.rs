@@ -33,32 +33,24 @@ impl Action for LongPush<'_> {
 }
 
 fn main() {
-    let mut target = String::new();
     let mut record = Record::<AnyAction<String, ()>>::new();
+    let mut target = String::new();
 
-    record.apply(&mut target, AnyAction::new(Push('a')));
-    record.apply(&mut target, AnyAction::new(Push('b')));
-    record.apply(&mut target, AnyAction::new(Push('c')));
-    assert_eq!(target, "abc");
+    record.apply(&mut target, AnyAction::new(LongPush("rust")));
+    assert_eq!(target, "rust");
 
-    record.apply(&mut target, AnyAction::new(LongPush("def")));
-    assert_eq!(target, "abcdef");
-
-    record.undo(&mut target);
-    assert_eq!(target, "abc");
+    record.apply(&mut target, AnyAction::new(Push('y')));
+    assert_eq!(target, "rusty");
 
     record.undo(&mut target);
-    record.undo(&mut target);
-    record.undo(&mut target);
-    assert_eq!(target, "");
+    assert_eq!(target, "rust");
 
-    record.redo(&mut target);
-    record.redo(&mut target);
-    record.redo(&mut target);
-    assert_eq!(target, "abc");
+    record.apply(&mut target, AnyAction::new(LongPush("acean")));
+    assert_eq!(target, "rustacean");
 
+    record.undo(&mut target);
     record.redo(&mut target);
-    assert_eq!(target, "abcdef");
+    assert_eq!(target, "rustacean");
 
     assert!(record.redo(&mut target).is_none());
 }
