@@ -18,21 +18,21 @@ impl Action for Push {
 }
 
 fn main() {
-    let mut target = String::new();
     let mut record = Record::new();
+    let mut target = String::new();
 
-    record.apply(&mut target, Push('a'));
-    record.apply(&mut target, Push('b'));
-    record.apply(&mut target, Push('c'));
-    assert_eq!(target, "abc");
+    record.apply(&mut target, Push('r'));
+    record.apply(&mut target, Push('u'));
+    record.apply(&mut target, Push('s'));
+    record.apply(&mut target, Push('t'));
+    assert_eq!(target, "rust");
 
     record.undo(&mut target);
     record.undo(&mut target);
     record.undo(&mut target);
-    assert_eq!(target, "");
+    assert_eq!(target, "r");
 
     record.redo(&mut target);
     record.redo(&mut target);
-    record.redo(&mut target);
-    assert_eq!(target, "abc");
+    assert_eq!(target, "rus");
 }

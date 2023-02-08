@@ -7,15 +7,16 @@
 //!
 //! # Features
 //!
-//! * [Action](trait.Action.html) provides the base functionality for all actions.
-//! * [Record](record/struct.Record.html) provides basic undo-redo functionality.
-//! * [History](history/struct.History.html) provides non-linear undo-redo functionality that allows you to jump between different branches.
-//! * Queues that wraps a record or history and extends them with queue functionality.
-//! * Checkpoints that wraps a record or history and extends them with checkpoint functionality.
-//! * Actions can be merged into a single action by implementing the
-//!   [merge](trait.Action.html#method.merge) method on the action.
-//!   This allows smaller actions to be used to build more complex operations, or smaller incremental changes to be
-//!   merged into larger changes that can be undone and redone in a single step.
+//! * [`Action`] provides the base functionality for all actions. Multiple [`Action`]s can be merged into a single action
+//!   by implementing the [`merge`](Action::merge) method on the action. This allows smaller actions to be used to build
+//!   more complex operations, or smaller incremental changes to be merged into larger changes that can be undone and
+//!   redone in a single step.
+//!
+//! * [`Record`] provides basic undo-redo functionality.
+//! * [`History`] provides non-linear undo-redo functionality that allows you to jump between different branches.
+//!
+//! * `Queues` that wraps a record or history and extends them with queue functionality.
+//! * `Checkpoints` that wraps a record or history and extends them with checkpoint functionality.
 //! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
@@ -33,49 +34,16 @@
 //! # Examples
 //!
 //! ```rust
-//! use undo::{Action, History};
-//!
-//! struct Push(char);
-//!
-//! impl Action for Push {
-//!     type Target = String;
-//!     type Output = ();
-//!
-//!     fn apply(&mut self, s: &mut String) {
-//!         s.push(self.0);
-//!     }
-//!
-//!     fn undo(&mut self, s: &mut String) {
-//!         self.0 = s.pop().expect("s is empty");
-//!     }
-//! }
-//!
-//! fn main() {
-//!     let mut target = String::new();
-//!     let mut history = History::new();
-//!     history.apply(&mut target, Push('a'));
-//!     history.apply(&mut target, Push('b'));
-//!     history.apply(&mut target, Push('c'));
-//!     assert_eq!(target, "abc");
-//!     history.undo(&mut target);
-//!     history.undo(&mut target);
-//!     history.undo(&mut target);
-//!     assert_eq!(target, "");
-//!     history.redo(&mut target);
-//!     history.redo(&mut target);
-//!     history.redo(&mut target);
-//!     assert_eq!(target, "abc");
-//! }
+#![doc = include_str!("../examples/record.rs")]
 //! ```
 
 #![no_std]
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
-#![cfg_attr(not(feature = "alloc"), allow(dead_code, unused_imports))]
 
-#[doc = include_str!("../README.md")]
 #[cfg(doctest)]
+#[doc = include_str!("../README.md")]
 pub struct ReadmeDocTest;
 
 #[cfg(feature = "alloc")]
