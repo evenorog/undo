@@ -1,4 +1,4 @@
-//! **A undo-redo library.**
+//! **An undo-redo library.**
 //!
 //! It is an implementation of the action pattern, where all modifications are done
 //! by creating objects of actions that applies the modifications. All actions knows
@@ -26,7 +26,7 @@
 //! | Name    | Default | Description                                                     |
 //! |---------|---------|-----------------------------------------------------------------|
 //! | alloc   | ✓       | Enables the use of the alloc crate.                             |
-//! | colored | ✓       | Enables colored output when visualizing the display structures. |
+//! | colored |         | Enables colored output when visualizing the display structures. |
 //! | time    |         | Enables time stamps and time travel.                            |
 //! | serde   |         | Enables serialization and deserialization.                      |
 //!

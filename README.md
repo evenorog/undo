@@ -1,6 +1,6 @@
 # undo
 
-**A undo-redo library.**
+**An undo-redo library.**
 
 [![Rust](https://github.com/evenorog/undo/actions/workflows/rust.yml/badge.svg)](https://github.com/evenorog/undo/actions/workflows/rust.yml)
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)

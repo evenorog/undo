@@ -2,7 +2,7 @@
 name = "undo"
 version = "0.48.0"
 authors = ["evenorog <evenorog@gmail.com>"]
-description = "A undo-redo library."
+description = "An undo-redo library."
 documentation = "https://docs.rs/undo"
 repository = "https://github.com/evenorog/undo"
 readme = "README.md"
@@ -17,7 +17,7 @@ serde = { version = "1", optional = true, default-features = false, features = [
 time = { version = "0.3", optional = true, default-features = false, features = ["formatting"] }
 
 [features]
-default = ["alloc", "colored"]
+default = ["alloc"]
 alloc = ["serde?/alloc"]
 serde = ["dep:serde", "time?/serde"]
 
@@ -25,4 +25,4 @@ serde = ["dep:serde", "time?/serde"]
 maintenance = { status = "actively-developed" }
 
 [package.metadata.docs.rs]
-features = ["serde", "time"]
+features = ["colored", "serde", "time"]
