@@ -2,6 +2,12 @@ use undo::{Action, History};
 
 struct Push(char);
 
+impl std::fmt::Display for Push {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Push({:?})", self.0)
+    }
+}
+
 impl Action for Push {
     type Target = String;
     type Output = ();
@@ -34,7 +40,7 @@ fn main() {
     history.apply(&mut target, Push('d'));
     history.apply(&mut target, Push('e'));
     history.apply(&mut target, Push('f'));
-    assert_eq!(target, "abde");
+    assert_eq!(target, "abdef");
 
     let (branch_two, current_two) = (history.branch(), history.current());
 
@@ -43,4 +49,6 @@ fn main() {
 
     history.go_to(&mut target, branch_two, current_two);
     assert_eq!(target, "abdef");
+
+    println!("History: {}", history.display());
 }

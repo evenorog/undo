@@ -2,6 +2,12 @@ use undo::{Action, Record};
 
 struct Push(char);
 
+impl std::fmt::Display for Push {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Push({:?})", self.0)
+    }
+}
+
 impl Action for Push {
     type Target = String;
     type Output = ();
@@ -35,4 +41,6 @@ fn main() {
     record.redo(&mut target);
     record.redo(&mut target);
     assert_eq!(target, "rus");
+
+    println!("Record: {}", record.display());
 }
