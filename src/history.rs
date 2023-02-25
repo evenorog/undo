@@ -1,4 +1,4 @@
-//! A history of actions.
+//! A multi branch non-linear history of actions.
 
 use crate::record::Builder as RecordBuilder;
 use crate::slot::{NoOp, Signal, Slot};
@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 
 /// A history tree of actions.
 ///
-/// Unlike [Timeline](struct.Timeline.html) which maintains a linear undo history,
-/// History maintains an undo tree containing every edit made to the target.
+/// Unlike [`Record`](crate::record::Record) which maintains a linear undo history,
+/// [`History`] maintains an undo tree containing every edit made to the target.
 ///
 /// # Examples
 /// ```

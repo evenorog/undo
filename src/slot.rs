@@ -4,7 +4,7 @@ use core::mem;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// Trait for emitting signals.
+/// Use this to receive signals from [`History`](crate::history::History) or [`Record`](crate::record::Record).
 pub trait Slot {
     /// Receives a signal that describes the state change done to the data structures.
     fn emit(&mut self, signal: Signal);

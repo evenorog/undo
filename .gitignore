@@ -1,5 +1,8 @@
-target
+# Cargo
+target/
 Cargo.lock
 
-.idea
+# Editors
+.vscode/
+.idea/
 *.iml

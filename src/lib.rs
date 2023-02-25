@@ -79,21 +79,19 @@ pub use self::{
 
 /// Base functionality for all actions.
 pub trait Action {
-    /// The target type.
+    /// The type on which the action will be applied.
     type Target;
-    /// The output type.
+    /// The return type of [`apply`](Self::apply), [`undo`](Self::undo) and [`redo`](Self::redo)
+    /// You might want to use rust [`Result`] to be able to handle cases where the action is not applicable
     type Output;
 
-    /// Applies the action on the target and returns `Ok` if everything went fine,
-    /// and `Err` if something went wrong.
+    /// Applies the action on the target.
     fn apply(&mut self, target: &mut Self::Target) -> Self::Output;
 
-    /// Restores the state of the target as it was before the action was applied
-    /// and returns `Ok` if everything went fine, and `Err` if something went wrong.
+    /// Restores the state of the target as it was before the action was applied.
     fn undo(&mut self, target: &mut Self::Target) -> Self::Output;
 
-    /// Reapplies the action on the target and return `Ok` if everything went fine,
-    /// and `Err` if something went wrong.
+    /// Reapplies the action on the target.
     ///
     /// The default implementation uses the [`Action::apply`] implementation.
     fn redo(&mut self, target: &mut Self::Target) -> Self::Output {
