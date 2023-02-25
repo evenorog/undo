@@ -2,6 +2,12 @@ use undo::{Action, AnyAction, Record};
 
 struct Push(char);
 
+impl std::fmt::Display for Push {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Push({:?})", self.0)
+    }
+}
+
 impl Action for Push {
     type Target = String;
     type Output = ();
@@ -18,6 +24,12 @@ impl Action for Push {
 }
 
 struct LongPush<'a>(&'a str);
+
+impl std::fmt::Display for LongPush<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LongPush({:?})", self.0)
+    }
+}
 
 impl Action for LongPush<'_> {
     type Target = String;
@@ -53,4 +65,6 @@ fn main() {
     assert_eq!(target, "rustacean");
 
     assert!(record.redo(&mut target).is_none());
+
+    println!("Record: {record:?}");
 }
