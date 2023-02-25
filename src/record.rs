@@ -1,4 +1,4 @@
-//! A record of actions.
+//! A linear record of actions.
 
 use crate::entry::LimitDeque;
 use crate::slot::{NoOp, Slot, Socket};
@@ -18,7 +18,7 @@ use {core::convert::identity, time::OffsetDateTime};
 ///
 /// The record can roll the targets state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
-/// about changes to the stack or the target through [signal](enum.Signal.html).
+/// about changes to the stack or the target through [`Signal`](crate::Signal).
 /// The user can give the record a function that is called each time the state
 /// changes by using the [`record::Builder`](self::Builder).
 ///
