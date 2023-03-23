@@ -1,12 +1,7 @@
+use std::fmt::{self, Display, Formatter};
 use undo::{Action, History};
 
 struct Push(char);
-
-impl std::fmt::Display for Push {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Push({:?})", self.0)
-    }
-}
 
 impl Action for Push {
     type Target = String;
@@ -20,6 +15,12 @@ impl Action for Push {
         self.0 = string
             .pop()
             .expect("cannot remove more characters than have been added");
+    }
+}
+
+impl Display for Push {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "Push '{}'", self.0)
     }
 }
 
@@ -50,5 +51,5 @@ fn main() {
     history.go_to(&mut target, branch_two, current_two);
     assert_eq!(target, "abdef");
 
-    println!("History: {}", history.display());
+    println!("{}", history.display());
 }

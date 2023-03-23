@@ -1,13 +1,13 @@
 //! **An undo-redo library.**
 //!
 //! It is an implementation of the command pattern, where all modifications are done
-//! by creating objects of commands that applies the modifications. All commands knows
+//! by creating objects that applies the modifications. All objects knows
 //! how to undo the changes it applies, and by using the provided data structures
 //! it is easy to apply, undo, and redo changes made to a target.
 //!
 //! # Features
 //!
-//! * [`Action`] provides the base functionality for all commands. Multiple [`Action`]s can be merged into a single action
+//! * [`Action`] provides the base functionality for all actions. Multiple [`Action`]s can be merged into a single action
 //!   by implementing the [`merge`](Action::merge) method on the action. This allows smaller actions to be used to build
 //!   more complex operations, or smaller incremental changes to be merged into larger changes that can be undone and
 //!   redone in a single step.
@@ -15,8 +15,8 @@
 //! * [`Record`] provides basic undo-redo functionality.
 //! * [`History`] provides non-linear undo-redo functionality that allows you to jump between different branches.
 //!
-//! * `Queues` that wraps a record or history and extends them with queue functionality.
-//! * `Checkpoints` that wraps a record or history and extends them with checkpoint functionality.
+//! * Queues that wraps a record or history and extends them with queue functionality.
+//! * Checkpoints that wraps a record or history and extends them with checkpoint functionality.
 //! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
 //!   when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
@@ -26,16 +26,9 @@
 //!
 //! | Name    | Default | Description                                                     |
 //! |---------|---------|-----------------------------------------------------------------|
-//! | alloc   | ✓       | Enables the use of the alloc crate.                             |
 //! | colored |         | Enables colored output when visualizing the display structures. |
 //! | time    |         | Enables time stamps and time travel.                            |
 //! | serde   |         | Enables serialization and deserialization.                      |
-//!
-//! # Examples
-//!
-//! ```rust
-#![doc = include_str!("../examples/record.rs")]
-//! ```
 
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
@@ -46,8 +39,6 @@
 pub struct ReadmeDocTest;
 
 mod any;
-#[cfg(doctest)]
-mod doctest;
 mod entry;
 mod format;
 pub mod history;
@@ -63,9 +54,6 @@ pub use any::AnyAction;
 pub use history::History;
 pub use record::Record;
 pub use socket::{NoOp, Signal, Slot};
-
-#[cfg(doctest)]
-pub use doctest::Push;
 
 /// Base functionality for all actions.
 pub trait Action {

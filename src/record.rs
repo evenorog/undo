@@ -21,9 +21,9 @@ use {std::convert::identity, time::OffsetDateTime};
 ///
 /// # Examples
 /// ```
-/// # use undo::Record;
 /// # include!("doctest.rs");
 /// # fn main() {
+/// # use undo::Record;
 /// let mut target = String::new();
 /// let mut record = Record::new();
 ///
@@ -444,9 +444,9 @@ enum QueueAction<A> {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Record};
 /// # include!("doctest.rs");
 /// # fn main() {
+/// # use undo::Record;
 /// let mut string = String::new();
 /// let mut record = Record::new();
 /// let mut queue = record.queue();

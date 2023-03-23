@@ -1,25 +1,26 @@
+use std::fmt::{self, Display, Formatter};
 use undo::{Action, Record};
 
 struct Push(char);
-
-impl std::fmt::Display for Push {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Push({:?})", self.0)
-    }
-}
 
 impl Action for Push {
     type Target = String;
     type Output = ();
 
-    fn apply(&mut self, string: &mut String) {
-        string.push(self.0);
+    fn apply(&mut self, target: &mut String) {
+        target.push(self.0);
     }
 
-    fn undo(&mut self, string: &mut String) {
-        self.0 = string
+    fn undo(&mut self, target: &mut String) {
+        self.0 = target
             .pop()
             .expect("cannot remove more characters than have been added");
+    }
+}
+
+impl Display for Push {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "Push '{}'", self.0)
     }
 }
 
@@ -27,20 +28,18 @@ fn main() {
     let mut record = Record::new();
     let mut target = String::new();
 
-    record.apply(&mut target, Push('r'));
-    record.apply(&mut target, Push('u'));
-    record.apply(&mut target, Push('s'));
-    record.apply(&mut target, Push('t'));
-    assert_eq!(target, "rust");
+    record.apply(&mut target, Push('a'));
+    record.apply(&mut target, Push('b'));
+    record.apply(&mut target, Push('c'));
+    assert_eq!(target, "abc");
 
     record.undo(&mut target);
     record.undo(&mut target);
-    record.undo(&mut target);
-    assert_eq!(target, "r");
+    assert_eq!(target, "a");
 
     record.redo(&mut target);
     record.redo(&mut target);
-    assert_eq!(target, "rus");
+    assert_eq!(target, "abc");
 
-    println!("Record: {}", record.display());
+    println!("{}", record.display());
 }
