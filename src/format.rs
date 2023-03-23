@@ -1,7 +1,6 @@
 #![cfg_attr(not(feature = "colored"), allow(unused_variables))]
 
 use crate::At;
-use alloc::string::ToString;
 use core::fmt::{self, Write};
 #[cfg(feature = "time")]
 use time::{format_description::well_known::Rfc2822, OffsetDateTime};
