@@ -18,9 +18,9 @@ use std::{
 ///
 /// # Examples
 /// ```
-/// # use undo::History;
 /// # include!("doctest.rs");
 /// # fn main() {
+/// # use undo::History;
 /// let mut target = String::new();
 /// let mut history = History::new();
 ///
@@ -442,9 +442,9 @@ enum QueueAction<A> {
 ///
 /// # Examples
 /// ```
-/// # use undo::{Record};
 /// # include!("doctest.rs");
 /// # fn main() {
+/// # use undo::Record;
 /// let mut string = String::new();
 /// let mut record = Record::new();
 /// let mut queue = record.queue();
