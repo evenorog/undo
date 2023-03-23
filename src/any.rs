@@ -1,9 +1,6 @@
-#![allow(dead_code)]
-
 use crate::Action;
-use alloc::boxed::Box;
-use core::fmt::{self, Debug, Formatter};
-use core::mem;
+use std::fmt::{self, Debug, Formatter};
+use std::mem;
 
 /// Any action type.
 ///
@@ -222,7 +219,6 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{AnyAction, Record};
-    use alloc::string::String;
 
     #[test]
     fn join() {

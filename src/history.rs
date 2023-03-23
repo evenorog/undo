@@ -1,17 +1,15 @@
 //! A multi branch non-linear history of actions.
 
 use crate::record::Builder as RecordBuilder;
-use crate::slot::{NoOp, Signal, Slot};
+use crate::socket::{NoOp, Signal, Slot};
 use crate::{Action, At, Entry, Format, Record};
-use alloc::{
-    collections::{BTreeMap, VecDeque},
-    string::{String, ToString},
-    vec,
-    vec::Vec,
-};
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    vec,
+};
 
 /// A history tree of actions.
 ///
@@ -21,7 +19,7 @@ use serde::{Deserialize, Serialize};
 /// # Examples
 /// ```
 /// # use undo::History;
-/// # include!("./doctest_setup.rs");
+/// # include!("doctest.rs");
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut history = History::new();
@@ -150,12 +148,8 @@ impl<A: Action, S: Slot> History<A, S> {
     /// Pushes the [`Action`] to the top of the history and executes its [`apply`](Action::apply) method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
         let at = self.at();
-        let saved = self
-            .record
-            .timeline
-            .saved
-            .filter(|&saved| saved > at.current);
-        let (output, merged, tail) = self.record.timeline.apply(target, action);
+        let saved = self.record.saved.filter(|&saved| saved > at.current);
+        let (output, merged, tail) = self.record.__apply(target, action);
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -166,11 +160,11 @@ impl<A: Action, S: Slot> History<A, S> {
                 .for_each(|branch| branch.parent.current -= 1);
         }
         // Handle new branch.
-        if !tail.deque.is_empty() {
+        if !tail.is_empty() {
             let new = self.next;
             self.next += 1;
             self.branches
-                .insert(at.branch, Branch::new(new, at.current, tail.deque));
+                .insert(at.branch, Branch::new(new, at.current, tail));
             self.set_root(new, at.current, saved);
         }
         output
@@ -207,13 +201,9 @@ impl<A: Action, S: Slot> History<A, S> {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.at());
         let current = self.current();
-        let saved = self.record.timeline.saved.filter(|&saved| saved > current);
-        let tail = self.record.timeline.entries.deque.split_off(current);
-        self.record
-            .timeline
-            .entries
-            .deque
-            .append(&mut branch.entries);
+        let saved = self.record.saved.filter(|&saved| saved > current);
+        let tail = self.record.entries.split_off(current);
+        self.record.entries.append(&mut branch.entries);
         self.branches
             .insert(self.root, Branch::new(root, current, tail));
         self.set_root(root, current, saved);
@@ -228,10 +218,10 @@ impl<A: Action, S: Slot> History<A, S> {
             .values_mut()
             .filter(|branch| branch.parent.branch == old && branch.parent.current <= current)
             .for_each(|branch| branch.parent.branch = root);
-        match (self.record.timeline.saved, saved, self.saved) {
+        match (self.record.saved, saved, self.saved) {
             (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(root, old, current),
             (None, Some(_), None) => {
-                self.record.timeline.saved = saved;
+                self.record.saved = saved;
                 self.swap_saved(old, root, current);
             }
             (None, None, None) => (),
@@ -246,12 +236,12 @@ impl<A: Action, S: Slot> History<A, S> {
             .filter(|at| at.branch == new && at.current <= current)
         {
             self.saved = None;
-            self.record.timeline.saved = Some(saved);
-            self.record.timeline.slot.emit(Signal::Saved(true));
-        } else if let Some(saved) = self.record.timeline.saved {
+            self.record.saved = Some(saved);
+            self.record.socket.emit(Signal::Saved(true));
+        } else if let Some(saved) = self.record.saved {
             self.saved = Some(At::new(old, saved));
-            self.record.timeline.saved = None;
-            self.record.timeline.slot.emit(Signal::Saved(false));
+            self.record.saved = None;
+            self.record.socket.emit(Signal::Saved(false));
         }
     }
 
@@ -306,11 +296,11 @@ impl<A: Action<Output = ()>, S: Slot> History<A, S> {
             // Apply the actions in the branch and move older actions into their own branch.
             for entry in branch.entries {
                 let current = self.current();
-                let saved = self.record.timeline.saved.filter(|&saved| saved > current);
-                let (_, _, entries) = self.record.timeline.apply(target, entry.action);
-                if !entries.deque.is_empty() {
+                let saved = self.record.saved.filter(|&saved| saved > current);
+                let (_, _, entries) = self.record.__apply(target, entry.action);
+                if !entries.is_empty() {
                     self.branches
-                        .insert(self.root, Branch::new(new, current, entries.deque));
+                        .insert(self.root, Branch::new(new, current, entries));
                     self.set_root(new, current, saved);
                 }
             }
@@ -382,7 +372,7 @@ impl<A> Branch<A> {
 ///
 /// # Examples
 /// ```
-/// # include!("./doctest_setup.rs");
+/// # include!("doctest.rs");
 /// # fn main() {
 /// # use undo::History;
 /// # let mut target = String::new();
@@ -453,7 +443,7 @@ enum QueueAction<A> {
 /// # Examples
 /// ```
 /// # use undo::{Record};
-/// # include!("./doctest_setup.rs");
+/// # include!("doctest.rs");
 /// # fn main() {
 /// let mut string = String::new();
 /// let mut record = Record::new();
@@ -572,7 +562,7 @@ impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
                     let root = self.history.branch();
                     self.history.jump_to(branch);
                     if root == branch {
-                        self.history.record.timeline.entries.deque.pop_back();
+                        self.history.record.entries.pop_back();
                     } else {
                         self.history.branches.remove(&root).unwrap();
                     }
@@ -669,7 +659,6 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
             At::new(self.history.branch(), self.history.current()),
             self.history
                 .record
-                .timeline
                 .saved
                 .map(|saved| At::new(self.history.branch(), saved))
                 .or(self.history.saved),
@@ -731,16 +720,7 @@ impl<'a, A, S> From<&'a History<A, S>> for Display<'a, A, S> {
 impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let branch = self.history.branch();
-        for (i, entry) in self
-            .history
-            .record
-            .timeline
-            .entries
-            .deque
-            .iter()
-            .enumerate()
-            .rev()
-        {
+        for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
             let at = At::new(branch, i + 1);
             self.fmt_graph(f, at, Some(entry), 0)?;
         }
@@ -751,7 +731,6 @@ impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use alloc::string::String;
 
     struct Push(char);
 

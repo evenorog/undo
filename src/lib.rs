@@ -1,13 +1,13 @@
 //! **An undo-redo library.**
 //!
-//! It is an implementation of the action pattern, where all modifications are done
-//! by creating objects of actions that applies the modifications. All actions knows
+//! It is an implementation of the command pattern, where all modifications are done
+//! by creating objects of commands that applies the modifications. All commands knows
 //! how to undo the changes it applies, and by using the provided data structures
 //! it is easy to apply, undo, and redo changes made to a target.
 //!
 //! # Features
 //!
-//! * [`Action`] provides the base functionality for all actions. Multiple [`Action`]s can be merged into a single action
+//! * [`Action`] provides the base functionality for all commands. Multiple [`Action`]s can be merged into a single action
 //!   by implementing the [`merge`](Action::merge) method on the action. This allows smaller actions to be used to build
 //!   more complex operations, or smaller incremental changes to be merged into larger changes that can be undone and
 //!   redone in a single step.
@@ -37,7 +37,6 @@
 #![doc = include_str!("../examples/record.rs")]
 //! ```
 
-#![no_std]
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
@@ -46,36 +45,27 @@
 #[doc = include_str!("../README.md")]
 pub struct ReadmeDocTest;
 
-#[cfg(feature = "alloc")]
-extern crate alloc;
-
-#[cfg(feature = "alloc")]
 mod any;
+#[cfg(doctest)]
+mod doctest;
 mod entry;
-#[cfg(feature = "alloc")]
 mod format;
-#[cfg(feature = "alloc")]
 pub mod history;
-#[cfg(feature = "alloc")]
 pub mod record;
-mod slot;
-mod timeline;
-
-#[cfg(feature = "alloc")]
-use crate::format::Format;
+mod socket;
 
 use entry::Entry;
+use format::Format;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use timeline::Timeline;
 
-#[cfg(feature = "alloc")]
-pub use self::{
-    any::AnyAction,
-    history::History,
-    record::Record,
-    slot::{NoOp, Signal, Slot},
-};
+pub use any::AnyAction;
+pub use history::History;
+pub use record::Record;
+pub use socket::{NoOp, Signal, Slot};
+
+#[cfg(doctest)]
+pub use doctest::Push;
 
 /// Base functionality for all actions.
 pub trait Action {

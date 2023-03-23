@@ -1,18 +1,15 @@
 //! A linear record of actions.
 
-use crate::entry::LimitDeque;
-use crate::slot::{NoOp, Slot, Socket};
-use crate::{Action, At, Entry, Format, History, Timeline};
-use alloc::collections::VecDeque;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use core::fmt::{self, Write};
-use core::marker::PhantomData;
-use core::num::NonZeroUsize;
+use crate::socket::{NoOp, Slot, Socket};
+use crate::{Action, At, Entry, Format, History, Merged, Signal};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use std::fmt::{self, Write};
+use std::marker::PhantomData;
+use std::num::NonZeroUsize;
 #[cfg(feature = "time")]
-use {core::convert::identity, time::OffsetDateTime};
+use {std::convert::identity, time::OffsetDateTime};
 
 /// A linear record of actions.
 ///
@@ -25,7 +22,7 @@ use {core::convert::identity, time::OffsetDateTime};
 /// # Examples
 /// ```
 /// # use undo::Record;
-/// # include!("./doctest_setup.rs");
+/// # include!("doctest.rs");
 /// # fn main() {
 /// let mut target = String::new();
 /// let mut record = Record::new();
@@ -49,7 +46,11 @@ use {core::convert::identity, time::OffsetDateTime};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Record<A, S = NoOp> {
-    pub(crate) timeline: Timeline<LimitDeque<A>, S>,
+    pub(crate) entries: VecDeque<Entry<A>>,
+    pub(crate) limit: NonZeroUsize,
+    pub(crate) current: usize,
+    pub(crate) saved: Option<usize>,
+    pub(crate) socket: Socket<S>,
 }
 
 impl<A> Record<A> {
@@ -70,62 +71,62 @@ impl<A, S> Record<A, S> {
     /// # Panics
     /// Panics if the new capacity overflows usize.
     pub fn reserve(&mut self, additional: usize) {
-        self.timeline.entries.deque.reserve(additional);
+        self.entries.reserve(additional);
     }
 
     /// Returns the capacity of the record.
     pub fn capacity(&self) -> usize {
-        self.timeline.entries.deque.capacity()
+        self.entries.capacity()
     }
 
     /// Shrinks the capacity of the record as much as possible.
     pub fn shrink_to_fit(&mut self) {
-        self.timeline.entries.deque.shrink_to_fit();
+        self.entries.shrink_to_fit();
     }
 
     /// Returns the number of actions in the record.
     pub fn len(&self) -> usize {
-        self.timeline.entries.deque.len()
+        self.entries.len()
     }
 
     /// Returns `true` if the record is empty.
     pub fn is_empty(&self) -> bool {
-        self.timeline.entries.deque.is_empty()
+        self.entries.is_empty()
     }
 
     /// Returns the limit of the record.
     pub fn limit(&self) -> usize {
-        self.timeline.entries.limit.get()
+        self.limit.get()
     }
 
     /// Sets how the signal should be handled when the state changes.
     pub fn connect(&mut self, slot: S) -> Option<S> {
-        self.timeline.slot.connect(Some(slot))
+        self.socket.connect(Some(slot))
     }
 
     /// Removes and returns the slot if it exists.
     pub fn disconnect(&mut self) -> Option<S> {
-        self.timeline.slot.disconnect()
+        self.socket.disconnect()
     }
 
     /// Returns `true` if the record can undo.
     pub fn can_undo(&self) -> bool {
-        self.timeline.can_undo()
+        self.current > 0
     }
 
     /// Returns `true` if the record can redo.
     pub fn can_redo(&self) -> bool {
-        self.timeline.can_redo()
+        self.current < self.entries.len()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
     pub fn is_saved(&self) -> bool {
-        self.timeline.is_saved()
+        self.saved == Some(self.current)
     }
 
     /// Returns the position of the current action.
     pub fn current(&self) -> usize {
-        self.timeline.current
+        self.current
     }
 
     /// Returns a structure for configurable formatting of the record.
@@ -135,59 +136,172 @@ impl<A, S> Record<A, S> {
 
     /// Returns an iterator over the actions.
     pub fn actions(&self) -> impl Iterator<Item = &A> {
-        self.timeline.entries.deque.iter().map(|e| &e.action)
+        self.entries.iter().map(|e| &e.action)
     }
 }
 
 impl<A: Action, S: Slot> Record<A, S> {
     /// Pushes the action on top of the record and executes its [`Action::apply`] method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
-        let (output, _, _) = self.timeline.apply(target, action);
+        let (output, _, _) = self.__apply(target, action);
         output
+    }
+
+    pub(crate) fn __apply(
+        &mut self,
+        target: &mut A::Target,
+        mut action: A,
+    ) -> (A::Output, bool, VecDeque<Entry<A>>) {
+        let output = action.apply(target);
+        // We store the state of the stack before adding the entry.
+        let current = self.current;
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        let was_saved = self.is_saved();
+        // Pop off all elements after len from entries.
+        let tail = self.entries.split_off(current);
+        // Check if the saved state was popped off.
+        self.saved = self.saved.filter(|&saved| saved <= current);
+        // Try to merge actions unless the target is in a saved state.
+        let merged = match self.entries.back_mut() {
+            Some(last) if !was_saved => last.action.merge(action),
+            _ => Merged::No(action),
+        };
+
+        let merged_or_annulled = match merged {
+            Merged::Yes => true,
+            Merged::Annul => {
+                self.entries.pop_back();
+                self.current -= 1;
+                true
+            }
+            // If actions are not merged or annulled push it onto the storage.
+            Merged::No(action) => {
+                // If limit is reached, pop off the first action.
+                if self.limit() == self.current {
+                    self.entries.pop_front();
+                    self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
+                } else {
+                    self.current += 1;
+                }
+                self.entries.push_back(Entry::from(action));
+                false
+            }
+        };
+
+        self.socket.emit_if(could_redo, Signal::Redo(false));
+        self.socket.emit_if(!could_undo, Signal::Undo(true));
+        self.socket.emit_if(was_saved, Signal::Saved(false));
+        (output, merged_or_annulled, tail)
     }
 
     /// Calls the [`Action::undo`] method for the active action and sets
     /// the previous one as the new active one.
     pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
-        self.timeline.undo(target)
+        self.can_undo().then(|| {
+            let was_saved = self.is_saved();
+            let old = self.current;
+            let output = self.entries[self.current - 1].action.undo(target);
+            self.current -= 1;
+            let is_saved = self.is_saved();
+            self.socket
+                .emit_if(old == self.entries.len(), Signal::Redo(true));
+            self.socket.emit_if(old == 1, Signal::Undo(false));
+            self.socket
+                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+            output
+        })
     }
 
     /// Calls the [`Action::redo`] method for the active action and sets
     /// the next one as the new active one.
     pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
-        self.timeline.redo(target)
+        self.can_redo().then(|| {
+            let was_saved = self.is_saved();
+            let old = self.current;
+            let output = self.entries[self.current].action.redo(target);
+            self.current += 1;
+            let is_saved = self.is_saved();
+            self.socket
+                .emit_if(old == self.entries.len() - 1, Signal::Redo(false));
+            self.socket.emit_if(old == 0, Signal::Undo(true));
+            self.socket
+                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+            output
+        })
     }
 
     /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
-        self.timeline.set_saved(saved)
+        let was_saved = self.is_saved();
+        if saved {
+            self.saved = Some(self.current);
+            self.socket.emit_if(!was_saved, Signal::Saved(true));
+        } else {
+            self.saved = None;
+            self.socket.emit_if(was_saved, Signal::Saved(false));
+        }
     }
 
     /// Removes all actions from the record without undoing them.
     pub fn clear(&mut self) {
-        self.timeline.clear()
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        self.entries.clear();
+        self.saved = self.is_saved().then_some(0);
+        self.current = 0;
+        self.socket.emit_if(could_undo, Signal::Undo(false));
+        self.socket.emit_if(could_redo, Signal::Redo(false));
     }
 }
 
 impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
     /// Revert the changes done to the target since the saved state.
     pub fn revert(&mut self, target: &mut A::Target) -> Option<()> {
-        self.timeline.revert(target)
+        self.saved.and_then(|saved| self.go_to(target, saved))
     }
 
     /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action at `current` is reached.
     ///
     pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<()> {
-        self.timeline.go_to(target, current)
+        if current > self.entries.len() {
+            return None;
+        }
+
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        let was_saved = self.is_saved();
+        // Temporarily remove slot so they are not called each iteration.
+        let slot = self.socket.disconnect();
+        // Decide if we need to undo or redo to reach current.
+        let undo_or_redo = if current > self.current {
+            Record::redo
+        } else {
+            Record::undo
+        };
+
+        while self.current != current {
+            undo_or_redo(self, target);
+        }
+
+        let can_undo = self.can_undo();
+        let can_redo = self.can_redo();
+        let is_saved = self.is_saved();
+        self.socket.connect(slot);
+        self.socket
+            .emit_if(could_undo != can_undo, Signal::Undo(can_undo));
+        self.socket
+            .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
+        self.socket
+            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+        Some(())
     }
 
     /// Go back or forward in the record to the action that was made closest to the datetime provided.
     #[cfg(feature = "time")]
     pub fn time_travel(&mut self, target: &mut A::Target, to: &OffsetDateTime) -> Option<()> {
         let current = self
-            .timeline
             .entries
-            .deque
             .binary_search_by(|e| e.timestamp.cmp(to))
             .unwrap_or_else(identity);
         self.go_to(target, current)
@@ -208,24 +322,17 @@ impl<A: ToString, S> Record<A, S> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`Record::undo`].
     pub fn undo_text(&self) -> Option<String> {
-        self.timeline
-            .current
-            .checked_sub(1)
-            .and_then(|i| self.text(i))
+        self.current.checked_sub(1).and_then(|i| self.text(i))
     }
 
     /// Returns the string of the action which will be redone
     /// in the next call to [`Record::redo`].
     pub fn redo_text(&self) -> Option<String> {
-        self.text(self.timeline.current)
+        self.text(self.current)
     }
 
     fn text(&self, i: usize) -> Option<String> {
-        self.timeline
-            .entries
-            .deque
-            .get(i)
-            .map(|e| e.action.to_string())
+        self.entries.get(i).map(|e| e.action.to_string())
     }
 }
 
@@ -245,7 +352,7 @@ impl<A, F> From<History<A, F>> for Record<A, F> {
 ///
 /// # Examples
 /// ```
-/// # include!("./doctest_setup.rs");
+/// # include!("doctest.rs");
 /// # fn main() {
 /// # use undo::Record;
 /// # let mut target = String::new();
@@ -303,12 +410,11 @@ impl<A, S> Builder<A, S> {
     /// Builds the record.
     pub fn build(self) -> Record<A, S> {
         Record {
-            timeline: Timeline {
-                entries: LimitDeque::new(self.capacity, self.limit),
-                current: 0,
-                saved: self.saved.then_some(0),
-                slot: self.slot,
-            },
+            entries: VecDeque::with_capacity(self.capacity),
+            limit: self.limit,
+            current: 0,
+            saved: self.saved.then_some(0),
+            socket: self.slot,
         }
     }
 }
@@ -339,7 +445,7 @@ enum QueueAction<A> {
 /// # Examples
 /// ```
 /// # use undo::{Record};
-/// # include!("./doctest_setup.rs");
+/// # include!("doctest.rs");
 /// # fn main() {
 /// let mut string = String::new();
 /// let mut record = Record::new();
@@ -428,10 +534,9 @@ pub struct Checkpoint<'a, A, S> {
 impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
     /// Calls the `apply` method.
     pub fn apply(&mut self, target: &mut A::Target, action: A) {
-        let saved = self.record.timeline.saved;
-        let (_, _, tail) = self.record.timeline.apply(target, action);
-        self.actions
-            .push(CheckpointAction::Apply(saved, tail.deque));
+        let saved = self.record.saved;
+        let (_, _, tail) = self.record.__apply(target, action);
+        self.actions.push(CheckpointAction::Apply(saved, tail));
     }
 
     /// Calls the `undo` method.
@@ -457,9 +562,9 @@ impl<A: Action<Output = ()>, S: Slot> Checkpoint<'_, A, S> {
             match action {
                 CheckpointAction::Apply(saved, mut entries) => {
                     self.record.undo(target)?;
-                    self.record.timeline.entries.deque.pop_back();
-                    self.record.timeline.entries.deque.append(&mut entries);
-                    self.record.timeline.saved = saved;
+                    self.record.entries.pop_back();
+                    self.record.entries.append(&mut entries);
+                    self.record.saved = saved;
                 }
                 CheckpointAction::Undo => self.record.redo(target)?,
                 CheckpointAction::Redo => self.record.undo(target)?,
@@ -544,7 +649,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
             f,
             at,
             At::new(0, self.record.current()),
-            self.record.timeline.saved.map(|saved| At::new(0, saved)),
+            self.record.saved.map(|saved| At::new(0, saved)),
         )?;
         if let Some(entry) = entry {
             if self.format.detailed {
@@ -571,7 +676,7 @@ impl<'a, A, S> From<&'a Record<A, S>> for Display<'a, A, S> {
 
 impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, entry) in self.record.timeline.entries.deque.iter().enumerate().rev() {
+        for (i, entry) in self.record.entries.iter().enumerate().rev() {
             let at = At::new(0, i + 1);
             self.fmt_list(f, at, Some(entry))?;
         }
@@ -582,8 +687,6 @@ impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use alloc::string::String;
-    use alloc::vec::Vec;
 
     enum Edit {
         Push(Push),
