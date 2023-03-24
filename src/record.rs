@@ -15,9 +15,9 @@ use time::OffsetDateTime;
 ///
 /// The record can roll the targets state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
-/// about changes to the stack or the target through [`Signal`](crate::Signal).
+/// about changes to the stack or the target through [`Signal`](Signal).
 /// The user can give the record a function that is called each time the state
-/// changes by using the [`record::Builder`](self::Builder).
+/// changes by using the [`record::Builder`](Builder).
 ///
 /// # Examples
 /// ```

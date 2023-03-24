@@ -13,7 +13,7 @@ use std::{
 
 /// A history tree of actions.
 ///
-/// Unlike [`Record`](crate::record::Record) which maintains a linear undo history,
+/// Unlike [`Record`](Record) which maintains a linear undo history,
 /// [`History`] maintains an undo tree containing every edit made to the target.
 ///
 /// # Examples
