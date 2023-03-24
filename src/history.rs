@@ -43,9 +43,9 @@ use std::{
 pub struct History<A, S = Nop> {
     root: usize,
     next: usize,
-    pub(crate) saved: Option<At>,
+    saved: Option<At>,
     pub(crate) record: Record<A, S>,
-    pub(crate) branches: BTreeMap<usize, Branch<A>>,
+    branches: BTreeMap<usize, Branch<A>>,
 }
 
 impl<A> History<A> {
@@ -140,7 +140,7 @@ impl<A, S> History<A, S> {
     }
 
     fn at(&self) -> At {
-        At::new(self.branch(), self.current())
+        At::new(self.root, self.current())
     }
 }
 
@@ -278,6 +278,7 @@ impl<A: Action, S: Slot> History<A, S> {
             i = dest.parent.branch;
             path.push((to, dest));
         }
+
         Some(path.into_iter().rev())
     }
 }
@@ -663,6 +664,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
                 .map(|saved| At::new(self.history.branch(), saved))
                 .or(self.history.saved),
         )?;
+
         if let Some(entry) = entry {
             if self.format.detailed {
                 writeln!(f)?;
@@ -693,17 +695,21 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
                 let at = At::new(i, j + branch.parent.current + 1);
                 self.fmt_graph(f, at, Some(entry), level + 1)?;
             }
+
             for j in 0..level {
                 self.format.edge(f, j)?;
                 f.write_char(' ')?;
             }
+
             self.format.split(f, level)?;
             writeln!(f)?;
         }
+
         for i in 0..level {
             self.format.edge(f, i)?;
             f.write_char(' ')?;
         }
+
         self.fmt_list(f, at, entry, level)
     }
 }
