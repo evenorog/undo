@@ -45,7 +45,7 @@ use format::Format;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub use any::AnyAction;
+pub use any::Any;
 pub use history::History;
 pub use record::Record;
 pub use socket::{Nop, Signal, Slot};
