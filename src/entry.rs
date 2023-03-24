@@ -1,3 +1,4 @@
+use crate::Action;
 use core::fmt::{self, Debug, Display, Formatter};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -10,7 +11,17 @@ use time::OffsetDateTime;
 pub struct Entry<A> {
     pub action: A,
     #[cfg(feature = "time")]
-    pub timestamp: OffsetDateTime,
+    pub created_at: OffsetDateTime,
+}
+
+impl<A: Action> Entry<A> {
+    pub fn undo(&mut self, target: &mut A::Target) -> A::Output {
+        self.action.undo(target)
+    }
+
+    pub fn redo(&mut self, target: &mut A::Target) -> A::Output {
+        self.action.redo(target)
+    }
 }
 
 impl<A> From<A> for Entry<A> {
@@ -18,7 +29,7 @@ impl<A> From<A> for Entry<A> {
         Entry {
             action,
             #[cfg(feature = "time")]
-            timestamp: OffsetDateTime::now_utc(),
+            created_at: OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc()),
         }
     }
 }
