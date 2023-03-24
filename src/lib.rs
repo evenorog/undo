@@ -1,9 +1,9 @@
 //! **An undo-redo library.**
 //!
-//! It is an implementation of the command pattern, where all modifications are done
-//! by creating objects that applies the modifications. All objects knows
-//! how to undo the changes it applies, and by using the provided data structures
-//! it is easy to apply, undo, and redo changes made to a target.
+//! It is an implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
+//! where all modifications are done by creating objects that applies the modifications.
+//! All objects knows how to undo the changes it applies, and by using the provided data
+//! structures it is easy to apply, undo, and redo changes made to a target.
 //!
 //! # Features
 //!
@@ -16,7 +16,7 @@
 //! * Queue and checkpoint functionality is supported for both [`Record`] and [`History`].
 //! * The target can be marked as saved to disk and the user will be notified when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
-//! * Configurable display formatting using the display structure.
+//! * Configurable display formatting using the display structures.
 //!
 //! # Cargo Feature Flags
 //!

@@ -33,7 +33,8 @@ fn main() {
     history.apply(&mut target, Push('c'));
     assert_eq!(target, "abc");
 
-    let (branch_one, current_one) = (history.branch(), history.current());
+    let abc_branch = history.branch();
+    let abc_current = history.current();
 
     history.undo(&mut target);
     assert_eq!(target, "ab");
@@ -43,12 +44,13 @@ fn main() {
     history.apply(&mut target, Push('f'));
     assert_eq!(target, "abdef");
 
-    let (branch_two, current_two) = (history.branch(), history.current());
+    let abdef_branch = history.branch();
+    let abdef_current = history.current();
 
-    history.go_to(&mut target, branch_one, current_one);
+    history.go_to(&mut target, abc_branch, abc_current);
     assert_eq!(target, "abc");
 
-    history.go_to(&mut target, branch_two, current_two);
+    history.go_to(&mut target, abdef_branch, abdef_current);
     assert_eq!(target, "abdef");
 
     println!("{}", history.display());
