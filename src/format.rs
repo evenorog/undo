@@ -4,8 +4,7 @@ use crate::At;
 #[cfg(feature = "colored")]
 use colored::{Color, Colorize};
 use std::fmt::{self, Write};
-#[cfg(feature = "time")]
-use time::{format_description::well_known::Rfc2822, OffsetDateTime};
+use std::time::SystemTime;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Format {
@@ -161,14 +160,19 @@ impl Format {
         }
     }
 
-    #[cfg(feature = "time")]
-    pub fn timestamp(self, f: &mut fmt::Formatter, timestamp: &OffsetDateTime) -> fmt::Result {
-        let rfc2822 = timestamp.format(&Rfc2822).unwrap();
+    pub fn elapsed(
+        self,
+        f: &mut fmt::Formatter,
+        now: SystemTime,
+        earlier: SystemTime,
+    ) -> fmt::Result {
+        let elapsed = now.duration_since(earlier).unwrap_or_else(|e| e.duration());
+        let string = format!("{elapsed:.1?}");
         #[cfg(feature = "colored")]
         if self.colored {
-            return write!(f, " {}", rfc2822.yellow());
+            return write!(f, " {}", string.yellow());
         }
-        write!(f, " {rfc2822}")
+        write!(f, " {string}")
     }
 }
 
