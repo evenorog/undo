@@ -634,7 +634,13 @@ impl<A, S> Display<'_, A, S> {
 }
 
 impl<A: fmt::Display, S> Display<'_, A, S> {
-    fn fmt_list(&self, f: &mut fmt::Formatter, at: At, entry: Option<&Entry<A>>) -> fmt::Result {
+    fn fmt_list(
+        &self,
+        f: &mut fmt::Formatter,
+        current: usize,
+        entry: Option<&Entry<A>>,
+    ) -> fmt::Result {
+        let at = At::root(current);
         self.format.position(f, at, false)?;
 
         #[cfg(feature = "time")]
@@ -647,9 +653,10 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         self.format.labels(
             f,
             at,
-            At::new(0, self.record.current()),
-            self.record.saved.map(|saved| At::new(0, saved)),
+            At::root(self.record.current()),
+            self.record.saved.map(At::root),
         )?;
+
         if let Some(entry) = entry {
             if self.format.detailed {
                 writeln!(f)?;
@@ -676,10 +683,9 @@ impl<'a, A, S> From<&'a Record<A, S>> for Display<'a, A, S> {
 impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, entry) in self.record.entries.iter().enumerate().rev() {
-            let at = At::new(0, i + 1);
-            self.fmt_list(f, at, Some(entry))?;
+            self.fmt_list(f, i + 1, Some(entry))?;
         }
-        self.fmt_list(f, At::ROOT, None)
+        self.fmt_list(f, 0, None)
     }
 }
 
