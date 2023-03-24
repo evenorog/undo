@@ -6,10 +6,10 @@
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 
-It is an implementation of the command pattern, where all modifications are done
-by creating objects that applies the modifications. All objects knows
-how to undo the changes it applies, and by using the provided data structures
-it is easy to apply, undo, and redo changes made to a target.
+It is an implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
+where all modifications are done by creating objects that applies the modifications.
+All objects knows how to undo the changes it applies, and by using the provided data
+structures it is easy to apply, undo, and redo changes made to a target.
 
 ## Examples
 
@@ -58,8 +58,8 @@ fn main() {
 
 Licensed under either of
 
--   Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
--   MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+ * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
 
