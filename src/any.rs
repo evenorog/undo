@@ -6,76 +6,78 @@ use std::mem;
 ///
 /// This allows you to use multiple different actions in a record or history
 /// as long as they all share the same target and output type.
-pub struct AnyAction<T, O> {
+pub struct Any<T, O> {
     action: Box<dyn Action<Target = T, Output = O>>,
+    message: String,
 }
 
-impl<T, O> AnyAction<T, O> {
-    /// Creates an `AnyAction` from the provided action.
-    pub fn new<A>(action: A) -> AnyAction<T, O>
+impl<T, O> Any<T, O> {
+    /// Creates an `Any` from the provided action.
+    pub fn new<A>(action: A) -> Any<T, O>
     where
         A: Action<Target = T, Output = O>,
         A: 'static,
     {
-        AnyAction {
+        Any {
             action: Box::new(action),
+            message: String::new(),
         }
     }
 }
 
-impl<T> AnyAction<T, ()>
+impl<T> Any<T, ()>
 where
     Self: 'static,
 {
-    /// Creates a new `AnyAction` from a function.
-    pub fn from_fn<F>(f: F) -> AnyAction<T, ()>
+    /// Creates a new `Any` from a function.
+    pub fn from_fn<F>(f: F) -> Any<T, ()>
     where
         F: FnMut(&mut T),
         F: 'static,
         T: Clone,
     {
-        AnyAction::new(FromFn { f, target: None })
+        Any::new(FromFn { f, target: None })
     }
 
-    /// Creates a new `AnyAction` from `self` and `action`.
+    /// Creates a new `Any` from `self` and `action`.
     ///
     /// `self` will be called first in `apply`.
-    pub fn join<A>(self, action: A) -> AnyAction<T, ()>
+    pub fn join<A>(self, action: A) -> Any<T, ()>
     where
         A: Action<Target = T, Output = ()>,
         A: 'static,
     {
-        AnyAction::new(Join { a: self, b: action })
+        Any::new(Join { a: self, b: action })
     }
 }
 
-impl<T, E> AnyAction<T, Result<(), E>>
+impl<T, E> Any<T, Result<(), E>>
 where
     Self: 'static,
 {
-    /// Creates a new `AnyAction` from a function.
-    pub fn from_fn<F>(f: F) -> AnyAction<T, Result<(), E>>
+    /// Creates a new `Any` from a function.
+    pub fn from_fn<F>(f: F) -> Any<T, Result<(), E>>
     where
         F: FnMut(&mut T) -> Result<(), E>,
         F: 'static,
         T: Clone,
     {
-        AnyAction::new(TryFromFn { f, target: None })
+        Any::new(TryFromFn { f, target: None })
     }
 
-    /// Creates a new `AnyAction` from `self` and `action`.
+    /// Creates a new `Any` from `self` and `action`.
     ///
     /// `self` will be called first in `apply`.
-    pub fn join<A>(self, action: A) -> AnyAction<T, Result<(), E>>
+    pub fn join<A>(self, action: A) -> Any<T, Result<(), E>>
     where
         A: Action<Target = T, Output = Result<(), E>>,
         A: 'static,
     {
-        AnyAction::new(TryJoin { a: self, b: action })
+        Any::new(TryJoin { a: self, b: action })
     }
 }
 
-impl<T, O> Action for AnyAction<T, O> {
+impl<T, O> Action for Any<T, O> {
     type Target = T;
     type Output = O;
 
@@ -92,9 +94,11 @@ impl<T, O> Action for AnyAction<T, O> {
     }
 }
 
-impl<T, O> Debug for AnyAction<T, O> {
+impl<T, O> Debug for Any<T, O> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("AnyAction").finish_non_exhaustive()
+        f.debug_struct("Any")
+            .field("message", &self.message)
+            .finish_non_exhaustive()
     }
 }
 
@@ -218,15 +222,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{AnyAction, Record};
+    use crate::{Any, Record};
 
     #[test]
     fn join() {
         let mut target = String::new();
         let mut record = Record::new();
-        let a = AnyAction::<String, ()>::from_fn(|s| s.push('a'));
-        let b = AnyAction::<String, ()>::from_fn(|s| s.push('b'));
-        let c = AnyAction::<String, ()>::from_fn(|s| s.push('c'));
+        let a = Any::<String, ()>::from_fn(|s| s.push('a'));
+        let b = Any::<String, ()>::from_fn(|s| s.push('b'));
+        let c = Any::<String, ()>::from_fn(|s| s.push('c'));
         let joined = a.join(b).join(c);
         record.apply(&mut target, joined);
         assert_eq!(target, "abc");
@@ -240,18 +244,9 @@ mod tests {
     fn from_fn() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(
-            &mut target,
-            AnyAction::<String, ()>::from_fn(|s| s.push('a')),
-        );
-        record.apply(
-            &mut target,
-            AnyAction::<String, ()>::from_fn(|s| s.push('b')),
-        );
-        record.apply(
-            &mut target,
-            AnyAction::<String, ()>::from_fn(|s| s.push('c')),
-        );
+        record.apply(&mut target, Any::<String, ()>::from_fn(|s| s.push('a')));
+        record.apply(&mut target, Any::<String, ()>::from_fn(|s| s.push('b')));
+        record.apply(&mut target, Any::<String, ()>::from_fn(|s| s.push('c')));
         assert_eq!(target, "abc");
         record.undo(&mut target).unwrap();
         record.undo(&mut target).unwrap();
