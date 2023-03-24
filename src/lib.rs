@@ -11,14 +11,10 @@
 //!   by implementing the [`merge`](Action::merge) method on the action. This allows smaller actions to be used to build
 //!   more complex operations, or smaller incremental changes to be merged into larger changes that can be undone and
 //!   redone in a single step.
-//!
-//! * [`Record`] provides basic undo-redo functionality.
-//! * [`History`] provides non-linear undo-redo functionality that allows you to jump between different branches.
-//!
-//! * Queues that wraps a record or history and extends them with queue functionality.
-//! * Checkpoints that wraps a record or history and extends them with checkpoint functionality.
-//! * The target can be marked as being saved to disk and the data-structures can track the saved state and notify
-//!   when it changes.
+//! * [`Record`] provides basic stack based undo-redo functionality.
+//! * [`History`] provides full tree based undo-redo functionality.
+//! * Queue and checkpoint functionality is supported for both [`Record`] and [`History`].
+//! * The target can be marked as saved to disk and the user will be notified when it changes.
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //! * Configurable display formatting using the display structure.
 //!
@@ -53,14 +49,13 @@ use serde::{Deserialize, Serialize};
 pub use any::AnyAction;
 pub use history::History;
 pub use record::Record;
-pub use socket::{NoOp, Signal, Slot};
+pub use socket::{Nop, Signal, Slot};
 
 /// Base functionality for all actions.
 pub trait Action {
-    /// The type on which the action will be applied.
+    /// The target type.
     type Target;
-    /// The return type of [`apply`](Self::apply), [`undo`](Self::undo) and [`redo`](Self::redo)
-    /// You might want to use rust [`Result`] to be able to handle cases where the action is not applicable
+    /// The output type.
     type Output;
 
     /// Applies the action on the target.
@@ -76,15 +71,7 @@ pub trait Action {
         self.apply(target)
     }
 
-    /// Used for manual merging of actions.
-    ///
-    /// You should return:
-    /// * `Yes` if you have merged the two actions.
-    /// The `other` action will not be added to the stack.
-    /// * `No` if you have not merged the two actions.
-    /// The `other` action will be added to the stack.
-    /// * `Annul` if the two actions cancels each other out.
-    /// This will removed both `self` and `other` from the stack.
+    /// Used for manual merging of actions. See [`Merged`] for more information.
     fn merge(&mut self, other: Self) -> Merged<Self>
     where
         Self: Sized,

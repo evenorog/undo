@@ -5,7 +5,7 @@ use core::mem;
 use serde::{Deserialize, Serialize};
 
 /// Slot wrapper that adds some additional functionality.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
 pub(crate) struct Socket<S>(Option<S>);
 
@@ -59,8 +59,8 @@ impl<F: FnMut(Signal)> Slot for F {
 ///
 /// For example, if the history tree can no longer redo any actions,
 /// it sends a `Redo(false)` signal to tell the user.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Signal {
     /// Says if the structures can undo.
     Undo(bool),
@@ -73,8 +73,8 @@ pub enum Signal {
 /// Default slot that does nothing.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub struct NoOp;
+pub struct Nop;
 
-impl Slot for NoOp {
+impl Slot for Nop {
     fn emit(&mut self, _: Signal) {}
 }

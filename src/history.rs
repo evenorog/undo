@@ -1,7 +1,7 @@
-//! A multi branch non-linear history of actions.
+//! A history tree of actions.
 
 use crate::record::Builder as RecordBuilder;
-use crate::socket::{NoOp, Signal, Slot};
+use crate::socket::{Nop, Signal, Slot};
 use crate::{Action, At, Entry, Format, Record};
 use core::fmt::{self, Write};
 #[cfg(feature = "serde")]
@@ -40,7 +40,7 @@ use std::{
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct History<A, S = NoOp> {
+pub struct History<A, S = Nop> {
     root: usize,
     next: usize,
     pub(crate) saved: Option<At>,
@@ -385,7 +385,7 @@ impl<A> Branch<A> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<A, S = NoOp>(RecordBuilder<A, S>);
+pub struct Builder<A, S = Nop>(RecordBuilder<A, S>);
 
 impl<A, S> Builder<A, S> {
     /// Returns a builder for a history.
@@ -649,7 +649,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         #[cfg(feature = "time")]
         if let Some(entry) = entry {
             if self.format.detailed {
-                self.format.timestamp(f, &entry.timestamp)?;
+                self.format.timestamp(f, &entry.created_at)?;
             }
         }
 

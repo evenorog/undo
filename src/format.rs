@@ -1,14 +1,11 @@
 #![cfg_attr(not(feature = "colored"), allow(unused_variables))]
 
 use crate::At;
-use core::fmt::{self, Write};
+#[cfg(feature = "colored")]
+use colored::{Color, Colorize};
+use std::fmt::{self, Write};
 #[cfg(feature = "time")]
 use time::{format_description::well_known::Rfc2822, OffsetDateTime};
-#[cfg(feature = "colored")]
-use {
-    alloc::format,
-    colored::{Color, Colorize},
-};
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Format {

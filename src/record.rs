@@ -1,6 +1,6 @@
 //! A linear record of actions.
 
-use crate::socket::{NoOp, Slot, Socket};
+use crate::socket::{Nop, Slot, Socket};
 use crate::{Action, At, Entry, Format, History, Merged, Signal};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use std::fmt::{self, Write};
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 #[cfg(feature = "time")]
-use {std::convert::identity, time::OffsetDateTime};
+use time::OffsetDateTime;
 
 /// A linear record of actions.
 ///
@@ -45,7 +45,7 @@ use {std::convert::identity, time::OffsetDateTime};
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct Record<A, S = NoOp> {
+pub struct Record<A, S = Nop> {
     pub(crate) entries: VecDeque<Entry<A>>,
     pub(crate) limit: NonZeroUsize,
     pub(crate) current: usize,
@@ -116,7 +116,7 @@ impl<A, S> Record<A, S> {
 
     /// Returns `true` if the record can redo.
     pub fn can_redo(&self) -> bool {
-        self.current < self.entries.len()
+        self.current < self.len()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
@@ -201,7 +201,7 @@ impl<A: Action, S: Slot> Record<A, S> {
         self.can_undo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
-            let output = self.entries[self.current - 1].action.undo(target);
+            let output = self.entries[self.current - 1].undo(target);
             self.current -= 1;
             let is_saved = self.is_saved();
             self.socket
@@ -219,11 +219,11 @@ impl<A: Action, S: Slot> Record<A, S> {
         self.can_redo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
-            let output = self.entries[self.current].action.redo(target);
+            let output = self.entries[self.current].redo(target);
             self.current += 1;
             let is_saved = self.is_saved();
             self.socket
-                .emit_if(old == self.entries.len() - 1, Signal::Redo(false));
+                .emit_if(old == self.len() - 1, Signal::Redo(false));
             self.socket.emit_if(old == 0, Signal::Undo(true));
             self.socket
                 .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
@@ -262,9 +262,8 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
     }
 
     /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action at `current` is reached.
-    ///
     pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<()> {
-        if current > self.entries.len() {
+        if current > self.len() {
             return None;
         }
 
@@ -302,8 +301,8 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
     pub fn time_travel(&mut self, target: &mut A::Target, to: &OffsetDateTime) -> Option<()> {
         let current = self
             .entries
-            .binary_search_by(|e| e.timestamp.cmp(to))
-            .unwrap_or_else(identity);
+            .binary_search_by(|e| e.created_at.cmp(to))
+            .unwrap_or_else(std::convert::identity);
         self.go_to(target, current)
     }
 
@@ -365,7 +364,7 @@ impl<A, F> From<History<A, F>> for Record<A, F> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<A, S = NoOp> {
+pub struct Builder<A, S = Nop> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
@@ -641,7 +640,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         #[cfg(feature = "time")]
         if let Some(entry) = entry {
             if self.format.detailed {
-                self.format.timestamp(f, &entry.timestamp)?;
+                self.format.timestamp(f, &entry.created_at)?;
             }
         }
 
