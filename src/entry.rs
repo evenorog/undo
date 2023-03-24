@@ -2,16 +2,14 @@ use crate::Action;
 use core::fmt::{self, Debug, Display, Formatter};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "time")]
-use time::OffsetDateTime;
+use std::time::SystemTime;
 
 /// Wrapper around an action that contains additional metadata.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Entry<A> {
     pub action: A,
-    #[cfg(feature = "time")]
-    pub created_at: OffsetDateTime,
+    pub created_at: SystemTime,
 }
 
 impl<A: Action> Entry<A> {
@@ -28,8 +26,7 @@ impl<A> From<A> for Entry<A> {
     fn from(action: A) -> Self {
         Entry {
             action,
-            #[cfg(feature = "time")]
-            created_at: OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc()),
+            created_at: SystemTime::now(),
         }
     }
 }

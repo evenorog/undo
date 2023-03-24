@@ -23,7 +23,6 @@
 //! | Name    | Default | Description                                                     |
 //! |---------|---------|-----------------------------------------------------------------|
 //! | colored |         | Enables colored output when visualizing the display structures. |
-//! | time    |         | Enables time stamps and time travel.                            |
 //! | serde   |         | Enables serialization and deserialization.                      |
 
 #![doc(html_root_url = "https://docs.rs/undo")]

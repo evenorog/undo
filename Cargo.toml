@@ -14,13 +14,9 @@ edition = "2021"
 [dependencies]
 colored = { version = "2", optional = true }
 serde = { version = "1", optional = true, features = ["derive"] }
-time = { version = "0.3", optional = true, features = ["formatting", "local-offset"] }
-
-[features]
-serde = ["dep:serde", "time?/serde"]
 
 [badges]
 maintenance = { status = "actively-developed" }
 
 [package.metadata.docs.rs]
-features = ["colored", "serde", "time"]
+features = ["colored", "serde"]

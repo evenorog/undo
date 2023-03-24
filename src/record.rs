@@ -8,8 +8,7 @@ use std::collections::VecDeque;
 use std::fmt::{self, Write};
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
-#[cfg(feature = "time")]
-use time::OffsetDateTime;
+use std::time::SystemTime;
 
 /// A linear record of actions.
 ///
@@ -296,12 +295,11 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
         Some(())
     }
 
-    /// Go back or forward in the record to the action that was made closest to the datetime provided.
-    #[cfg(feature = "time")]
-    pub fn time_travel(&mut self, target: &mut A::Target, to: &OffsetDateTime) -> Option<()> {
+    /// Go back or forward in the record to the action that was made closest to the system time provided.
+    pub fn time_travel(&mut self, target: &mut A::Target, to: SystemTime) -> Option<()> {
         let current = self
             .entries
-            .binary_search_by(|e| e.created_at.cmp(to))
+            .binary_search_by(|e| e.created_at.cmp(&to))
             .unwrap_or_else(std::convert::identity);
         self.go_to(target, current)
     }
@@ -639,14 +637,14 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         f: &mut fmt::Formatter,
         current: usize,
         entry: Option<&Entry<A>>,
+        now: SystemTime,
     ) -> fmt::Result {
         let at = At::root(current);
         self.format.position(f, at, false)?;
 
-        #[cfg(feature = "time")]
         if let Some(entry) = entry {
             if self.format.detailed {
-                self.format.timestamp(f, &entry.created_at)?;
+                self.format.elapsed(f, now, entry.created_at)?;
             }
         }
 
@@ -682,10 +680,11 @@ impl<'a, A, S> From<&'a Record<A, S>> for Display<'a, A, S> {
 
 impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let now = SystemTime::now();
         for (i, entry) in self.record.entries.iter().enumerate().rev() {
-            self.fmt_list(f, i + 1, Some(entry))?;
+            self.fmt_list(f, i + 1, Some(entry), now)?;
         }
-        self.fmt_list(f, 0, None)
+        self.fmt_list(f, 0, None, now)
     }
 }
 
