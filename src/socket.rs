@@ -43,7 +43,7 @@ impl<S: Slot> Socket<S> {
     }
 }
 
-/// Use this to receive signals from [`History`](crate::history::History) or [`Record`](crate::record::Record).
+/// Use this to receive signals from [`History`](crate::History) or [`Record`](crate::Record).
 pub trait Slot {
     /// Receives a signal that describes the state change done to the data structures.
     fn emit(&mut self, signal: Signal);

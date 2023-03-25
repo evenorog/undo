@@ -3,8 +3,22 @@ use std::fmt::{self, Debug, Display, Formatter};
 
 /// Any action type.
 ///
-/// This allows you to use multiple different actions in a record or history
+/// This allows you to use multiple types of actions at the same time
 /// as long as they all share the same target and output type.
+///
+/// # Examples
+/// ```
+/// # include!("doctest.rs");
+/// # fn main() {
+/// # use undo::{Any, Record, FromFn};
+/// let mut target = String::new();
+/// let mut record = Record::new();
+///
+/// record.apply(&mut target, Any::new(Push('a')));
+/// record.apply(&mut target, Any::new(FromFn::new(|s: &mut String| s.push('b'))));
+/// assert_eq!(target, "ab");
+/// # }
+/// ```
 pub struct Any<T, O> {
     action: Box<dyn Action<Target = T, Output = O>>,
     message: String,

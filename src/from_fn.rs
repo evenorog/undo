@@ -2,6 +2,30 @@ use crate::Action;
 use std::mem;
 
 /// Action made from a function.
+///
+/// # Examples
+/// ```
+/// # include!("doctest.rs");
+/// # fn main() {
+/// # use undo::{Any, Record, FromFn};
+/// let mut target = String::new();
+/// let mut record = Record::new();
+///
+/// let a: fn(&mut String) = |s| s.push('a');
+/// let b: fn(&mut String) = |s| s.push('b');
+/// record.apply(&mut target, FromFn::new(a));
+/// record.apply(&mut target, FromFn::new(b));
+/// assert_eq!(target, "ab");
+///
+/// record.undo(&mut target);
+/// record.undo(&mut target);
+/// assert_eq!(target, "");
+///
+/// record.redo(&mut target);
+/// record.redo(&mut target);
+/// assert_eq!(target, "ab");
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct FromFn<F, T> {
     f: F,
@@ -10,7 +34,7 @@ pub struct FromFn<F, T> {
 
 impl<F, T> FromFn<F, T> {
     /// Creates a new `FromFn` from `f`.
-    pub fn new(f: F) -> Self {
+    pub const fn new(f: F) -> Self {
         FromFn { f, target: None }
     }
 }
@@ -42,6 +66,8 @@ where
 }
 
 /// Action made from a fallible function.
+///
+/// Same as [`FromFn`] but for functions that outputs [`Result`].
 #[derive(Clone, Debug)]
 pub struct TryFromFn<F, T> {
     f: F,
@@ -50,7 +76,7 @@ pub struct TryFromFn<F, T> {
 
 impl<F, T> TryFromFn<F, T> {
     /// Creates a new `TryFromFn` from `f`.
-    pub fn new(f: F) -> Self {
+    pub const fn new(f: F) -> Self {
         TryFromFn { f, target: None }
     }
 }
