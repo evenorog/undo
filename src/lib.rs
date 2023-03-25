@@ -36,7 +36,9 @@ pub struct ReadmeDocTest;
 mod any;
 mod entry;
 mod format;
+mod from_fn;
 pub mod history;
+mod join;
 pub mod record;
 mod socket;
 
@@ -46,7 +48,9 @@ use format::Format;
 use serde::{Deserialize, Serialize};
 
 pub use any::Any;
+pub use from_fn::{FromFn, TryFromFn};
 pub use history::History;
+pub use join::{Join, TryJoin};
 pub use record::Record;
 pub use socket::{Nop, Signal, Slot};
 
