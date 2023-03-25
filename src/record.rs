@@ -145,6 +145,16 @@ impl<A, S> Record<A, S> {
     pub fn actions(&self) -> impl Iterator<Item = &A> {
         self.entries.iter().map(|e| &e.action)
     }
+
+    /// Returns a queue.
+    pub fn queue(&mut self) -> Queue<A, S> {
+        Queue::from(self)
+    }
+
+    /// Returns a checkpoint.
+    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+        Checkpoint::from(self)
+    }
 }
 
 impl<A: Action, S: Slot> Record<A, S> {
@@ -310,16 +320,6 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
             .binary_search_by(|e| e.created_at.cmp(&to))
             .unwrap_or_else(std::convert::identity);
         self.go_to(target, current)
-    }
-
-    /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
-        Queue::from(self)
-    }
-
-    /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
-        Checkpoint::from(self)
     }
 }
 
