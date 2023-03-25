@@ -1,7 +1,9 @@
 use crate::Action;
 use std::fmt::{self, Display, Formatter};
 
-/// Joins two actions together.
+/// Two actions joined together.
+///
+/// Can be used to build more complex actions from simpler ones.
 ///
 /// # Examples
 /// ```
@@ -11,12 +13,13 @@ use std::fmt::{self, Display, Formatter};
 /// let mut target = String::new();
 /// let mut record = Record::new();
 ///
-/// record.apply(&mut target, Join::new(Push('a'), Push('b')));
-/// assert_eq!(target, "ab");
+/// let abc = Join::new(Push('a'), Push('b')).join(Push('c'));
+/// record.apply(&mut target, abc);
+/// assert_eq!(target, "abc");
 /// record.undo(&mut target);
 /// assert_eq!(target, "");
 /// record.redo(&mut target);
-/// assert_eq!(target, "ab");
+/// assert_eq!(target, "abc");
 /// # }
 /// ```
 #[derive(Clone, Debug)]
