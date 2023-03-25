@@ -2,6 +2,23 @@ use crate::Action;
 use std::fmt::{self, Display, Formatter};
 
 /// Joins two actions together.
+///
+/// # Examples
+/// ```
+/// # include!("doctest.rs");
+/// # fn main() {
+/// # use undo::{Record, Join};
+/// let mut target = String::new();
+/// let mut record = Record::new();
+///
+/// record.apply(&mut target, Join::new(Push('a'), Push('b')));
+/// assert_eq!(target, "ab");
+/// record.undo(&mut target);
+/// assert_eq!(target, "");
+/// record.redo(&mut target);
+/// assert_eq!(target, "ab");
+/// # }
+/// ```
 #[derive(Clone, Debug)]
 pub struct Join<A, B> {
     a: A,
@@ -10,12 +27,12 @@ pub struct Join<A, B> {
 
 impl<A, B> Join<A, B> {
     /// Creates a new `Join` from `a` and `b`.
-    pub fn new(a: A, b: B) -> Self {
+    pub const fn new(a: A, b: B) -> Self {
         Join { a, b }
     }
 
     /// Joins `self` with `c`.
-    pub fn join<C>(self, c: C) -> Join<Self, C> {
+    pub const fn join<C>(self, c: C) -> Join<Self, C> {
         Join::new(self, c)
     }
 }
@@ -55,6 +72,8 @@ where
 }
 
 /// Joins two fallible actions together.
+///
+/// Same as [`Join`] but for actions that outputs [`Result`].
 #[derive(Clone, Debug)]
 pub struct TryJoin<A, B> {
     a: A,
@@ -63,12 +82,12 @@ pub struct TryJoin<A, B> {
 
 impl<A, B> TryJoin<A, B> {
     /// Creates a new `TryJoin` from `a` and `b`.
-    pub fn new(a: A, b: B) -> Self {
+    pub const fn new(a: A, b: B) -> Self {
         TryJoin { a, b }
     }
 
     /// Joins `self` with `c`.
-    pub fn join<C>(self, c: C) -> TryJoin<Self, C> {
+    pub const fn join<C>(self, c: C) -> TryJoin<Self, C> {
         TryJoin::new(self, c)
     }
 }
