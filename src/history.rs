@@ -147,6 +147,16 @@ impl<A, S> History<A, S> {
         self.record.actions()
     }
 
+    /// Returns a queue.
+    pub fn queue(&mut self) -> Queue<A, S> {
+        Queue::from(self)
+    }
+
+    /// Returns a checkpoint.
+    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+        Checkpoint::from(self)
+    }
+
     fn at(&self) -> At {
         At::new(self.root, self.current())
     }
@@ -315,16 +325,6 @@ impl<A: Action<Output = ()>, S: Slot> History<A, S> {
             }
         }
         self.record.go_to(target, current)
-    }
-
-    /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
-        Queue::from(self)
-    }
-
-    /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
-        Checkpoint::from(self)
     }
 }
 
