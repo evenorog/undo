@@ -299,11 +299,14 @@ impl<A: Action, S: Slot> History<A, S> {
 
         Some(path.into_iter().rev())
     }
-}
 
-impl<A: Action<Output = ()>, S: Slot> History<A, S> {
     /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action in `branch` at `current` is reached.
-    pub fn go_to(&mut self, target: &mut A::Target, branch: usize, current: usize) -> Option<()> {
+    pub fn go_to(
+        &mut self,
+        target: &mut A::Target,
+        branch: usize,
+        current: usize,
+    ) -> Option<Vec<A::Output>> {
         let root = self.root;
         if root == branch {
             return self.record.go_to(target, current);

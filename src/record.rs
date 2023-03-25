@@ -270,16 +270,14 @@ impl<A: Action, S: Slot> Record<A, S> {
         self.socket.emit_if(could_undo, Signal::Undo(false));
         self.socket.emit_if(could_redo, Signal::Redo(false));
     }
-}
 
-impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
     /// Revert the changes done to the target since the saved state.
-    pub fn revert(&mut self, target: &mut A::Target) -> Option<()> {
+    pub fn revert(&mut self, target: &mut A::Target) -> Option<Vec<A::Output>> {
         self.saved.and_then(|saved| self.go_to(target, saved))
     }
 
     /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action at `current` is reached.
-    pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<()> {
+    pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<Vec<A::Output>> {
         if current > self.len() {
             return None;
         }
@@ -296,8 +294,10 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
             Record::undo
         };
 
+        let mut outputs = Vec::new();
         while self.current != current {
-            undo_or_redo(self, target);
+            let output = undo_or_redo(self, target)?;
+            outputs.push(output);
         }
 
         let can_undo = self.can_undo();
@@ -310,11 +310,15 @@ impl<A: Action<Output = ()>, S: Slot> Record<A, S> {
             .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
         self.socket
             .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-        Some(())
+        Some(outputs)
     }
 
     /// Go back or forward in the record to the action that was made closest to the system time provided.
-    pub fn time_travel(&mut self, target: &mut A::Target, to: SystemTime) -> Option<()> {
+    pub fn time_travel(
+        &mut self,
+        target: &mut A::Target,
+        to: SystemTime,
+    ) -> Option<Vec<A::Output>> {
         let current = self
             .entries
             .binary_search_by(|e| e.created_at.cmp(&to))
