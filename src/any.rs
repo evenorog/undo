@@ -21,7 +21,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 /// ```
 pub struct Any<T, O> {
     action: Box<dyn Action<Target = T, Output = O>>,
-    message: String,
+    string: String,
 }
 
 impl<T, O> Any<T, O> {
@@ -33,8 +33,13 @@ impl<T, O> Any<T, O> {
     {
         Any {
             action: Box::new(action),
-            message: String::new(),
+            string: String::new(),
         }
+    }
+
+    /// Sets the display message of this action.
+    pub fn set_string(&mut self, str: impl Into<String>) {
+        self.string = str.into();
     }
 }
 
@@ -58,13 +63,13 @@ impl<T, O> Action for Any<T, O> {
 impl<T, O> Debug for Any<T, O> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Any")
-            .field("message", &self.message)
+            .field("string", &self.string)
             .finish_non_exhaustive()
     }
 }
 
 impl<T, O> Display for Any<T, O> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Display::fmt(&self.message, f)
+        Display::fmt(&self.string, f)
     }
 }
