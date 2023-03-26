@@ -1,4 +1,5 @@
 use crate::Action;
+use std::fmt::{self, Debug, Formatter};
 use std::mem;
 
 /// Action made from a function.
@@ -26,7 +27,7 @@ use std::mem;
 /// assert_eq!(target, "ab");
 /// # }
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct FromFn<F, T> {
     f: F,
     target: Option<T>,
@@ -62,6 +63,12 @@ where
         if let Some(new) = self.target.as_mut() {
             mem::swap(new, target);
         }
+    }
+}
+
+impl<F, T> Debug for FromFn<F, T> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("FromFn").finish_non_exhaustive()
     }
 }
 
