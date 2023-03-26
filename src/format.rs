@@ -174,6 +174,14 @@ impl Format {
         }
         write!(f, " {string}")
     }
+
+    pub fn text(self, f: &mut fmt::Formatter, text: &str, i: usize) -> fmt::Result {
+        #[cfg(feature = "colored")]
+        if self.colored {
+            return write!(f, "{}", text.color(color_of_level(i)));
+        }
+        f.write_str(text)
+    }
 }
 
 #[cfg(feature = "colored")]
