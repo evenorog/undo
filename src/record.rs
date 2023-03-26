@@ -328,17 +328,17 @@ impl<A: Action, S: Slot> Record<A, S> {
 impl<A: ToString, S> Record<A, S> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`Record::undo`].
-    pub fn undo_text(&self) -> Option<String> {
-        self.current.checked_sub(1).and_then(|i| self.text(i))
+    pub fn undo_string(&self) -> Option<String> {
+        self.current.checked_sub(1).and_then(|i| self.string_at(i))
     }
 
     /// Returns the string of the action which will be redone
     /// in the next call to [`Record::redo`].
-    pub fn redo_text(&self) -> Option<String> {
-        self.text(self.current)
+    pub fn redo_string(&self) -> Option<String> {
+        self.string_at(self.current)
     }
 
-    fn text(&self, i: usize) -> Option<String> {
+    fn string_at(&self, i: usize) -> Option<String> {
         self.entries.get(i).map(|e| e.action.to_string())
     }
 }

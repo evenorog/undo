@@ -342,14 +342,14 @@ impl<A: Action, S: Slot> History<A, S> {
 impl<A: ToString, S> History<A, S> {
     /// Returns the string of the action which will be undone
     /// in the next call to [`History::undo`].
-    pub fn undo_text(&self) -> Option<String> {
-        self.record.undo_text()
+    pub fn undo_string(&self) -> Option<String> {
+        self.record.undo_string()
     }
 
     /// Returns the string of the action which will be redone
     /// in the next call to [`History::redo`].
-    pub fn redo_text(&self) -> Option<String> {
-        self.record.redo_text()
+    pub fn redo_string(&self) -> Option<String> {
+        self.record.redo_string()
     }
 }
 
