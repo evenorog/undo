@@ -57,6 +57,8 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         if let Some(entry) = entry {
             if self.format.detailed {
                 self.format.elapsed(f, now, entry.created_at)?;
+                self.format.text(f, ",", 3)?;
+                self.format.elapsed(f, now, entry.updated_at)?;
             }
         }
 

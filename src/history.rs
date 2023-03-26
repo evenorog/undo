@@ -306,15 +306,21 @@ impl<A: Action, S: Slot> History<A, S> {
         target: &mut A::Target,
         branch: usize,
         current: usize,
-    ) -> Option<Vec<A::Output>> {
+    ) -> Vec<A::Output> {
         let root = self.root;
         if root == branch {
             return self.record.go_to(target, current);
         }
+
         // Walk the path from `root` to `branch`.
-        for (new, branch) in self.mk_path(branch)? {
+        let mut outputs = Vec::new();
+        let  Some(path) = self.mk_path(branch) else {
+            return Vec::new();
+        };
+        for (new, branch) in path {
             // Walk to `branch.current` either by undoing or redoing.
-            self.record.go_to(target, branch.parent.current).unwrap();
+            let o = self.record.go_to(target, branch.parent.current);
+            outputs.extend(o);
             // Apply the actions in the branch and move older actions into their own branch.
             for entry in branch.entries {
                 let current = self.current();
@@ -327,7 +333,9 @@ impl<A: Action, S: Slot> History<A, S> {
                 }
             }
         }
-        self.record.go_to(target, current)
+        let o = self.record.go_to(target, current);
+        outputs.extend(o);
+        outputs
     }
 }
 
@@ -448,7 +456,7 @@ mod tests {
         history.apply(&mut target, Push('m'));
         assert_eq!(target, "abcfhilm");
         let abcfhilm = history.branch();
-        history.go_to(&mut target, abcde, 2).unwrap();
+        history.go_to(&mut target, abcde, 2);
         history.apply(&mut target, Push('n'));
         history.apply(&mut target, Push('o'));
         assert_eq!(target, "abno");
@@ -459,19 +467,19 @@ mod tests {
         assert_eq!(target, "abnpq");
 
         let abnpq = history.branch();
-        history.go_to(&mut target, abcde, 5).unwrap();
+        history.go_to(&mut target, abcde, 5);
         assert_eq!(target, "abcde");
-        history.go_to(&mut target, abcfg, 5).unwrap();
+        history.go_to(&mut target, abcfg, 5);
         assert_eq!(target, "abcfg");
-        history.go_to(&mut target, abcfhij, 7).unwrap();
+        history.go_to(&mut target, abcfhij, 7);
         assert_eq!(target, "abcfhij");
-        history.go_to(&mut target, abcfhik, 7).unwrap();
+        history.go_to(&mut target, abcfhik, 7);
         assert_eq!(target, "abcfhik");
-        history.go_to(&mut target, abcfhilm, 8).unwrap();
+        history.go_to(&mut target, abcfhilm, 8);
         assert_eq!(target, "abcfhilm");
-        history.go_to(&mut target, abno, 4).unwrap();
+        history.go_to(&mut target, abno, 4);
         assert_eq!(target, "abno");
-        history.go_to(&mut target, abnpq, 5).unwrap();
+        history.go_to(&mut target, abnpq, 5);
         assert_eq!(target, "abnpq");
     }
 }

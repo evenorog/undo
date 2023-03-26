@@ -10,29 +10,34 @@ use std::time::SystemTime;
 pub struct Entry<A> {
     pub action: A,
     pub created_at: SystemTime,
+    pub updated_at: SystemTime,
 }
 
 impl<A: Action> Entry<A> {
     pub fn undo(&mut self, target: &mut A::Target) -> A::Output {
+        self.updated_at = SystemTime::now();
         self.action.undo(target)
     }
 
     pub fn redo(&mut self, target: &mut A::Target) -> A::Output {
+        self.updated_at = SystemTime::now();
         self.action.redo(target)
     }
 }
 
 impl<A> From<A> for Entry<A> {
     fn from(action: A) -> Self {
+        let at = SystemTime::now();
         Entry {
             action,
-            created_at: SystemTime::now(),
+            created_at: at,
+            updated_at: at,
         }
     }
 }
 
 impl<A: Display> Display for Entry<A> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        (&self.action as &dyn Display).fmt(f)
+        Display::fmt(&self.action, f)
     }
 }

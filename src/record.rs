@@ -272,14 +272,15 @@ impl<A: Action, S: Slot> Record<A, S> {
     }
 
     /// Revert the changes done to the target since the saved state.
-    pub fn revert(&mut self, target: &mut A::Target) -> Option<Vec<A::Output>> {
-        self.saved.and_then(|saved| self.go_to(target, saved))
+    pub fn revert(&mut self, target: &mut A::Target) -> Vec<A::Output> {
+        self.saved
+            .map_or_else(Vec::new, |saved| self.go_to(target, saved))
     }
 
     /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action at `current` is reached.
-    pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Option<Vec<A::Output>> {
+    pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Vec<A::Output> {
         if current > self.len() {
-            return None;
+            return Vec::new();
         }
 
         let could_undo = self.can_undo();
@@ -296,7 +297,7 @@ impl<A: Action, S: Slot> Record<A, S> {
 
         let mut outputs = Vec::new();
         while self.current != current {
-            let output = undo_or_redo(self, target)?;
+            let output = undo_or_redo(self, target).unwrap();
             outputs.push(output);
         }
 
@@ -310,15 +311,12 @@ impl<A: Action, S: Slot> Record<A, S> {
             .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
         self.socket
             .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
-        Some(outputs)
+
+        outputs
     }
 
     /// Go back or forward in the record to the action that was made closest to the system time provided.
-    pub fn time_travel(
-        &mut self,
-        target: &mut A::Target,
-        to: SystemTime,
-    ) -> Option<Vec<A::Output>> {
+    pub fn time_travel(&mut self, target: &mut A::Target, to: SystemTime) -> Vec<A::Output> {
         let current = self
             .entries
             .binary_search_by(|e| e.created_at.cmp(&to))
@@ -439,25 +437,25 @@ mod tests {
         record.apply(&mut target, Push('d'));
         record.apply(&mut target, Push('e'));
 
-        record.go_to(&mut target, 0).unwrap();
+        record.go_to(&mut target, 0);
         assert_eq!(record.current(), 0);
         assert_eq!(target, "");
-        record.go_to(&mut target, 5).unwrap();
+        record.go_to(&mut target, 5);
         assert_eq!(record.current(), 5);
         assert_eq!(target, "abcde");
-        record.go_to(&mut target, 1).unwrap();
+        record.go_to(&mut target, 1);
         assert_eq!(record.current(), 1);
         assert_eq!(target, "a");
-        record.go_to(&mut target, 4).unwrap();
+        record.go_to(&mut target, 4);
         assert_eq!(record.current(), 4);
         assert_eq!(target, "abcd");
-        record.go_to(&mut target, 2).unwrap();
+        record.go_to(&mut target, 2);
         assert_eq!(record.current(), 2);
         assert_eq!(target, "ab");
-        record.go_to(&mut target, 3).unwrap();
+        record.go_to(&mut target, 3);
         assert_eq!(record.current(), 3);
         assert_eq!(target, "abc");
-        assert!(record.go_to(&mut target, 6).is_none());
+        assert!(record.go_to(&mut target, 6).is_empty());
         assert_eq!(record.current(), 3);
     }
 
