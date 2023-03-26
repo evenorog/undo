@@ -16,7 +16,6 @@ use crate::{Action, Entry, History, Merged, Signal};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::num::NonZeroUsize;
-use std::time::SystemTime;
 
 /// A linear record of actions.
 ///
@@ -313,15 +312,6 @@ impl<A: Action, S: Slot> Record<A, S> {
             .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
 
         outputs
-    }
-
-    /// Go back or forward in the record to the action that was made closest to the system time provided.
-    pub fn time_travel(&mut self, target: &mut A::Target, to: SystemTime) -> Vec<A::Output> {
-        let current = self
-            .entries
-            .binary_search_by(|e| e.created_at.cmp(&to))
-            .unwrap_or_else(std::convert::identity);
-        self.go_to(target, current)
     }
 }
 
