@@ -1,3 +1,5 @@
+// This file is included in the documentation examples to avoid some boilerplate.
+
 /// This is the action used in all the examples.
 pub struct Push(char);
 

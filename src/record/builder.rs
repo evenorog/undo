@@ -25,7 +25,7 @@ pub struct Builder<A, S = Nop> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
-    slot: Socket<S>,
+    socket: Socket<S>,
     pd: PhantomData<A>,
 }
 
@@ -36,7 +36,7 @@ impl<A, S> Builder<A, S> {
             capacity: 0,
             limit: NonZeroUsize::new(usize::MAX).unwrap(),
             saved: true,
-            slot: Socket::default(),
+            socket: Socket::default(),
             pd: PhantomData,
         }
     }
@@ -70,7 +70,7 @@ impl<A, S> Builder<A, S> {
             limit: self.limit,
             current: 0,
             saved: self.saved.then_some(0),
-            socket: self.slot,
+            socket: self.socket,
         }
     }
 }
@@ -78,7 +78,7 @@ impl<A, S> Builder<A, S> {
 impl<A, S: Slot> Builder<A, S> {
     /// Connects the slot.
     pub fn connect(mut self, slot: S) -> Builder<A, S> {
-        self.slot = Socket::new(slot);
+        self.socket = Socket::new(slot);
         self
     }
 }

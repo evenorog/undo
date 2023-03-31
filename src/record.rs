@@ -294,7 +294,8 @@ impl<A: Action, S: Slot> Record<A, S> {
             Record::undo
         };
 
-        let mut outputs = Vec::new();
+        let capacity = self.current.abs_diff(current);
+        let mut outputs = Vec::with_capacity(capacity);
         while self.current != current {
             let output = undo_or_redo(self, target).unwrap();
             outputs.push(output);

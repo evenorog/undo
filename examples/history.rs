@@ -12,9 +12,7 @@ impl Action for Push {
     }
 
     fn undo(&mut self, string: &mut String) {
-        self.0 = string
-            .pop()
-            .expect("cannot remove more characters than have been added");
+        self.0 = string.pop().expect("cannot pop empty string");
     }
 }
 
