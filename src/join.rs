@@ -43,24 +43,27 @@ impl<A, B> Join<A, B> {
 impl<A, B> Action for Join<A, B>
 where
     A: Action,
-    B: Action<Target = A::Target>,
+    B: Action<Target = A::Target, Output = A::Output>,
 {
     type Target = A::Target;
-    type Output = ();
+    type Output = A::Output;
 
+    /// The output of a will be discarded.
     fn apply(&mut self, target: &mut A::Target) -> Self::Output {
         self.a.apply(target);
-        self.b.apply(target);
+        self.b.apply(target)
     }
 
+    /// The output of b will be discarded.
     fn undo(&mut self, target: &mut A::Target) -> Self::Output {
         self.b.undo(target);
-        self.a.undo(target);
+        self.a.undo(target)
     }
 
+    /// The output of a will be discarded.
     fn redo(&mut self, target: &mut A::Target) -> Self::Output {
         self.a.redo(target);
-        self.b.redo(target);
+        self.b.redo(target)
     }
 }
 
@@ -95,24 +98,27 @@ impl<A, B> TryJoin<A, B> {
     }
 }
 
-impl<A, B, E> Action for TryJoin<A, B>
+impl<A, B, T, E> Action for TryJoin<A, B>
 where
-    A: Action<Output = Result<(), E>>,
+    A: Action<Output = Result<T, E>>,
     B: Action<Target = A::Target, Output = A::Output>,
 {
     type Target = A::Target;
     type Output = A::Output;
 
+    /// The output of a will be discarded if success.
     fn apply(&mut self, target: &mut A::Target) -> Self::Output {
         self.a.apply(target)?;
         self.b.apply(target)
     }
 
+    /// The output of b will be discarded if success.
     fn undo(&mut self, target: &mut A::Target) -> Self::Output {
         self.b.undo(target)?;
         self.a.undo(target)
     }
 
+    /// The output of a will be discarded if success.
     fn redo(&mut self, target: &mut A::Target) -> Self::Output {
         self.a.redo(target)?;
         self.b.redo(target)
