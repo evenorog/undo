@@ -12,10 +12,12 @@ pub use queue::Queue;
 
 use crate::socket::{Nop, Slot, Socket};
 use crate::{Action, Entry, History, Merged, Signal};
+use alloc::collections::VecDeque;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::num::NonZeroUsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
-use std::num::NonZeroUsize;
 
 /// A linear record of actions.
 ///
@@ -349,6 +351,8 @@ impl<A, F> From<History<A, F>> for Record<A, F> {
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use alloc::string::String;
+    use alloc::vec::Vec;
 
     enum Edit {
         Push(Push),

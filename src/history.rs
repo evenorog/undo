@@ -12,12 +12,11 @@ pub use queue::Queue;
 
 use crate::socket::{Nop, Signal, Slot};
 use crate::{Action, At, Entry, Record};
+use alloc::collections::{BTreeMap, VecDeque};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, VecDeque},
-    vec,
-};
 
 /// A history tree of actions.
 ///
@@ -157,7 +156,7 @@ impl<A, S> History<A, S> {
         Checkpoint::from(self)
     }
 
-    fn at(&self) -> At {
+    pub(crate) fn at(&self) -> At {
         At::new(self.root, self.current())
     }
 }
@@ -289,7 +288,7 @@ impl<A: Action, S: Slot> History<A, S> {
         debug_assert_ne!(self.branch(), to);
         let mut dest = self.branches.remove(&to)?;
         let mut i = dest.parent.branch;
-        let mut path = vec![(to, dest)];
+        let mut path = alloc::vec![(to, dest)];
         while i != self.branch() {
             dest = self.branches.remove(&i).unwrap();
             to = i;

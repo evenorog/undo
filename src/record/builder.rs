@@ -1,8 +1,8 @@
 use super::Socket;
 use crate::{Nop, Record, Slot};
-use std::collections::VecDeque;
-use std::marker::PhantomData;
-use std::num::NonZeroUsize;
+use alloc::collections::VecDeque;
+use core::marker::PhantomData;
+use core::num::NonZeroUsize;
 
 /// Builder for a record.
 ///

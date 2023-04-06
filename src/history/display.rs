@@ -1,6 +1,6 @@
 use crate::{At, Entry, Format, History};
-use std::fmt;
-use std::fmt::Write;
+use core::fmt::{self, Write};
+#[cfg(feature = "std")]
 use std::time::SystemTime;
 
 /// Configurable display formatting for the history.
@@ -51,11 +51,12 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         at: At,
         entry: Option<&Entry<A>>,
         level: usize,
-        now: SystemTime,
+        #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
         self.format.mark(f, level)?;
         self.format.position(f, at, true)?;
 
+        #[cfg(feature = "std")]
         if let Some(entry) = entry {
             if self.format.detailed {
                 self.format.elapsed(f, now, entry.created_at)?;
@@ -67,7 +68,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         self.format.labels(
             f,
             at,
-            At::new(self.history.branch(), self.history.current()),
+            self.history.at(),
             self.history
                 .record
                 .saved
@@ -94,7 +95,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         at: At,
         entry: Option<&Entry<A>>,
         level: usize,
-        now: SystemTime,
+        #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
         for (&i, branch) in self
             .history
@@ -104,7 +105,14 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         {
             for (j, entry) in branch.entries.iter().enumerate().rev() {
                 let at = At::new(i, j + branch.parent.current + 1);
-                self.fmt_graph(f, at, Some(entry), level + 1, now)?;
+                self.fmt_graph(
+                    f,
+                    at,
+                    Some(entry),
+                    level + 1,
+                    #[cfg(feature = "std")]
+                    now,
+                )?;
             }
 
             for j in 0..level {
@@ -121,7 +129,14 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
             f.write_char(' ')?;
         }
 
-        self.fmt_list(f, at, entry, level, now)
+        self.fmt_list(
+            f,
+            at,
+            entry,
+            level,
+            #[cfg(feature = "std")]
+            now,
+        )
     }
 }
 
@@ -136,12 +151,27 @@ impl<'a, A, S> From<&'a History<A, S>> for Display<'a, A, S> {
 
 impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        #[cfg(feature = "std")]
         let now = SystemTime::now();
         let branch = self.history.branch();
         for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
             let at = At::new(branch, i + 1);
-            self.fmt_graph(f, at, Some(entry), 0, now)?;
+            self.fmt_graph(
+                f,
+                at,
+                Some(entry),
+                0,
+                #[cfg(feature = "std")]
+                now,
+            )?;
         }
-        self.fmt_graph(f, At::new(branch, 0), None, 0, now)
+        self.fmt_graph(
+            f,
+            At::new(branch, 0),
+            None,
+            0,
+            #[cfg(feature = "std")]
+            now,
+        )
     }
 }

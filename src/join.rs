@@ -1,5 +1,5 @@
 use crate::Action;
-use std::fmt::{self, Display, Formatter};
+use core::fmt::{self, Display, Formatter};
 
 /// Two actions joined together.
 ///

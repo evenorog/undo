@@ -22,36 +22,54 @@
 //!
 //! | Name    | Default | Description                                                     |
 //! |---------|---------|-----------------------------------------------------------------|
+//! | std     | ✓       | Enables the standard library.                                   |
+//! | alloc   | ✓       | Enables the `alloc` crate.                                      |
 //! | colored |         | Enables colored output when visualizing the display structures. |
 //! | serde   |         | Enables serialization and deserialization.                      |
 
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
 pub struct ReadmeDocTest;
 
+#[cfg(feature = "alloc")]
 mod any;
+#[cfg(feature = "alloc")]
 mod entry;
+#[cfg(feature = "alloc")]
 mod format;
 mod from_fn;
+#[cfg(feature = "alloc")]
 pub mod history;
 mod join;
+#[cfg(feature = "alloc")]
 pub mod record;
+#[cfg(feature = "alloc")]
 mod socket;
 
+#[cfg(feature = "alloc")]
 use entry::Entry;
+#[cfg(feature = "alloc")]
 use format::Format;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "alloc")]
 pub use any::Any;
 pub use from_fn::{FromFn, TryFromFn};
+#[cfg(feature = "alloc")]
 pub use history::History;
 pub use join::{Join, TryJoin};
+#[cfg(feature = "alloc")]
 pub use record::Record;
+#[cfg(feature = "alloc")]
 pub use socket::{Nop, Signal, Slot};
 
 /// Base functionality for all actions.
@@ -102,6 +120,7 @@ pub enum Merged<A> {
 }
 
 /// A position in a history tree.
+#[cfg(feature = "alloc")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq)]
 struct At {
@@ -109,6 +128,7 @@ struct At {
     current: usize,
 }
 
+#[cfg(feature = "alloc")]
 impl At {
     const fn new(branch: usize, current: usize) -> At {
         At { branch, current }

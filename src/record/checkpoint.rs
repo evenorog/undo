@@ -1,6 +1,7 @@
 use super::Queue;
 use crate::{Action, Entry, Record, Slot};
-use std::collections::VecDeque;
+use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 
 #[derive(Debug)]
 enum CheckpointEntry<A> {

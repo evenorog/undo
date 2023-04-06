@@ -1,6 +1,6 @@
 use crate::Action;
-use std::fmt::{self, Debug, Formatter};
-use std::mem;
+use core::fmt::{self, Debug, Formatter};
+use core::mem;
 
 /// Action made from a function.
 ///
