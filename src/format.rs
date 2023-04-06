@@ -90,9 +90,9 @@ impl Format {
             #[cfg(feature = "colored")]
             if self.colored {
                 let position = if use_branch {
-                    format!("{}:{}", at.branch, at.current)
+                    alloc::format!("{}:{}", at.branch, at.current)
                 } else {
-                    format!("{}", at.current)
+                    alloc::format!("{}", at.current)
                 };
                 return write!(f, "{}", position.yellow().bold());
             }
