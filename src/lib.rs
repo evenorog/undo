@@ -20,12 +20,12 @@
 //!
 //! # Cargo Feature Flags
 //!
-//! | Name    | Default | Description                                                     |
-//! |---------|---------|-----------------------------------------------------------------|
-//! | std     | ✓       | Enables the standard library.                                   |
-//! | alloc   | ✓       | Enables the `alloc` crate.                                      |
-//! | colored |         | Enables colored output when visualizing the display structures. |
-//! | serde   |         | Enables serialization and deserialization.                      |
+//! | Name    | Default | Enables | Description                                                     |
+//! |---------|---------|---------|-----------------------------------------------------------------|
+//! | std     | ✓       | alloc   | Enables the standard library.                                   |
+//! | alloc   |         |         | Enables the `alloc` crate.                                      |
+//! | colored |         |         | Enables colored output when visualizing the display structures. |
+//! | serde   |         |         | Enables serialization and deserialization.                      |
 
 #![doc(html_root_url = "https://docs.rs/undo")]
 #![deny(missing_docs)]
