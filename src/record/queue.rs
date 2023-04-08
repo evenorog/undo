@@ -1,5 +1,6 @@
 use super::Checkpoint;
 use crate::{Action, Record, Slot};
+use alloc::vec::Vec;
 
 #[derive(Debug)]
 enum QueueEntry<A> {
@@ -90,6 +91,7 @@ impl<'a, A, S> From<&'a mut Record<A, S>> for Queue<'a, A, S> {
 #[cfg(test)]
 mod tests {
     use crate::{FromFn, Record};
+    use alloc::string::String;
 
     const A: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('a'));
     const B: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('b'));

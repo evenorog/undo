@@ -1,5 +1,6 @@
 use super::Checkpoint;
 use crate::{Action, History, Slot};
+use alloc::vec::Vec;
 
 #[derive(Debug)]
 enum QueueEntry<A> {

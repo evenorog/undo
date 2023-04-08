@@ -1,5 +1,7 @@
 use crate::Action;
-use std::fmt::{self, Debug, Display, Formatter};
+use alloc::boxed::Box;
+use alloc::string::String;
+use core::fmt::{self, Debug, Display, Formatter};
 
 /// Any action type.
 ///

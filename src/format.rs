@@ -1,9 +1,11 @@
 #![cfg_attr(not(feature = "colored"), allow(unused_variables))]
 
 use crate::At;
+use alloc::string::ToString;
 #[cfg(feature = "colored")]
 use colored::{Color, Colorize};
-use std::fmt::{self, Write};
+use core::fmt::{self, Write};
+#[cfg(feature = "std")]
 use std::time::SystemTime;
 
 #[derive(Copy, Clone, Debug)]
@@ -88,9 +90,9 @@ impl Format {
             #[cfg(feature = "colored")]
             if self.colored {
                 let position = if use_branch {
-                    format!("{}:{}", at.branch, at.current)
+                    alloc::format!("{}:{}", at.branch, at.current)
                 } else {
-                    format!("{}", at.current)
+                    alloc::format!("{}", at.current)
                 };
                 return write!(f, "{}", position.yellow().bold());
             }
@@ -160,6 +162,7 @@ impl Format {
         }
     }
 
+    #[cfg(feature = "std")]
     pub fn elapsed(
         self,
         f: &mut fmt::Formatter,
@@ -175,6 +178,7 @@ impl Format {
         write!(f, " {string}")
     }
 
+    #[cfg(feature = "std")]
     pub fn text(self, f: &mut fmt::Formatter, text: &str, i: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
