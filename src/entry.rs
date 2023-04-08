@@ -1,58 +1,58 @@
-use crate::Action;
+use crate::Edit;
 use core::fmt::{self, Debug, Display, Formatter};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::time::SystemTime;
 
-/// Wrapper around an action that contains additional metadata.
+/// Wrapper around an edit that contains additional metadata.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct Entry<A> {
-    pub action: A,
+pub struct Entry<E> {
+    pub edit: E,
     #[cfg(feature = "std")]
     pub created_at: SystemTime,
     #[cfg(feature = "std")]
     pub updated_at: SystemTime,
 }
 
-impl<A: Action> Entry<A> {
-    pub fn undo(&mut self, target: &mut A::Target) -> A::Output {
+impl<E: Edit> Entry<E> {
+    pub fn undo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
             self.updated_at = SystemTime::now();
         }
-        self.action.undo(target)
+        self.edit.undo(target)
     }
 
-    pub fn redo(&mut self, target: &mut A::Target) -> A::Output {
+    pub fn redo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
             self.updated_at = SystemTime::now();
         }
-        self.action.redo(target)
+        self.edit.redo(target)
     }
 }
 
-impl<A> From<A> for Entry<A> {
+impl<E> From<E> for Entry<E> {
     #[cfg(feature = "std")]
-    fn from(action: A) -> Self {
+    fn from(edit: E) -> Self {
         let at = SystemTime::now();
         Entry {
-            action,
+            edit,
             created_at: at,
             updated_at: at,
         }
     }
 
     #[cfg(not(feature = "std"))]
-    fn from(action: A) -> Self {
-        Entry { action }
+    fn from(edit: E) -> Self {
+        Entry { edit }
     }
 }
 
-impl<A: Display> Display for Entry<A> {
+impl<E: Display> Display for Entry<E> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Display::fmt(&self.action, f)
+        Display::fmt(&self.edit, f)
     }
 }

@@ -1,28 +1,28 @@
 use super::Checkpoint;
-use crate::{Action, History, Slot};
+use crate::{Edit, History, Slot};
 use alloc::vec::Vec;
 
 #[derive(Debug)]
 enum QueueEntry<A> {
-    Apply(A),
+    Edit(A),
     Undo,
     Redo,
 }
 
-/// Wraps a record and gives it batch queue functionality.
+/// Wraps a history and gives it batch queue functionality.
 ///
 /// # Examples
 /// ```
 /// # include!("../doctest.rs");
 /// # fn main() {
-/// # use undo::Record;
+/// # use undo::History;
 /// let mut string = String::new();
-/// let mut record = Record::new();
+/// let mut record = History::new();
 /// let mut queue = record.queue();
 ///
-/// queue.apply(Push('a'));
-/// queue.apply(Push('b'));
-/// queue.apply(Push('c'));
+/// queue.edit(Push('a'));
+/// queue.edit(Push('b'));
+/// queue.edit(Push('c'));
 /// assert_eq!(string, "");
 ///
 /// queue.commit(&mut string);
@@ -47,35 +47,35 @@ impl<A, S> Queue<'_, A, S> {
     }
 }
 
-impl<A: Action, S: Slot> Queue<'_, A, S> {
-    /// Queues an `apply` action.
-    pub fn apply(&mut self, action: A) {
-        self.entries.push(QueueEntry::Apply(action));
+impl<A: Edit, S: Slot> Queue<'_, A, S> {
+    /// Queues a [`History::edit`] call.
+    pub fn edit(&mut self, edit: A) {
+        self.entries.push(QueueEntry::Edit(edit));
     }
 
-    /// Queues an `undo` action.
+    /// Queues a [`History::undo`] call.
     pub fn undo(&mut self) {
         self.entries.push(QueueEntry::Undo);
     }
 
-    /// Queues a `redo` action.
+    /// Queues a [`History::redo`] call.
     pub fn redo(&mut self) {
         self.entries.push(QueueEntry::Redo);
     }
 
-    /// Applies the queued actions.
+    /// Applies the queued edits.
     pub fn commit(self, target: &mut A::Target) -> Vec<A::Output> {
         self.entries
             .into_iter()
             .filter_map(|entry| match entry {
-                QueueEntry::Apply(action) => Some(self.history.apply(target, action)),
+                QueueEntry::Edit(edit) => Some(self.history.edit(target, edit)),
                 QueueEntry::Undo => self.history.undo(target),
                 QueueEntry::Redo => self.history.redo(target),
             })
             .collect()
     }
 
-    /// Cancels the queued actions.
+    /// Cancels the queued edits.
     pub fn cancel(self) {}
 }
 

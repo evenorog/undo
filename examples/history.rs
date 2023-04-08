@@ -1,13 +1,13 @@
 use core::fmt::{self, Display, Formatter};
-use undo::{Action, History};
+use undo::{Edit, History};
 
 struct Push(char);
 
-impl Action for Push {
+impl Edit for Push {
     type Target = String;
     type Output = ();
 
-    fn apply(&mut self, string: &mut String) {
+    fn edit(&mut self, string: &mut String) {
         string.push(self.0);
     }
 
@@ -23,12 +23,12 @@ impl Display for Push {
 }
 
 fn main() {
-    let mut history = History::new();
     let mut target = String::new();
+    let mut history = History::new();
 
-    history.apply(&mut target, Push('a'));
-    history.apply(&mut target, Push('b'));
-    history.apply(&mut target, Push('c'));
+    history.edit(&mut target, Push('a'));
+    history.edit(&mut target, Push('b'));
+    history.edit(&mut target, Push('c'));
     assert_eq!(target, "abc");
 
     let abc_branch = history.branch();
@@ -37,9 +37,9 @@ fn main() {
     history.undo(&mut target);
     assert_eq!(target, "ab");
 
-    history.apply(&mut target, Push('d'));
-    history.apply(&mut target, Push('e'));
-    history.apply(&mut target, Push('f'));
+    history.edit(&mut target, Push('d'));
+    history.edit(&mut target, Push('e'));
+    history.edit(&mut target, Push('f'));
     assert_eq!(target, "abdef");
 
     let abdef_branch = history.branch();

@@ -1,8 +1,8 @@
-use crate::Action;
+use crate::Edit;
 use core::fmt::{self, Debug, Formatter};
 use core::mem;
 
-/// Action made from a function.
+/// An edit made from a function.
 ///
 /// # Examples
 /// ```
@@ -14,8 +14,8 @@ use core::mem;
 ///
 /// let a: fn(&mut String) = |s| s.push('a');
 /// let b: fn(&mut String) = |s| s.push('b');
-/// record.apply(&mut target, FromFn::new(a));
-/// record.apply(&mut target, FromFn::new(b));
+/// record.edit(&mut target, FromFn::new(a));
+/// record.edit(&mut target, FromFn::new(b));
 /// assert_eq!(target, "ab");
 ///
 /// record.undo(&mut target);
@@ -40,7 +40,7 @@ impl<F, T> FromFn<F, T> {
     }
 }
 
-impl<F, T> Action for FromFn<F, T>
+impl<F, T> Edit for FromFn<F, T>
 where
     F: FnMut(&mut T),
     T: Clone,
@@ -48,7 +48,7 @@ where
     type Target = T;
     type Output = ();
 
-    fn apply(&mut self, target: &mut Self::Target) -> Self::Output {
+    fn edit(&mut self, target: &mut Self::Target) -> Self::Output {
         self.target = Some(target.clone());
         (self.f)(target)
     }
@@ -72,7 +72,7 @@ impl<F, T> Debug for FromFn<F, T> {
     }
 }
 
-/// Action made from a fallible function.
+/// An edit made from a fallible function.
 ///
 /// Same as [`FromFn`] but for functions that outputs [`Result`].
 #[derive(Clone, Debug)]
@@ -88,7 +88,7 @@ impl<F, T> TryFromFn<F, T> {
     }
 }
 
-impl<F, T, E> Action for TryFromFn<F, T>
+impl<F, T, E> Edit for TryFromFn<F, T>
 where
     F: FnMut(&mut T) -> Result<(), E>,
     T: Clone,
@@ -96,7 +96,7 @@ where
     type Target = T;
     type Output = Result<(), E>;
 
-    fn apply(&mut self, target: &mut Self::Target) -> Self::Output {
+    fn edit(&mut self, target: &mut Self::Target) -> Self::Output {
         self.target = Some(target.clone());
         (self.f)(target)
     }

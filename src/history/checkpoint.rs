@@ -1,10 +1,10 @@
 use super::Queue;
-use crate::{Action, History, Slot};
+use crate::{Edit, History, Slot};
 use alloc::vec::Vec;
 
 #[derive(Debug)]
 enum CheckpointEntry {
-    Apply(usize),
+    Edit(usize),
     Undo,
     Redo,
 }
@@ -28,21 +28,21 @@ impl<A, S> Checkpoint<'_, A, S> {
     }
 }
 
-impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
-    /// Calls the `apply` method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
+impl<A: Edit, S: Slot> Checkpoint<'_, A, S> {
+    /// Calls the [`History::edit`] method.
+    pub fn edit(&mut self, target: &mut A::Target, edit: A) -> A::Output {
         let branch = self.history.branch();
-        self.entries.push(CheckpointEntry::Apply(branch));
-        self.history.apply(target, action)
+        self.entries.push(CheckpointEntry::Edit(branch));
+        self.history.edit(target, edit)
     }
 
-    /// Calls the `undo` method.
+    /// Calls the [`History::undo`] method.
     pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
         self.entries.push(CheckpointEntry::Undo);
         self.history.undo(target)
     }
 
-    /// Calls the `redo` method.
+    /// Calls the [`History::redo`] method.
     pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
         self.entries.push(CheckpointEntry::Redo);
         self.history.redo(target)
@@ -57,7 +57,7 @@ impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
             .into_iter()
             .rev()
             .filter_map(|entry| match entry {
-                CheckpointEntry::Apply(branch) => {
+                CheckpointEntry::Edit(branch) => {
                     let output = self.history.undo(target)?;
                     let root = self.history.branch();
                     if root == branch {
@@ -100,17 +100,17 @@ mod tests {
         let mut history = History::new();
         let mut checkpoint = history.checkpoint();
 
-        checkpoint.apply(&mut target, A);
-        checkpoint.apply(&mut target, B);
-        checkpoint.apply(&mut target, C);
+        checkpoint.edit(&mut target, A);
+        checkpoint.edit(&mut target, B);
+        checkpoint.edit(&mut target, C);
         assert_eq!(target, "abc");
 
         checkpoint.undo(&mut target);
         checkpoint.undo(&mut target);
         assert_eq!(target, "a");
 
-        checkpoint.apply(&mut target, D);
-        checkpoint.apply(&mut target, E);
+        checkpoint.edit(&mut target, D);
+        checkpoint.edit(&mut target, E);
         assert_eq!(target, "ade");
 
         checkpoint.cancel(&mut target);

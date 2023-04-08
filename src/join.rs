@@ -1,9 +1,9 @@
-use crate::Action;
+use crate::Edit;
 use core::fmt::{self, Display, Formatter};
 
-/// Two actions joined together.
+/// Two edits joined together.
 ///
-/// Can be used to build more complex actions from simpler ones.
+/// Can be used to build more complex edits from simpler ones.
 ///
 /// # Examples
 /// ```
@@ -14,7 +14,7 @@ use core::fmt::{self, Display, Formatter};
 /// let mut record = Record::new();
 ///
 /// let abc = Join::new(Push('a'), Push('b')).join(Push('c'));
-/// record.apply(&mut target, abc);
+/// record.edit(&mut target, abc);
 /// assert_eq!(target, "abc");
 /// record.undo(&mut target);
 /// assert_eq!(target, "");
@@ -40,18 +40,18 @@ impl<A, B> Join<A, B> {
     }
 }
 
-impl<A, B> Action for Join<A, B>
+impl<A, B> Edit for Join<A, B>
 where
-    A: Action,
-    B: Action<Target = A::Target, Output = A::Output>,
+    A: Edit,
+    B: Edit<Target = A::Target, Output = A::Output>,
 {
     type Target = A::Target;
     type Output = A::Output;
 
     /// The output of a will be discarded.
-    fn apply(&mut self, target: &mut A::Target) -> Self::Output {
-        self.a.apply(target);
-        self.b.apply(target)
+    fn edit(&mut self, target: &mut A::Target) -> Self::Output {
+        self.a.edit(target);
+        self.b.edit(target)
     }
 
     /// The output of b will be discarded.
@@ -77,9 +77,9 @@ where
     }
 }
 
-/// Joins two fallible actions together.
+/// Joins two fallible edits together.
 ///
-/// Same as [`Join`] but for actions that outputs [`Result`].
+/// Same as [`Join`] but for edits that outputs [`Result`].
 #[derive(Clone, Debug)]
 pub struct TryJoin<A, B> {
     a: A,
@@ -98,18 +98,18 @@ impl<A, B> TryJoin<A, B> {
     }
 }
 
-impl<A, B, T, E> Action for TryJoin<A, B>
+impl<A, B, T, E> Edit for TryJoin<A, B>
 where
-    A: Action<Output = Result<T, E>>,
-    B: Action<Target = A::Target, Output = A::Output>,
+    A: Edit<Output = Result<T, E>>,
+    B: Edit<Target = A::Target, Output = A::Output>,
 {
     type Target = A::Target;
     type Output = A::Output;
 
     /// The output of a will be discarded if success.
-    fn apply(&mut self, target: &mut A::Target) -> Self::Output {
-        self.a.apply(target)?;
-        self.b.apply(target)
+    fn edit(&mut self, target: &mut A::Target) -> Self::Output {
+        self.a.edit(target)?;
+        self.b.edit(target)
     }
 
     /// The output of b will be discarded if success.

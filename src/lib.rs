@@ -3,12 +3,12 @@
 //! It is an implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
 //! where all modifications are done by creating objects that applies the modifications.
 //! All objects knows how to undo the changes it applies, and by using the provided data
-//! structures it is easy to apply, undo, and redo changes made to a target.
+//! structures it is easy to undo and redo edits made to a target.
 //!
 //! # Features
 //!
-//! * [`Action`] provides the base functionality for all actions. Multiple [`Action`]s can be merged into a single action
-//!   by implementing the [`merge`](Action::merge) method on the action. This allows smaller actions to be used to build
+//! * [`Edit`] provides the base functionality for all edit commands. Multiple [`Edit`]s can be merged into a single edit
+//!   by implementing the [`Edit::merge`] method on the edit. This allows smaller edits to be used to build
 //!   more complex operations, or smaller incremental changes to be merged into larger changes that can be undone and
 //!   redone in a single step.
 //! * [`Record`] provides basic stack based undo-redo functionality.
@@ -72,27 +72,27 @@ pub use record::Record;
 #[cfg(feature = "alloc")]
 pub use socket::{Nop, Signal, Slot};
 
-/// Base functionality for all actions.
-pub trait Action {
+/// Base functionality for all edits.
+pub trait Edit {
     /// The target type.
     type Target;
     /// The output type.
     type Output;
 
-    /// Applies the action on the target.
-    fn apply(&mut self, target: &mut Self::Target) -> Self::Output;
+    /// Applies the edit on the target.
+    fn edit(&mut self, target: &mut Self::Target) -> Self::Output;
 
-    /// Restores the state of the target as it was before the action was applied.
+    /// Restores the state of the target as it was before the edit was applied.
     fn undo(&mut self, target: &mut Self::Target) -> Self::Output;
 
-    /// Reapplies the action on the target.
+    /// Reapplies the edit on the target.
     ///
-    /// The default implementation uses the [`Action::apply`] implementation.
+    /// The default implementation uses the [`Edit::edit`] implementation.
     fn redo(&mut self, target: &mut Self::Target) -> Self::Output {
-        self.apply(target)
+        self.edit(target)
     }
 
-    /// Used for manual merging of actions. See [`Merged`] for more information.
+    /// Used for manual merging of edits. See [`Merged`] for more information.
     fn merge(&mut self, other: Self) -> Merged<Self>
     where
         Self: Sized,
@@ -101,21 +101,21 @@ pub trait Action {
     }
 }
 
-/// Says if the action have been merged with another action.
+/// Says if the edit have been merged with another edit.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Merged<A> {
-    /// The actions have been merged.
+    /// The edits have been merged.
     ///
-    /// This means that the `other` action will not be added to the stack.
+    /// This means that the `other` edit will not be added to the stack.
     Yes,
-    /// The actions have not been merged.
+    /// The edits have not been merged.
     ///
-    /// We need to return the `other` action so it can be added to the stack.
+    /// We need to return the `other` edit so it can be added to the stack.
     No(A),
-    /// The two actions cancels each other out.
+    /// The two edits cancels each other out.
     ///
-    /// This means that both action will be removed from the stack.
+    /// This means that both edits will be removed from the stack.
     Annul,
 }
 

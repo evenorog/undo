@@ -1,4 +1,4 @@
-//! A history tree of actions.
+//! A history tree of edits.
 
 mod builder;
 mod checkpoint;
@@ -11,14 +11,14 @@ pub use display::Display;
 pub use queue::Queue;
 
 use crate::socket::{Nop, Signal, Slot};
-use crate::{Action, At, Entry, Record};
+use crate::{At, Edit, Entry, Record};
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// A history tree of actions.
+/// A history tree of edits.
 ///
 /// Unlike [`Record`] which maintains a linear undo history,
 /// [`History`] maintains an undo tree containing every edit made to the target.
@@ -31,14 +31,14 @@ use serde::{Deserialize, Serialize};
 /// let mut target = String::new();
 /// let mut history = History::new();
 ///
-/// history.apply(&mut target, Push('a'));
-/// history.apply(&mut target, Push('b'));
-/// history.apply(&mut target, Push('c'));
+/// history.edit(&mut target, Push('a'));
+/// history.edit(&mut target, Push('b'));
+/// history.edit(&mut target, Push('c'));
 /// let abc = history.branch();
 ///
 /// history.go_to(&mut target, abc, 1);
-/// history.apply(&mut target, Push('f'));
-/// history.apply(&mut target, Push('g'));
+/// history.edit(&mut target, Push('f'));
+/// history.edit(&mut target, Push('g'));
 /// assert_eq!(target, "afg");
 ///
 /// history.go_to(&mut target, abc, 3);
@@ -47,28 +47,28 @@ use serde::{Deserialize, Serialize};
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct History<A, S = Nop> {
+pub struct History<E, S = Nop> {
     root: usize,
     next: usize,
     saved: Option<At>,
-    pub(crate) record: Record<A, S>,
-    branches: BTreeMap<usize, Branch<A>>,
+    pub(crate) record: Record<E, S>,
+    branches: BTreeMap<usize, Branch<E>>,
 }
 
-impl<A> History<A> {
+impl<E> History<E> {
     /// Returns a new history.
-    pub fn new() -> History<A> {
+    pub fn new() -> History<E> {
         History::builder().build()
     }
 }
 
-impl<A, S> History<A, S> {
+impl<E, S> History<E, S> {
     /// Returns a new history builder.
-    pub fn builder() -> Builder<A, S> {
+    pub fn builder() -> Builder<E, S> {
         Builder::new()
     }
 
-    /// Reserves capacity for at least `additional` more actions.
+    /// Reserves capacity for at least `additional` more edits.
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
@@ -86,7 +86,7 @@ impl<A, S> History<A, S> {
         self.record.shrink_to_fit();
     }
 
-    /// Returns the number of actions in the current branch of the history.
+    /// Returns the number of edits in the current branch of the history.
     pub fn len(&self) -> usize {
         self.record.len()
     }
@@ -131,28 +131,28 @@ impl<A, S> History<A, S> {
         self.root
     }
 
-    /// Returns the position of the current action.
+    /// Returns the position of the current edit.
     pub fn current(&self) -> usize {
         self.record.current()
     }
 
     /// Returns a structure for configurable formatting of the history.
-    pub fn display(&self) -> Display<A, S> {
+    pub fn display(&self) -> Display<E, S> {
         Display::from(self)
     }
 
-    /// Returns an iterator over the actions in the current branch.
-    pub fn actions(&self) -> impl Iterator<Item = &A> {
-        self.record.actions()
+    /// Returns an iterator over the edits in the current branch.
+    pub fn edits(&self) -> impl Iterator<Item = &E> {
+        self.record.edits()
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
+    pub fn queue(&mut self) -> Queue<E, S> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         Checkpoint::from(self)
     }
 
@@ -161,12 +161,12 @@ impl<A, S> History<A, S> {
     }
 }
 
-impl<A: Action, S: Slot> History<A, S> {
-    /// Pushes the [`Action`] to the top of the history and executes its [`apply`](Action::apply) method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
+impl<E: Edit, S: Slot> History<E, S> {
+    /// Pushes the [`Edit`] to the top of the history and executes its [`Edit::edit`] method.
+    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let at = self.at();
         let saved = self.record.saved.filter(|&saved| saved > at.current);
-        let (output, merged, tail) = self.record.__apply(target, action);
+        let (output, merged, tail) = self.record.edit_inner(target, edit);
         // Check if the limit has been reached.
         if !merged && at.current == self.current() {
             let root = self.branch();
@@ -187,15 +187,15 @@ impl<A: Action, S: Slot> History<A, S> {
         output
     }
 
-    /// Calls the [`Action::undo`] method for the active action
+    /// Calls the [`Edit::undo`] method for the active edit
     /// and sets the previous one as the new active one.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.record.undo(target)
     }
 
-    /// Calls the [`Action::redo`] method for the active action
+    /// Calls the [`Edit::redo`] method for the active edit
     /// and sets the next one as the new active one.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.record.redo(target)
     }
 
@@ -205,7 +205,7 @@ impl<A: Action, S: Slot> History<A, S> {
         self.record.set_saved(saved);
     }
 
-    /// Removes all actions from the history without undoing them.
+    /// Removes all edits from the history without undoing them.
     pub fn clear(&mut self) {
         self.root = 0;
         self.next = 1;
@@ -284,7 +284,7 @@ impl<A: Action, S: Slot> History<A, S> {
         }
     }
 
-    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<A>)>> {
+    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<E>)>> {
         debug_assert_ne!(self.branch(), to);
         let mut dest = self.branches.remove(&to)?;
         let mut i = dest.parent.branch;
@@ -299,13 +299,13 @@ impl<A: Action, S: Slot> History<A, S> {
         Some(path.into_iter().rev())
     }
 
-    /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action in `branch` at `current` is reached.
+    /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit in `branch` at `current` is reached.
     pub fn go_to(
         &mut self,
-        target: &mut A::Target,
+        target: &mut E::Target,
         branch: usize,
         current: usize,
-    ) -> Vec<A::Output> {
+    ) -> Vec<E::Output> {
         let root = self.root;
         if root == branch {
             return self.record.go_to(target, current);
@@ -320,11 +320,11 @@ impl<A: Action, S: Slot> History<A, S> {
             // Walk to `branch.current` either by undoing or redoing.
             let o = self.record.go_to(target, branch.parent.current);
             outputs.extend(o);
-            // Apply the actions in the branch and move older actions into their own branch.
+            // Apply the edits in the branch and move older edits into their own branch.
             for entry in branch.entries {
                 let current = self.current();
                 let saved = self.record.saved.filter(|&saved| saved > current);
-                let (_, _, entries) = self.record.__apply(target, entry.action);
+                let (_, _, entries) = self.record.edit_inner(target, entry.edit);
                 if !entries.is_empty() {
                     self.branches
                         .insert(self.root, Branch::new(new, current, entries));
@@ -338,28 +338,28 @@ impl<A: Action, S: Slot> History<A, S> {
     }
 }
 
-impl<A: ToString, S> History<A, S> {
-    /// Returns the string of the action which will be undone
+impl<E: ToString, S> History<E, S> {
+    /// Returns the string of the edit which will be undone
     /// in the next call to [`History::undo`].
     pub fn undo_string(&self) -> Option<String> {
         self.record.undo_string()
     }
 
-    /// Returns the string of the action which will be redone
+    /// Returns the string of the edit which will be redone
     /// in the next call to [`History::redo`].
     pub fn redo_string(&self) -> Option<String> {
         self.record.redo_string()
     }
 }
 
-impl<A> Default for History<A> {
-    fn default() -> History<A> {
+impl<E> Default for History<E> {
+    fn default() -> History<E> {
         History::new()
     }
 }
 
-impl<A, S> From<Record<A, S>> for History<A, S> {
-    fn from(record: Record<A, S>) -> Self {
+impl<E, S> From<Record<E, S>> for History<E, S> {
+    fn from(record: Record<E, S>) -> Self {
         History {
             root: 0,
             next: 1,
@@ -373,13 +373,13 @@ impl<A, S> From<Record<A, S>> for History<A, S> {
 /// A branch in the history.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub(crate) struct Branch<A> {
+pub(crate) struct Branch<E> {
     pub(crate) parent: At,
-    pub(crate) entries: VecDeque<Entry<A>>,
+    pub(crate) entries: VecDeque<Entry<E>>,
 }
 
-impl<A> Branch<A> {
-    fn new(branch: usize, current: usize, entries: VecDeque<Entry<A>>) -> Branch<A> {
+impl<E> Branch<E> {
+    fn new(branch: usize, current: usize, entries: VecDeque<Entry<E>>) -> Branch<E> {
         Branch {
             parent: At::new(branch, current),
             entries,
@@ -393,11 +393,11 @@ mod tests {
 
     struct Push(char);
 
-    impl Action for Push {
+    impl Edit for Push {
         type Target = String;
         type Output = ();
 
-        fn apply(&mut self, s: &mut String) {
+        fn edit(&mut self, s: &mut String) {
             s.push(self.0);
         }
 
@@ -425,44 +425,44 @@ mod tests {
         // a
         let mut target = String::new();
         let mut history = History::new();
-        history.apply(&mut target, Push('a'));
-        history.apply(&mut target, Push('b'));
-        history.apply(&mut target, Push('c'));
-        history.apply(&mut target, Push('d'));
-        history.apply(&mut target, Push('e'));
+        history.edit(&mut target, Push('a'));
+        history.edit(&mut target, Push('b'));
+        history.edit(&mut target, Push('c'));
+        history.edit(&mut target, Push('d'));
+        history.edit(&mut target, Push('e'));
         assert_eq!(target, "abcde");
         history.undo(&mut target).unwrap();
         history.undo(&mut target).unwrap();
         assert_eq!(target, "abc");
         let abcde = history.branch();
-        history.apply(&mut target, Push('f'));
-        history.apply(&mut target, Push('g'));
+        history.edit(&mut target, Push('f'));
+        history.edit(&mut target, Push('g'));
         assert_eq!(target, "abcfg");
         history.undo(&mut target).unwrap();
         let abcfg = history.branch();
-        history.apply(&mut target, Push('h'));
-        history.apply(&mut target, Push('i'));
-        history.apply(&mut target, Push('j'));
+        history.edit(&mut target, Push('h'));
+        history.edit(&mut target, Push('i'));
+        history.edit(&mut target, Push('j'));
         assert_eq!(target, "abcfhij");
         history.undo(&mut target).unwrap();
         let abcfhij = history.branch();
-        history.apply(&mut target, Push('k'));
+        history.edit(&mut target, Push('k'));
         assert_eq!(target, "abcfhik");
         history.undo(&mut target).unwrap();
         let abcfhik = history.branch();
-        history.apply(&mut target, Push('l'));
+        history.edit(&mut target, Push('l'));
         assert_eq!(target, "abcfhil");
-        history.apply(&mut target, Push('m'));
+        history.edit(&mut target, Push('m'));
         assert_eq!(target, "abcfhilm");
         let abcfhilm = history.branch();
         history.go_to(&mut target, abcde, 2);
-        history.apply(&mut target, Push('n'));
-        history.apply(&mut target, Push('o'));
+        history.edit(&mut target, Push('n'));
+        history.edit(&mut target, Push('o'));
         assert_eq!(target, "abno");
         history.undo(&mut target).unwrap();
         let abno = history.branch();
-        history.apply(&mut target, Push('p'));
-        history.apply(&mut target, Push('q'));
+        history.edit(&mut target, Push('p'));
+        history.edit(&mut target, Push('q'));
         assert_eq!(target, "abnpq");
 
         let abnpq = history.branch();

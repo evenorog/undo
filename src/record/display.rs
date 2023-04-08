@@ -31,13 +31,13 @@ impl<A, S> Display<'_, A, S> {
         self
     }
 
-    /// Show the position of the action (on by default).
+    /// Show the position of the edit (on by default).
     pub fn position(&mut self, on: bool) -> &mut Self {
         self.format.position = on;
         self
     }
 
-    /// Show the saved action (on by default).
+    /// Show the saved edit (on by default).
     pub fn saved(&mut self, on: bool) -> &mut Self {
         self.format.saved = on;
         self

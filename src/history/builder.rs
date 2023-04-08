@@ -14,7 +14,7 @@ use crate::{History, Nop, Slot};
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
 ///     .build();
-/// # history.apply(&mut target, Push('a'));
+/// # history.edit(&mut target, Push('a'));
 /// # }
 /// ```
 #[derive(Debug)]

@@ -57,7 +57,7 @@ impl<F: FnMut(Signal)> Slot for F {
 
 /// The signal used for communicating state changes.
 ///
-/// For example, if the history tree can no longer redo any actions,
+/// For example, if the history tree can no longer redo any edits,
 /// it sends a `Redo(false)` signal to tell the user.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]

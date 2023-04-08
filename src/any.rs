@@ -1,11 +1,11 @@
-use crate::Action;
+use crate::Edit;
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::fmt::{self, Debug, Display, Formatter};
 
-/// Any action type.
+/// Any edit type.
 ///
-/// This allows you to use multiple types of actions at the same time
+/// This allows you to use multiple types of edits at the same time
 /// as long as they all share the same target and output type.
 ///
 /// # Examples
@@ -16,49 +16,49 @@ use core::fmt::{self, Debug, Display, Formatter};
 /// let mut target = String::new();
 /// let mut record = Record::new();
 ///
-/// record.apply(&mut target, Any::new(Push('a')));
-/// record.apply(&mut target, Any::new(FromFn::new(|s: &mut String| s.push('b'))));
+/// record.edit(&mut target, Any::new(Push('a')));
+/// record.edit(&mut target, Any::new(FromFn::new(|s: &mut String| s.push('b'))));
 /// assert_eq!(target, "ab");
 /// # }
 /// ```
 pub struct Any<T, O> {
-    action: Box<dyn Action<Target = T, Output = O>>,
+    edit: Box<dyn Edit<Target = T, Output = O>>,
     string: String,
 }
 
 impl<T, O> Any<T, O> {
-    /// Creates an `Any` from the provided action.
-    pub fn new<A>(action: A) -> Any<T, O>
+    /// Creates an `Any` from the provided edit.
+    pub fn new<A>(edit: A) -> Any<T, O>
     where
-        A: Action<Target = T, Output = O>,
+        A: Edit<Target = T, Output = O>,
         A: 'static,
     {
         Any {
-            action: Box::new(action),
+            edit: Box::new(edit),
             string: String::new(),
         }
     }
 
-    /// Sets the display message of this action.
+    /// Sets the display message of this edit.
     pub fn set_string(&mut self, str: impl Into<String>) {
         self.string = str.into();
     }
 }
 
-impl<T, O> Action for Any<T, O> {
+impl<T, O> Edit for Any<T, O> {
     type Target = T;
     type Output = O;
 
-    fn apply(&mut self, target: &mut Self::Target) -> Self::Output {
-        self.action.apply(target)
+    fn edit(&mut self, target: &mut Self::Target) -> Self::Output {
+        self.edit.edit(target)
     }
 
     fn undo(&mut self, target: &mut Self::Target) -> Self::Output {
-        self.action.undo(target)
+        self.edit.undo(target)
     }
 
     fn redo(&mut self, target: &mut Self::Target) -> Self::Output {
-        self.action.redo(target)
+        self.edit.redo(target)
     }
 }
 

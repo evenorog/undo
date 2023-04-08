@@ -1,4 +1,4 @@
-//! A linear record of actions.
+//! A linear record of edits.
 
 mod builder;
 mod checkpoint;
@@ -11,7 +11,7 @@ pub use display::Display;
 pub use queue::Queue;
 
 use crate::socket::{Nop, Slot, Socket};
-use crate::{Action, Entry, History, Merged, Signal};
+use crate::{Edit, Entry, History, Merged, Signal};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -19,7 +19,7 @@ use core::num::NonZeroUsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// A linear record of actions.
+/// A linear record of edits.
 ///
 /// The record can roll the targets state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
@@ -35,9 +35,9 @@ use serde::{Deserialize, Serialize};
 /// let mut target = String::new();
 /// let mut record = Record::new();
 ///
-/// record.apply(&mut target, Push('a'));
-/// record.apply(&mut target, Push('b'));
-/// record.apply(&mut target, Push('c'));
+/// record.edit(&mut target, Push('a'));
+/// record.edit(&mut target, Push('b'));
+/// record.edit(&mut target, Push('c'));
 /// assert_eq!(target, "abc");
 ///
 /// record.undo(&mut target);
@@ -53,28 +53,28 @@ use serde::{Deserialize, Serialize};
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct Record<A, S = Nop> {
-    pub(crate) entries: VecDeque<Entry<A>>,
+pub struct Record<E, S = Nop> {
+    pub(crate) entries: VecDeque<Entry<E>>,
     pub(crate) limit: NonZeroUsize,
     pub(crate) current: usize,
     pub(crate) saved: Option<usize>,
     pub(crate) socket: Socket<S>,
 }
 
-impl<A> Record<A> {
+impl<E> Record<E> {
     /// Returns a new record.
-    pub fn new() -> Record<A> {
+    pub fn new() -> Record<E> {
         Record::builder().build()
     }
 }
 
-impl<A, S> Record<A, S> {
+impl<E, S> Record<E, S> {
     /// Returns a new record builder.
-    pub fn builder() -> Builder<A, S> {
+    pub fn builder() -> Builder<E, S> {
         Builder::new()
     }
 
-    /// Reserves capacity for at least `additional` more actions.
+    /// Reserves capacity for at least `additional` more edits.
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
@@ -92,7 +92,7 @@ impl<A, S> Record<A, S> {
         self.entries.shrink_to_fit();
     }
 
-    /// Returns the number of actions in the record.
+    /// Returns the number of edits in the record.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -132,45 +132,45 @@ impl<A, S> Record<A, S> {
         self.saved == Some(self.current)
     }
 
-    /// Returns the position of the current action.
+    /// Returns the position of the current edit.
     pub fn current(&self) -> usize {
         self.current
     }
 
     /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<A, S> {
+    pub fn display(&self) -> Display<E, S> {
         Display::from(self)
     }
 
-    /// Returns an iterator over the actions.
-    pub fn actions(&self) -> impl Iterator<Item = &A> {
-        self.entries.iter().map(|e| &e.action)
+    /// Returns an iterator over the edits.
+    pub fn edits(&self) -> impl Iterator<Item = &E> {
+        self.entries.iter().map(|e| &e.edit)
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
+    pub fn queue(&mut self) -> Queue<E, S> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         Checkpoint::from(self)
     }
 }
 
-impl<A: Action, S: Slot> Record<A, S> {
-    /// Pushes the action on top of the record and executes its [`Action::apply`] method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
-        let (output, _, _) = self.__apply(target, action);
+impl<E: Edit, S: Slot> Record<E, S> {
+    /// Pushes the edit on top of the record and executes its [`Edit::edit`] method.
+    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
+        let (output, _, _) = self.edit_inner(target, edit);
         output
     }
 
-    pub(crate) fn __apply(
+    pub(crate) fn edit_inner(
         &mut self,
-        target: &mut A::Target,
-        mut action: A,
-    ) -> (A::Output, bool, VecDeque<Entry<A>>) {
-        let output = action.apply(target);
+        target: &mut E::Target,
+        mut edit: E,
+    ) -> (E::Output, bool, VecDeque<Entry<E>>) {
+        let output = edit.edit(target);
         // We store the state of the stack before adding the entry.
         let current = self.current;
         let could_undo = self.can_undo();
@@ -180,10 +180,10 @@ impl<A: Action, S: Slot> Record<A, S> {
         let tail = self.entries.split_off(current);
         // Check if the saved state was popped off.
         self.saved = self.saved.filter(|&saved| saved <= current);
-        // Try to merge actions unless the target is in a saved state.
+        // Try to merge edits unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
-            Some(last) if !was_saved => last.action.merge(action),
-            _ => Merged::No(action),
+            Some(last) if !was_saved => last.edit.merge(edit),
+            _ => Merged::No(edit),
         };
 
         let merged_or_annulled = match merged {
@@ -193,16 +193,16 @@ impl<A: Action, S: Slot> Record<A, S> {
                 self.current -= 1;
                 true
             }
-            // If actions are not merged or annulled push it onto the storage.
-            Merged::No(action) => {
-                // If limit is reached, pop off the first action.
+            // If edits are not merged or annulled push it onto the storage.
+            Merged::No(edit) => {
+                // If limit is reached, pop off the first edit.
                 if self.limit() == self.current {
                     self.entries.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                 } else {
                     self.current += 1;
                 }
-                self.entries.push_back(Entry::from(action));
+                self.entries.push_back(Entry::from(edit));
                 false
             }
         };
@@ -213,9 +213,9 @@ impl<A: Action, S: Slot> Record<A, S> {
         (output, merged_or_annulled, tail)
     }
 
-    /// Calls the [`Action::undo`] method for the active action and sets
+    /// Calls the [`Edit::undo`] method for the active edit and sets
     /// the previous one as the new active one.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.can_undo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
@@ -231,9 +231,9 @@ impl<A: Action, S: Slot> Record<A, S> {
         })
     }
 
-    /// Calls the [`Action::redo`] method for the active action and sets
+    /// Calls the [`Edit::redo`] method for the active edit and sets
     /// the next one as the new active one.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.can_redo().then(|| {
             let was_saved = self.is_saved();
             let old = self.current;
@@ -261,7 +261,7 @@ impl<A: Action, S: Slot> Record<A, S> {
         }
     }
 
-    /// Removes all actions from the record without undoing them.
+    /// Removes all edits from the record without undoing them.
     pub fn clear(&mut self) {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -273,13 +273,13 @@ impl<A: Action, S: Slot> Record<A, S> {
     }
 
     /// Revert the changes done to the target since the saved state.
-    pub fn revert(&mut self, target: &mut A::Target) -> Vec<A::Output> {
+    pub fn revert(&mut self, target: &mut E::Target) -> Vec<E::Output> {
         self.saved
             .map_or_else(Vec::new, |saved| self.go_to(target, saved))
     }
 
-    /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action at `current` is reached.
-    pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Vec<A::Output> {
+    /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `current` is reached.
+    pub fn go_to(&mut self, target: &mut E::Target, current: usize) -> Vec<E::Output> {
         if current > self.len() {
             return Vec::new();
         }
@@ -318,32 +318,32 @@ impl<A: Action, S: Slot> Record<A, S> {
     }
 }
 
-impl<A: ToString, S> Record<A, S> {
-    /// Returns the string of the action which will be undone
+impl<E: ToString, S> Record<E, S> {
+    /// Returns the string of the edit which will be undone
     /// in the next call to [`Record::undo`].
     pub fn undo_string(&self) -> Option<String> {
         self.current.checked_sub(1).and_then(|i| self.string_at(i))
     }
 
-    /// Returns the string of the action which will be redone
+    /// Returns the string of the edit which will be redone
     /// in the next call to [`Record::redo`].
     pub fn redo_string(&self) -> Option<String> {
         self.string_at(self.current)
     }
 
     fn string_at(&self, i: usize) -> Option<String> {
-        self.entries.get(i).map(|e| e.action.to_string())
+        self.entries.get(i).map(|e| e.edit.to_string())
     }
 }
 
-impl<A> Default for Record<A> {
-    fn default() -> Record<A> {
+impl<E> Default for Record<E> {
+    fn default() -> Record<E> {
         Record::new()
     }
 }
 
-impl<A, F> From<History<A, F>> for Record<A, F> {
-    fn from(history: History<A, F>) -> Record<A, F> {
+impl<E, F> From<History<E, F>> for Record<E, F> {
+    fn from(history: History<E, F>) -> Record<E, F> {
         history.record
     }
 }
@@ -354,26 +354,26 @@ mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    enum Edit {
+    enum Editor {
         Push(Push),
         Pop(Pop),
     }
 
-    impl Action for Edit {
+    impl Edit for Editor {
         type Target = String;
         type Output = ();
 
-        fn apply(&mut self, s: &mut String) {
+        fn edit(&mut self, s: &mut String) {
             match self {
-                Edit::Push(add) => add.apply(s),
-                Edit::Pop(del) => del.apply(s),
+                Editor::Push(add) => add.edit(s),
+                Editor::Pop(del) => del.edit(s),
             }
         }
 
         fn undo(&mut self, s: &mut String) {
             match self {
-                Edit::Push(add) => add.undo(s),
-                Edit::Pop(del) => del.undo(s),
+                Editor::Push(add) => add.undo(s),
+                Editor::Pop(del) => del.undo(s),
             }
         }
 
@@ -382,8 +382,8 @@ mod tests {
             Self: Sized,
         {
             match (self, edit) {
-                (Edit::Push(_), Edit::Pop(_)) => Merged::Annul,
-                (Edit::Pop(Pop(Some(a))), Edit::Push(Push(b))) if a == &b => Merged::Annul,
+                (Editor::Push(_), Editor::Pop(_)) => Merged::Annul,
+                (Editor::Pop(Pop(Some(a))), Editor::Push(Push(b))) if a == &b => Merged::Annul,
                 (_, edit) => Merged::No(edit),
             }
         }
@@ -392,11 +392,11 @@ mod tests {
     #[derive(Debug, PartialEq)]
     struct Push(char);
 
-    impl Action for Push {
+    impl Edit for Push {
         type Target = String;
         type Output = ();
 
-        fn apply(&mut self, s: &mut String) {
+        fn edit(&mut self, s: &mut String) {
             s.push(self.0);
         }
 
@@ -408,11 +408,11 @@ mod tests {
     #[derive(Default)]
     struct Pop(Option<char>);
 
-    impl Action for Pop {
+    impl Edit for Pop {
         type Target = String;
         type Output = ();
 
-        fn apply(&mut self, s: &mut String) {
+        fn edit(&mut self, s: &mut String) {
             self.0 = s.pop();
         }
 
@@ -426,11 +426,11 @@ mod tests {
     fn go_to() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Push('a'));
-        record.apply(&mut target, Push('b'));
-        record.apply(&mut target, Push('c'));
-        record.apply(&mut target, Push('d'));
-        record.apply(&mut target, Push('e'));
+        record.edit(&mut target, Push('a'));
+        record.edit(&mut target, Push('b'));
+        record.edit(&mut target, Push('c'));
+        record.edit(&mut target, Push('d'));
+        record.edit(&mut target, Push('e'));
 
         record.go_to(&mut target, 0);
         assert_eq!(record.current(), 0);
@@ -458,19 +458,19 @@ mod tests {
     fn annul() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Edit::Push(Push('a')));
-        record.apply(&mut target, Edit::Pop(Pop::default()));
-        record.apply(&mut target, Edit::Push(Push('b')));
+        record.edit(&mut target, Editor::Push(Push('a')));
+        record.edit(&mut target, Editor::Pop(Pop::default()));
+        record.edit(&mut target, Editor::Push(Push('b')));
         assert_eq!(record.len(), 1);
     }
 
     #[test]
-    fn actions() {
+    fn edits() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Push('a'));
-        record.apply(&mut target, Push('b'));
-        let collected = record.actions().collect::<Vec<_>>();
+        record.edit(&mut target, Push('a'));
+        record.edit(&mut target, Push('b'));
+        let collected = record.edits().collect::<Vec<_>>();
         assert_eq!(&collected[..], &[&Push('a'), &Push('b')][..]);
     }
 }

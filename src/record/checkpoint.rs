@@ -1,11 +1,11 @@
 use super::Queue;
-use crate::{Action, Entry, Record, Slot};
+use crate::{Edit, Entry, Record, Slot};
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 
 #[derive(Debug)]
 enum CheckpointEntry<A> {
-    Apply(Option<usize>, VecDeque<Entry<A>>),
+    Edit(Option<usize>, VecDeque<Entry<A>>),
     Undo,
     Redo,
 }
@@ -29,12 +29,12 @@ impl<A, S> Checkpoint<'_, A, S> {
     }
 }
 
-impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
+impl<A: Edit, S: Slot> Checkpoint<'_, A, S> {
     /// Calls the `apply` method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
+    pub fn edit(&mut self, target: &mut A::Target, edit: A) -> A::Output {
         let saved = self.record.saved;
-        let (output, _, tail) = self.record.__apply(target, action);
-        self.entries.push(CheckpointEntry::Apply(saved, tail));
+        let (output, _, tail) = self.record.edit_inner(target, edit);
+        self.entries.push(CheckpointEntry::Edit(saved, tail));
         output
     }
 
@@ -61,7 +61,7 @@ impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
             .into_iter()
             .rev()
             .filter_map(|entry| match entry {
-                CheckpointEntry::Apply(saved, mut entries) => {
+                CheckpointEntry::Edit(saved, mut entries) => {
                     let output = self.record.undo(target)?;
                     self.record.entries.pop_back();
                     self.record.entries.append(&mut entries);
@@ -103,19 +103,19 @@ mod tests {
         let mut target = String::new();
         let mut record = Record::new();
         let mut cp1 = record.checkpoint();
-        cp1.apply(&mut target, A);
-        cp1.apply(&mut target, B);
-        cp1.apply(&mut target, C);
+        cp1.edit(&mut target, A);
+        cp1.edit(&mut target, B);
+        cp1.edit(&mut target, C);
         assert_eq!(target, "abc");
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(&mut target, D);
-        cp2.apply(&mut target, E);
-        cp2.apply(&mut target, F);
+        cp2.edit(&mut target, D);
+        cp2.edit(&mut target, E);
+        cp2.edit(&mut target, F);
         assert_eq!(target, "abcdef");
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(&mut target, G);
-        cp3.apply(&mut target, H);
-        cp3.apply(&mut target, I);
+        cp3.edit(&mut target, G);
+        cp3.edit(&mut target, H);
+        cp3.edit(&mut target, I);
         assert_eq!(target, "abcdefghi");
         cp3.commit();
         cp2.commit();
@@ -128,17 +128,17 @@ mod tests {
         let mut target = String::new();
         let mut record = Record::new();
         let mut cp1 = record.checkpoint();
-        cp1.apply(&mut target, A);
-        cp1.apply(&mut target, B);
-        cp1.apply(&mut target, C);
+        cp1.edit(&mut target, A);
+        cp1.edit(&mut target, B);
+        cp1.edit(&mut target, C);
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(&mut target, D);
-        cp2.apply(&mut target, E);
-        cp2.apply(&mut target, F);
+        cp2.edit(&mut target, D);
+        cp2.edit(&mut target, E);
+        cp2.edit(&mut target, F);
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(&mut target, G);
-        cp3.apply(&mut target, H);
-        cp3.apply(&mut target, I);
+        cp3.edit(&mut target, G);
+        cp3.edit(&mut target, H);
+        cp3.edit(&mut target, I);
         assert_eq!(target, "abcdefghi");
         cp3.cancel(&mut target);
         assert_eq!(target, "abcdef");
@@ -152,17 +152,17 @@ mod tests {
     fn checkpoint_saved() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, A);
-        record.apply(&mut target, B);
-        record.apply(&mut target, C);
+        record.edit(&mut target, A);
+        record.edit(&mut target, B);
+        record.edit(&mut target, C);
         record.set_saved(true);
         record.undo(&mut target).unwrap();
         record.undo(&mut target).unwrap();
         record.undo(&mut target).unwrap();
         let mut cp = record.checkpoint();
-        cp.apply(&mut target, D);
-        cp.apply(&mut target, E);
-        cp.apply(&mut target, F);
+        cp.edit(&mut target, D);
+        cp.edit(&mut target, E);
+        cp.edit(&mut target, F);
         assert_eq!(target, "def");
         cp.cancel(&mut target);
         assert_eq!(target, "");
