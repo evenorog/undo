@@ -21,17 +21,17 @@ use core::num::NonZeroUsize;
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<A, S = Nop> {
+pub struct Builder<E, S = Nop> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
     socket: Socket<S>,
-    pd: PhantomData<A>,
+    pd: PhantomData<E>,
 }
 
-impl<A, S> Builder<A, S> {
+impl<E, S> Builder<E, S> {
     /// Returns a builder for a record.
-    pub fn new() -> Builder<A, S> {
+    pub fn new() -> Builder<E, S> {
         Builder {
             capacity: 0,
             limit: NonZeroUsize::new(usize::MAX).unwrap(),
@@ -42,7 +42,7 @@ impl<A, S> Builder<A, S> {
     }
 
     /// Sets the capacity for the record.
-    pub fn capacity(mut self, capacity: usize) -> Builder<A, S> {
+    pub fn capacity(mut self, capacity: usize) -> Builder<E, S> {
         self.capacity = capacity;
         self
     }
@@ -51,20 +51,20 @@ impl<A, S> Builder<A, S> {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(mut self, limit: usize) -> Builder<A, S> {
+    pub fn limit(mut self, limit: usize) -> Builder<E, S> {
         self.limit = NonZeroUsize::new(limit).expect("limit can not be `0`");
         self
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(mut self, saved: bool) -> Builder<A, S> {
+    pub fn saved(mut self, saved: bool) -> Builder<E, S> {
         self.saved = saved;
         self
     }
 
     /// Builds the record.
-    pub fn build(self) -> Record<A, S> {
+    pub fn build(self) -> Record<E, S> {
         Record {
             entries: VecDeque::with_capacity(self.capacity),
             limit: self.limit,
@@ -75,15 +75,15 @@ impl<A, S> Builder<A, S> {
     }
 }
 
-impl<A, S: Slot> Builder<A, S> {
+impl<E, S: Slot> Builder<E, S> {
     /// Connects the slot.
-    pub fn connect(mut self, slot: S) -> Builder<A, S> {
+    pub fn connect(mut self, slot: S) -> Builder<E, S> {
         self.socket = Socket::new(slot);
         self
     }
 }
 
-impl<A> Default for Builder<A> {
+impl<E> Default for Builder<E> {
     fn default() -> Self {
         Builder::new()
     }

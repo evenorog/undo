@@ -4,12 +4,12 @@ use core::fmt::{self, Write};
 use std::time::SystemTime;
 
 /// Configurable display formatting for the record.
-pub struct Display<'a, A, S> {
-    record: &'a Record<A, S>,
+pub struct Display<'a, E, S> {
+    record: &'a Record<E, S>,
     format: Format,
 }
 
-impl<A, S> Display<'_, A, S> {
+impl<E, S> Display<'_, E, S> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -44,12 +44,12 @@ impl<A, S> Display<'_, A, S> {
     }
 }
 
-impl<A: fmt::Display, S> Display<'_, A, S> {
+impl<E: fmt::Display, S> Display<'_, E, S> {
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
         current: usize,
-        entry: Option<&Entry<A>>,
+        entry: Option<&Entry<E>>,
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
         let at = At::root(current);
@@ -85,8 +85,8 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
     }
 }
 
-impl<'a, A, S> From<&'a Record<A, S>> for Display<'a, A, S> {
-    fn from(record: &'a Record<A, S>) -> Self {
+impl<'a, E, S> From<&'a Record<E, S>> for Display<'a, E, S> {
+    fn from(record: &'a Record<E, S>) -> Self {
         Display {
             record,
             format: Format::default(),
@@ -94,7 +94,7 @@ impl<'a, A, S> From<&'a Record<A, S>> for Display<'a, A, S> {
     }
 }
 
-impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
+impl<E: fmt::Display, S> fmt::Display for Display<'_, E, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         #[cfg(feature = "std")]
         let now = SystemTime::now();

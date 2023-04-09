@@ -70,7 +70,7 @@ pub enum Signal {
     Saved(bool),
 }
 
-/// Default slot that does nothing.
+/// Default [`Slot`] that does nothing.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct Nop;

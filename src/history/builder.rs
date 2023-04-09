@@ -18,16 +18,16 @@ use crate::{History, Nop, Slot};
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<A, S = Nop>(RecordBuilder<A, S>);
+pub struct Builder<E, S = Nop>(RecordBuilder<E, S>);
 
-impl<A, S> Builder<A, S> {
+impl<E, S> Builder<E, S> {
     /// Returns a builder for a history.
-    pub fn new() -> Builder<A, S> {
+    pub fn new() -> Builder<E, S> {
         Builder(RecordBuilder::new())
     }
 
     /// Sets the capacity for the history.
-    pub fn capacity(self, capacity: usize) -> Builder<A, S> {
+    pub fn capacity(self, capacity: usize) -> Builder<E, S> {
         Builder(self.0.capacity(capacity))
     }
 
@@ -35,30 +35,30 @@ impl<A, S> Builder<A, S> {
     ///
     /// # Panics
     /// Panics if `limit` is `0`.
-    pub fn limit(self, limit: usize) -> Builder<A, S> {
+    pub fn limit(self, limit: usize) -> Builder<E, S> {
         Builder(self.0.limit(limit))
     }
 
     /// Sets if the target is initially in a saved state.
     /// By default the target is in a saved state.
-    pub fn saved(self, saved: bool) -> Builder<A, S> {
+    pub fn saved(self, saved: bool) -> Builder<E, S> {
         Builder(self.0.saved(saved))
     }
 
     /// Builds the history.
-    pub fn build(self) -> History<A, S> {
+    pub fn build(self) -> History<E, S> {
         History::from(self.0.build())
     }
 }
 
-impl<A, S: Slot> Builder<A, S> {
+impl<E, S: Slot> Builder<E, S> {
     /// Connects the slot.
-    pub fn connect(self, slot: S) -> Builder<A, S> {
+    pub fn connect(self, slot: S) -> Builder<E, S> {
         Builder(self.0.connect(slot))
     }
 }
 
-impl<A> Default for Builder<A> {
+impl<E> Default for Builder<E> {
     fn default() -> Self {
         Builder::new()
     }

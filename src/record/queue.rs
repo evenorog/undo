@@ -3,8 +3,8 @@ use crate::{Edit, Record, Slot};
 use alloc::vec::Vec;
 
 #[derive(Debug)]
-enum QueueEntry<A> {
-    Edit(A),
+enum QueueEntry<E> {
+    Edit(E),
     Undo,
     Redo,
 }
@@ -30,26 +30,26 @@ enum QueueEntry<A> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Queue<'a, A, S> {
-    record: &'a mut Record<A, S>,
-    entries: Vec<QueueEntry<A>>,
+pub struct Queue<'a, E, S> {
+    record: &'a mut Record<E, S>,
+    entries: Vec<QueueEntry<E>>,
 }
 
-impl<A, S> Queue<'_, A, S> {
+impl<E, S> Queue<'_, E, S> {
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
+    pub fn queue(&mut self) -> Queue<E, S> {
         self.record.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.record.checkpoint()
     }
 }
 
-impl<A: Edit, S: Slot> Queue<'_, A, S> {
+impl<E: Edit, S: Slot> Queue<'_, E, S> {
     /// Queues a [`Record::edit`] call.
-    pub fn edit(&mut self, edit: A) {
+    pub fn edit(&mut self, edit: E) {
         self.entries.push(QueueEntry::Edit(edit));
     }
 
@@ -64,7 +64,7 @@ impl<A: Edit, S: Slot> Queue<'_, A, S> {
     }
 
     /// Applies the queued edits.
-    pub fn commit(self, target: &mut A::Target) -> Vec<A::Output> {
+    pub fn commit(self, target: &mut E::Target) -> Vec<E::Output> {
         self.entries
             .into_iter()
             .filter_map(|entry| match entry {
@@ -79,8 +79,8 @@ impl<A: Edit, S: Slot> Queue<'_, A, S> {
     pub fn cancel(self) {}
 }
 
-impl<'a, A, S> From<&'a mut Record<A, S>> for Queue<'a, A, S> {
-    fn from(record: &'a mut Record<A, S>) -> Self {
+impl<'a, E, S> From<&'a mut Record<E, S>> for Queue<'a, E, S> {
+    fn from(record: &'a mut Record<E, S>) -> Self {
         Queue {
             record,
             entries: Vec::new(),

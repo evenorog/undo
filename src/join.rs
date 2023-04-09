@@ -1,7 +1,7 @@
 use crate::Edit;
 use core::fmt::{self, Display, Formatter};
 
-/// Two edits joined together.
+/// Two [`Edit`] commands joined together.
 ///
 /// Can be used to build more complex edits from simpler ones.
 ///
@@ -29,7 +29,7 @@ pub struct Join<A, B> {
 }
 
 impl<A, B> Join<A, B> {
-    /// Creates a new `Join` from `a` and `b`.
+    /// Creates a new [`Join`] from `a` and `b`.
     pub const fn new(a: A, b: B) -> Self {
         Join { a, b }
     }
@@ -77,7 +77,7 @@ where
     }
 }
 
-/// Joins two fallible edits together.
+/// Two fallible [`Edit`] commands joined together.
 ///
 /// Same as [`Join`] but for edits that outputs [`Result`].
 #[derive(Clone, Debug)]
@@ -87,7 +87,7 @@ pub struct TryJoin<A, B> {
 }
 
 impl<A, B> TryJoin<A, B> {
-    /// Creates a new `TryJoin` from `a` and `b`.
+    /// Creates a new [`TryJoin`] from `a` and `b`.
     pub const fn new(a: A, b: B) -> Self {
         TryJoin { a, b }
     }

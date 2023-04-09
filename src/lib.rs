@@ -72,7 +72,7 @@ pub use record::Record;
 #[cfg(feature = "alloc")]
 pub use socket::{Nop, Signal, Slot};
 
-/// Base functionality for all edits.
+/// Base functionality for all edit commands.
 pub trait Edit {
     /// The target type.
     type Target;
@@ -101,10 +101,10 @@ pub trait Edit {
     }
 }
 
-/// Says if the edit have been merged with another edit.
+/// Says if the [Edit] command have been merged with another command.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-pub enum Merged<A> {
+pub enum Merged<E> {
     /// The edits have been merged.
     ///
     /// This means that the `other` edit will not be added to the stack.
@@ -112,7 +112,7 @@ pub enum Merged<A> {
     /// The edits have not been merged.
     ///
     /// We need to return the `other` edit so it can be added to the stack.
-    No(A),
+    No(E),
     /// The two edits cancels each other out.
     ///
     /// This means that both edits will be removed from the stack.

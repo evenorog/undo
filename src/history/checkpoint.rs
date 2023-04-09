@@ -11,39 +11,39 @@ enum CheckpointEntry {
 
 /// Wraps a history and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, A, S> {
-    history: &'a mut History<A, S>,
+pub struct Checkpoint<'a, E, S> {
+    history: &'a mut History<E, S>,
     entries: Vec<CheckpointEntry>,
 }
 
-impl<A, S> Checkpoint<'_, A, S> {
+impl<E, S> Checkpoint<'_, E, S> {
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
+    pub fn queue(&mut self) -> Queue<E, S> {
         self.history.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.history.checkpoint()
     }
 }
 
-impl<A: Edit, S: Slot> Checkpoint<'_, A, S> {
+impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
     /// Calls the [`History::edit`] method.
-    pub fn edit(&mut self, target: &mut A::Target, edit: A) -> A::Output {
+    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let branch = self.history.branch();
         self.entries.push(CheckpointEntry::Edit(branch));
         self.history.edit(target, edit)
     }
 
     /// Calls the [`History::undo`] method.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.entries.push(CheckpointEntry::Undo);
         self.history.undo(target)
     }
 
     /// Calls the [`History::redo`] method.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.entries.push(CheckpointEntry::Redo);
         self.history.redo(target)
     }
@@ -52,7 +52,7 @@ impl<A: Edit, S: Slot> Checkpoint<'_, A, S> {
     pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
-    pub fn cancel(self, target: &mut A::Target) -> Vec<A::Output> {
+    pub fn cancel(self, target: &mut E::Target) -> Vec<E::Output> {
         self.entries
             .into_iter()
             .rev()
@@ -75,8 +75,8 @@ impl<A: Edit, S: Slot> Checkpoint<'_, A, S> {
     }
 }
 
-impl<'a, A, S> From<&'a mut History<A, S>> for Checkpoint<'a, A, S> {
-    fn from(history: &'a mut History<A, S>) -> Self {
+impl<'a, E, S> From<&'a mut History<E, S>> for Checkpoint<'a, E, S> {
+    fn from(history: &'a mut History<E, S>) -> Self {
         Checkpoint {
             history,
             entries: Vec::new(),

@@ -1,4 +1,4 @@
-//! A linear record of edits.
+//! A linear record of edit commands.
 
 mod builder;
 mod checkpoint;
@@ -19,13 +19,16 @@ use core::num::NonZeroUsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// A linear record of edits.
+/// A linear record of [`Edit`] commands.
 ///
 /// The record can roll the targets state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
 /// about changes to the stack or the target through [`Signal`].
 /// The user can give the record a function that is called each time the state
 /// changes by using the [`Builder`].
+///
+/// When adding a new edit command to the record the previously undone commands
+/// will be discarded. If you want to keep all edits you can use [`History`] instead.
 ///
 /// # Examples
 /// ```

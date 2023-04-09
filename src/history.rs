@@ -1,4 +1,4 @@
-//! A history tree of edits.
+//! A history tree of edit commands.
 
 mod builder;
 mod checkpoint;
@@ -18,7 +18,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// A history tree of edits.
+/// A history tree of [`Edit`] commands.
 ///
 /// Unlike [`Record`] which maintains a linear undo history,
 /// [`History`] maintains an undo tree containing every edit made to the target.

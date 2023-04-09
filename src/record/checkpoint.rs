@@ -4,34 +4,34 @@ use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 
 #[derive(Debug)]
-enum CheckpointEntry<A> {
-    Edit(Option<usize>, VecDeque<Entry<A>>),
+enum CheckpointEntry<E> {
+    Edit(Option<usize>, VecDeque<Entry<E>>),
     Undo,
     Redo,
 }
 
 /// Wraps a record and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, A, S> {
-    record: &'a mut Record<A, S>,
-    entries: Vec<CheckpointEntry<A>>,
+pub struct Checkpoint<'a, E, S> {
+    record: &'a mut Record<E, S>,
+    entries: Vec<CheckpointEntry<E>>,
 }
 
-impl<A, S> Checkpoint<'_, A, S> {
+impl<E, S> Checkpoint<'_, E, S> {
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
+    pub fn queue(&mut self) -> Queue<E, S> {
         self.record.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.record.checkpoint()
     }
 }
 
-impl<A: Edit, S: Slot> Checkpoint<'_, A, S> {
+impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
     /// Calls the `apply` method.
-    pub fn edit(&mut self, target: &mut A::Target, edit: A) -> A::Output {
+    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let saved = self.record.saved;
         let (output, _, tail) = self.record.edit_inner(target, edit);
         self.entries.push(CheckpointEntry::Edit(saved, tail));
@@ -39,14 +39,14 @@ impl<A: Edit, S: Slot> Checkpoint<'_, A, S> {
     }
 
     /// Calls the `undo` method.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         let output = self.record.undo(target)?;
         self.entries.push(CheckpointEntry::Undo);
         Some(output)
     }
 
     /// Calls the `redo` method.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         let output = self.record.redo(target)?;
         self.entries.push(CheckpointEntry::Redo);
         Some(output)
@@ -56,7 +56,7 @@ impl<A: Edit, S: Slot> Checkpoint<'_, A, S> {
     pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
-    pub fn cancel(self, target: &mut A::Target) -> Vec<A::Output> {
+    pub fn cancel(self, target: &mut E::Target) -> Vec<E::Output> {
         self.entries
             .into_iter()
             .rev()
@@ -75,8 +75,8 @@ impl<A: Edit, S: Slot> Checkpoint<'_, A, S> {
     }
 }
 
-impl<'a, A, S> From<&'a mut Record<A, S>> for Checkpoint<'a, A, S> {
-    fn from(record: &'a mut Record<A, S>) -> Self {
+impl<'a, E, S> From<&'a mut Record<E, S>> for Checkpoint<'a, E, S> {
+    fn from(record: &'a mut Record<E, S>) -> Self {
         Checkpoint {
             record,
             entries: Vec::new(),

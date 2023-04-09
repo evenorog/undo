@@ -4,12 +4,12 @@ use core::fmt::{self, Write};
 use std::time::SystemTime;
 
 /// Configurable display formatting for the history.
-pub struct Display<'a, A, S> {
-    history: &'a History<A, S>,
+pub struct Display<'a, E, S> {
+    history: &'a History<E, S>,
     format: Format,
 }
 
-impl<A, S> Display<'_, A, S> {
+impl<E, S> Display<'_, E, S> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -44,12 +44,12 @@ impl<A, S> Display<'_, A, S> {
     }
 }
 
-impl<A: fmt::Display, S> Display<'_, A, S> {
+impl<E: fmt::Display, S> Display<'_, E, S> {
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: Option<&Entry<A>>,
+        entry: Option<&Entry<E>>,
         level: usize,
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
@@ -93,7 +93,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: Option<&Entry<A>>,
+        entry: Option<&Entry<E>>,
         level: usize,
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
@@ -140,8 +140,8 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
     }
 }
 
-impl<'a, A, S> From<&'a History<A, S>> for Display<'a, A, S> {
-    fn from(history: &'a History<A, S>) -> Self {
+impl<'a, E, S> From<&'a History<E, S>> for Display<'a, E, S> {
+    fn from(history: &'a History<E, S>) -> Self {
         Display {
             history,
             format: Format::default(),
@@ -149,7 +149,7 @@ impl<'a, A, S> From<&'a History<A, S>> for Display<'a, A, S> {
     }
 }
 
-impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
+impl<E: fmt::Display, S> fmt::Display for Display<'_, E, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         #[cfg(feature = "std")]
         let now = SystemTime::now();

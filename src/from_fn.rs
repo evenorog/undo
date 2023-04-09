@@ -2,7 +2,7 @@ use crate::Edit;
 use core::fmt::{self, Debug, Formatter};
 use core::mem;
 
-/// An edit made from a function.
+/// An [`Edit`] command made from a function.
 ///
 /// # Examples
 /// ```
@@ -72,7 +72,7 @@ impl<F, T> Debug for FromFn<F, T> {
     }
 }
 
-/// An edit made from a fallible function.
+/// An [`Edit`] command made from a fallible function.
 ///
 /// Same as [`FromFn`] but for functions that outputs [`Result`].
 #[derive(Clone, Debug)]

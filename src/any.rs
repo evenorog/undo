@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use core::fmt::{self, Debug, Display, Formatter};
 
-/// Any edit type.
+/// Any [`Edit`] command.
 ///
 /// This allows you to use multiple types of edits at the same time
 /// as long as they all share the same target and output type.
@@ -27,11 +27,11 @@ pub struct Any<T, O> {
 }
 
 impl<T, O> Any<T, O> {
-    /// Creates an `Any` from the provided edit.
-    pub fn new<A>(edit: A) -> Any<T, O>
+    /// Creates an [`Any`] from the provided edit.
+    pub fn new<E>(edit: E) -> Any<T, O>
     where
-        A: Edit<Target = T, Output = O>,
-        A: 'static,
+        E: Edit<Target = T, Output = O>,
+        E: 'static,
     {
         Any {
             edit: Box::new(edit),

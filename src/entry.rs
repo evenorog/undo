@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::time::SystemTime;
 
-/// Wrapper around an edit that contains additional metadata.
+/// Wrapper around an [`Edit`] command that contains additional metadata.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct Entry<E> {
