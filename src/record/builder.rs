@@ -4,7 +4,7 @@ use alloc::collections::VecDeque;
 use core::marker::PhantomData;
 use core::num::NonZeroUsize;
 
-/// Builder for a record.
+/// Builder for a [`Record`].
 ///
 /// # Examples
 /// ```

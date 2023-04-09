@@ -3,7 +3,7 @@ use core::fmt::{self, Write};
 #[cfg(feature = "std")]
 use std::time::SystemTime;
 
-/// Configurable display formatting for the record.
+/// Configurable display formatting for the [`Record`].
 pub struct Display<'a, E, S> {
     record: &'a Record<E, S>,
     format: Format,

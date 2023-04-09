@@ -9,7 +9,7 @@ enum CheckpointEntry {
     Redo,
 }
 
-/// Wraps a history and gives it checkpoint functionality.
+/// Wraps a [`History`] and gives it checkpoint functionality.
 #[derive(Debug)]
 pub struct Checkpoint<'a, E, S> {
     history: &'a mut History<E, S>,

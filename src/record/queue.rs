@@ -9,7 +9,7 @@ enum QueueEntry<E> {
     Redo,
 }
 
-/// Wraps a record and gives it batch queue functionality.
+/// Wraps a [`Record`] and gives it batch queue functionality.
 ///
 /// # Examples
 /// ```

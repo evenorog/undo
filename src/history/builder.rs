@@ -1,7 +1,7 @@
 use crate::record::Builder as RecordBuilder;
 use crate::{History, Nop, Slot};
 
-/// Builder for a History.
+/// Builder for a [`History`].
 ///
 /// # Examples
 /// ```

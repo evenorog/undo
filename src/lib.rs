@@ -101,7 +101,7 @@ pub trait Edit {
     }
 }
 
-/// Says if the [Edit] command have been merged with another command.
+/// Says if the [`Edit`] command have been merged with another command.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Merged<E> {

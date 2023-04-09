@@ -3,7 +3,7 @@ use core::fmt::{self, Write};
 #[cfg(feature = "std")]
 use std::time::SystemTime;
 
-/// Configurable display formatting for the history.
+/// Configurable display formatting for the [`History`].
 pub struct Display<'a, E, S> {
     history: &'a History<E, S>,
     format: Format,

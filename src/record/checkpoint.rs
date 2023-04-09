@@ -10,7 +10,7 @@ enum CheckpointEntry<E> {
     Redo,
 }
 
-/// Wraps a record and gives it checkpoint functionality.
+/// Wraps a [`Record`] and gives it checkpoint functionality.
 #[derive(Debug)]
 pub struct Checkpoint<'a, E, S> {
     record: &'a mut Record<E, S>,

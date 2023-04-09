@@ -9,7 +9,7 @@ enum QueueEntry<E> {
     Redo,
 }
 
-/// Wraps a history and gives it batch queue functionality.
+/// Wraps a [`History`] and gives it batch queue functionality.
 ///
 /// # Examples
 /// ```
