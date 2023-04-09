@@ -17,7 +17,7 @@ use core::num::NonZeroUsize;
 ///     .capacity(100)
 ///     .connect(|s| { dbg!(s); })
 ///     .build();
-/// # record.edit(&mut target, Push('a'));
+/// # record.edit(&mut target, Add('a'));
 /// # }
 /// ```
 #[derive(Debug)]

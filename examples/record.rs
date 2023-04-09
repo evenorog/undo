@@ -1,9 +1,9 @@
 use core::fmt::{self, Display, Formatter};
 use undo::{Edit, Record};
 
-struct Push(char);
+struct Add(char);
 
-impl Edit for Push {
+impl Edit for Add {
     type Target = String;
     type Output = ();
 
@@ -16,9 +16,9 @@ impl Edit for Push {
     }
 }
 
-impl Display for Push {
+impl Display for Add {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "Push '{}'", self.0)
+        write!(f, "Add '{}'", self.0)
     }
 }
 
@@ -26,9 +26,9 @@ fn main() {
     let mut target = String::new();
     let mut record = Record::new();
 
-    record.edit(&mut target, Push('a'));
-    record.edit(&mut target, Push('b'));
-    record.edit(&mut target, Push('c'));
+    record.edit(&mut target, Add('a'));
+    record.edit(&mut target, Add('b'));
+    record.edit(&mut target, Add('c'));
     assert_eq!(target, "abc");
 
     record.undo(&mut target);

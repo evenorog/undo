@@ -16,7 +16,7 @@ use core::fmt::{self, Debug, Display, Formatter};
 /// let mut target = String::new();
 /// let mut record = Record::new();
 ///
-/// record.edit(&mut target, Any::new(Push('a')));
+/// record.edit(&mut target, Any::new(Add('a')));
 /// record.edit(&mut target, Any::new(FromFn::new(|s: &mut String| s.push('b'))));
 /// assert_eq!(target, "ab");
 /// # }

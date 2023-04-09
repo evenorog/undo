@@ -20,9 +20,9 @@ enum QueueEntry<A> {
 /// let mut record = History::new();
 /// let mut queue = record.queue();
 ///
-/// queue.edit(Push('a'));
-/// queue.edit(Push('b'));
-/// queue.edit(Push('c'));
+/// queue.edit(Add('a'));
+/// queue.edit(Add('b'));
+/// queue.edit(Add('c'));
 /// assert_eq!(string, "");
 ///
 /// queue.commit(&mut string);

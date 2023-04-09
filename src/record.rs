@@ -35,9 +35,9 @@ use serde::{Deserialize, Serialize};
 /// let mut target = String::new();
 /// let mut record = Record::new();
 ///
-/// record.edit(&mut target, Push('a'));
-/// record.edit(&mut target, Push('b'));
-/// record.edit(&mut target, Push('c'));
+/// record.edit(&mut target, Add('a'));
+/// record.edit(&mut target, Add('b'));
+/// record.edit(&mut target, Add('c'));
 /// assert_eq!(target, "abc");
 ///
 /// record.undo(&mut target);
@@ -354,26 +354,26 @@ mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    enum Editor {
-        Push(Push),
-        Pop(Pop),
+    enum Op {
+        Add(Add),
+        Del(Del),
     }
 
-    impl Edit for Editor {
+    impl Edit for Op {
         type Target = String;
         type Output = ();
 
         fn edit(&mut self, s: &mut String) {
             match self {
-                Editor::Push(add) => add.edit(s),
-                Editor::Pop(del) => del.edit(s),
+                Op::Add(add) => add.edit(s),
+                Op::Del(del) => del.edit(s),
             }
         }
 
         fn undo(&mut self, s: &mut String) {
             match self {
-                Editor::Push(add) => add.undo(s),
-                Editor::Pop(del) => del.undo(s),
+                Op::Add(add) => add.undo(s),
+                Op::Del(del) => del.undo(s),
             }
         }
 
@@ -382,17 +382,17 @@ mod tests {
             Self: Sized,
         {
             match (self, edit) {
-                (Editor::Push(_), Editor::Pop(_)) => Merged::Annul,
-                (Editor::Pop(Pop(Some(a))), Editor::Push(Push(b))) if a == &b => Merged::Annul,
+                (Op::Add(_), Op::Del(_)) => Merged::Annul,
+                (Op::Del(Del(Some(a))), Op::Add(Add(b))) if a == &b => Merged::Annul,
                 (_, edit) => Merged::No(edit),
             }
         }
     }
 
     #[derive(Debug, PartialEq)]
-    struct Push(char);
+    struct Add(char);
 
-    impl Edit for Push {
+    impl Edit for Add {
         type Target = String;
         type Output = ();
 
@@ -406,9 +406,9 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct Pop(Option<char>);
+    struct Del(Option<char>);
 
-    impl Edit for Pop {
+    impl Edit for Del {
         type Target = String;
         type Output = ();
 
@@ -426,11 +426,11 @@ mod tests {
     fn go_to() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.edit(&mut target, Push('a'));
-        record.edit(&mut target, Push('b'));
-        record.edit(&mut target, Push('c'));
-        record.edit(&mut target, Push('d'));
-        record.edit(&mut target, Push('e'));
+        record.edit(&mut target, Add('a'));
+        record.edit(&mut target, Add('b'));
+        record.edit(&mut target, Add('c'));
+        record.edit(&mut target, Add('d'));
+        record.edit(&mut target, Add('e'));
 
         record.go_to(&mut target, 0);
         assert_eq!(record.current(), 0);
@@ -458,9 +458,9 @@ mod tests {
     fn annul() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.edit(&mut target, Editor::Push(Push('a')));
-        record.edit(&mut target, Editor::Pop(Pop::default()));
-        record.edit(&mut target, Editor::Push(Push('b')));
+        record.edit(&mut target, Op::Add(Add('a')));
+        record.edit(&mut target, Op::Del(Del::default()));
+        record.edit(&mut target, Op::Add(Add('b')));
         assert_eq!(record.len(), 1);
     }
 
@@ -468,9 +468,9 @@ mod tests {
     fn edits() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.edit(&mut target, Push('a'));
-        record.edit(&mut target, Push('b'));
+        record.edit(&mut target, Add('a'));
+        record.edit(&mut target, Add('b'));
         let collected = record.edits().collect::<Vec<_>>();
-        assert_eq!(&collected[..], &[&Push('a'), &Push('b')][..]);
+        assert_eq!(&collected[..], &[&Add('a'), &Add('b')][..]);
     }
 }

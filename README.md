@@ -16,9 +16,9 @@ structures it is easy to undo and redo edits made to a target.
 ```rust
 use undo::{Edit, Record};
 
-struct Push(char);
+struct Add(char);
 
-impl Edit for Push {
+impl Edit for Add {
     type Target = String;
     type Output = ();
 
@@ -35,9 +35,9 @@ fn main() {
     let mut target = String::new();
     let mut record = Record::new();
 
-    record.edit(&mut target, Push('a'));
-    record.edit(&mut target, Push('b'));
-    record.edit(&mut target, Push('c'));
+    record.edit(&mut target, Add('a'));
+    record.edit(&mut target, Add('b'));
+    record.edit(&mut target, Add('c'));
     assert_eq!(target, "abc");
 
     record.undo(&mut target);

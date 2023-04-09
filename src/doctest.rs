@@ -1,9 +1,9 @@
 // This file is included in the documentation examples to avoid some boilerplate.
 
 /// This is the edit used in all the examples.
-pub struct Push(char);
+pub struct Add(char);
 
-impl undo::Edit for Push {
+impl undo::Edit for Add {
     type Target = String;
     type Output = ();
 

@@ -13,7 +13,7 @@ use core::fmt::{self, Display, Formatter};
 /// let mut target = String::new();
 /// let mut record = Record::new();
 ///
-/// let abc = Join::new(Push('a'), Push('b')).join(Push('c'));
+/// let abc = Join::new(Add('a'), Add('b')).join(Add('c'));
 /// record.edit(&mut target, abc);
 /// assert_eq!(target, "abc");
 /// record.undo(&mut target);

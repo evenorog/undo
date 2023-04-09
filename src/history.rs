@@ -31,14 +31,14 @@ use serde::{Deserialize, Serialize};
 /// let mut target = String::new();
 /// let mut history = History::new();
 ///
-/// history.edit(&mut target, Push('a'));
-/// history.edit(&mut target, Push('b'));
-/// history.edit(&mut target, Push('c'));
+/// history.edit(&mut target, Add('a'));
+/// history.edit(&mut target, Add('b'));
+/// history.edit(&mut target, Add('c'));
 /// let abc = history.branch();
 ///
 /// history.go_to(&mut target, abc, 1);
-/// history.edit(&mut target, Push('f'));
-/// history.edit(&mut target, Push('g'));
+/// history.edit(&mut target, Add('f'));
+/// history.edit(&mut target, Add('g'));
 /// assert_eq!(target, "afg");
 ///
 /// history.go_to(&mut target, abc, 3);
@@ -391,9 +391,9 @@ impl<E> Branch<E> {
 mod tests {
     use crate::*;
 
-    struct Push(char);
+    struct Add(char);
 
-    impl Edit for Push {
+    impl Edit for Add {
         type Target = String;
         type Output = ();
 
@@ -425,44 +425,44 @@ mod tests {
         // a
         let mut target = String::new();
         let mut history = History::new();
-        history.edit(&mut target, Push('a'));
-        history.edit(&mut target, Push('b'));
-        history.edit(&mut target, Push('c'));
-        history.edit(&mut target, Push('d'));
-        history.edit(&mut target, Push('e'));
+        history.edit(&mut target, Add('a'));
+        history.edit(&mut target, Add('b'));
+        history.edit(&mut target, Add('c'));
+        history.edit(&mut target, Add('d'));
+        history.edit(&mut target, Add('e'));
         assert_eq!(target, "abcde");
         history.undo(&mut target).unwrap();
         history.undo(&mut target).unwrap();
         assert_eq!(target, "abc");
         let abcde = history.branch();
-        history.edit(&mut target, Push('f'));
-        history.edit(&mut target, Push('g'));
+        history.edit(&mut target, Add('f'));
+        history.edit(&mut target, Add('g'));
         assert_eq!(target, "abcfg");
         history.undo(&mut target).unwrap();
         let abcfg = history.branch();
-        history.edit(&mut target, Push('h'));
-        history.edit(&mut target, Push('i'));
-        history.edit(&mut target, Push('j'));
+        history.edit(&mut target, Add('h'));
+        history.edit(&mut target, Add('i'));
+        history.edit(&mut target, Add('j'));
         assert_eq!(target, "abcfhij");
         history.undo(&mut target).unwrap();
         let abcfhij = history.branch();
-        history.edit(&mut target, Push('k'));
+        history.edit(&mut target, Add('k'));
         assert_eq!(target, "abcfhik");
         history.undo(&mut target).unwrap();
         let abcfhik = history.branch();
-        history.edit(&mut target, Push('l'));
+        history.edit(&mut target, Add('l'));
         assert_eq!(target, "abcfhil");
-        history.edit(&mut target, Push('m'));
+        history.edit(&mut target, Add('m'));
         assert_eq!(target, "abcfhilm");
         let abcfhilm = history.branch();
         history.go_to(&mut target, abcde, 2);
-        history.edit(&mut target, Push('n'));
-        history.edit(&mut target, Push('o'));
+        history.edit(&mut target, Add('n'));
+        history.edit(&mut target, Add('o'));
         assert_eq!(target, "abno");
         history.undo(&mut target).unwrap();
         let abno = history.branch();
-        history.edit(&mut target, Push('p'));
-        history.edit(&mut target, Push('q'));
+        history.edit(&mut target, Add('p'));
+        history.edit(&mut target, Add('q'));
         assert_eq!(target, "abnpq");
 
         let abnpq = history.branch();
