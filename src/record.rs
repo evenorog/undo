@@ -210,9 +210,9 @@ impl<E: Edit, S: Slot> Record<E, S> {
             }
         };
 
-        self.socket.emit_if(could_redo, Signal::Redo(false));
-        self.socket.emit_if(!could_undo, Signal::Undo(true));
-        self.socket.emit_if(was_saved, Signal::Saved(false));
+        self.socket.emit_if(could_redo, || Signal::Redo(false));
+        self.socket.emit_if(!could_undo, || Signal::Undo(true));
+        self.socket.emit_if(was_saved, || Signal::Saved(false));
         (output, merged_or_annulled, tail)
     }
 
@@ -226,10 +226,10 @@ impl<E: Edit, S: Slot> Record<E, S> {
             self.current -= 1;
             let is_saved = self.is_saved();
             self.socket
-                .emit_if(old == self.entries.len(), Signal::Redo(true));
-            self.socket.emit_if(old == 1, Signal::Undo(false));
+                .emit_if(old == self.entries.len(), || Signal::Redo(true));
+            self.socket.emit_if(old == 1, || Signal::Undo(false));
             self.socket
-                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+                .emit_if(was_saved != is_saved, || Signal::Saved(is_saved));
             output
         })
     }
@@ -244,10 +244,10 @@ impl<E: Edit, S: Slot> Record<E, S> {
             self.current += 1;
             let is_saved = self.is_saved();
             self.socket
-                .emit_if(old == self.len() - 1, Signal::Redo(false));
-            self.socket.emit_if(old == 0, Signal::Undo(true));
+                .emit_if(old == self.len() - 1, || Signal::Redo(false));
+            self.socket.emit_if(old == 0, || Signal::Undo(true));
             self.socket
-                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+                .emit_if(was_saved != is_saved, || Signal::Saved(is_saved));
             output
         })
     }
@@ -257,10 +257,10 @@ impl<E: Edit, S: Slot> Record<E, S> {
         let was_saved = self.is_saved();
         if saved {
             self.saved = Some(self.current);
-            self.socket.emit_if(!was_saved, Signal::Saved(true));
+            self.socket.emit_if(!was_saved, || Signal::Saved(true));
         } else {
             self.saved = None;
-            self.socket.emit_if(was_saved, Signal::Saved(false));
+            self.socket.emit_if(was_saved, || Signal::Saved(false));
         }
     }
 
@@ -271,8 +271,8 @@ impl<E: Edit, S: Slot> Record<E, S> {
         self.entries.clear();
         self.saved = self.is_saved().then_some(0);
         self.current = 0;
-        self.socket.emit_if(could_undo, Signal::Undo(false));
-        self.socket.emit_if(could_redo, Signal::Redo(false));
+        self.socket.emit_if(could_undo, || Signal::Undo(false));
+        self.socket.emit_if(could_redo, || Signal::Redo(false));
     }
 
     /// Revert the changes done to the target since the saved state.
@@ -311,11 +311,11 @@ impl<E: Edit, S: Slot> Record<E, S> {
         let is_saved = self.is_saved();
         self.socket.connect(slot);
         self.socket
-            .emit_if(could_undo != can_undo, Signal::Undo(can_undo));
+            .emit_if(could_undo != can_undo, || Signal::Undo(can_undo));
         self.socket
-            .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
+            .emit_if(could_redo != can_redo, || Signal::Redo(can_redo));
         self.socket
-            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+            .emit_if(was_saved != is_saved, || Signal::Saved(is_saved));
 
         outputs
     }

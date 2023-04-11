@@ -30,13 +30,13 @@ impl<S> Default for Socket<S> {
 }
 
 impl<S: Slot> Socket<S> {
-    pub fn emit(&mut self, signal: Signal) {
+    pub fn emit(&mut self, signal: impl FnOnce() -> Signal) {
         if let Some(slot) = &mut self.0 {
-            slot.emit(signal);
+            slot.emit(signal());
         }
     }
 
-    pub fn emit_if(&mut self, cond: bool, signal: Signal) {
+    pub fn emit_if(&mut self, cond: bool, signal: impl FnOnce() -> Signal) {
         if cond {
             self.emit(signal);
         }
@@ -59,7 +59,7 @@ impl<F: FnMut(Signal)> Slot for F {
 ///
 /// For example, if the history tree can no longer redo any edits,
 /// it sends a `Redo(false)` signal to tell the user.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Signal {
     /// Says if the structures can undo.

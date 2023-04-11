@@ -254,11 +254,11 @@ impl<E: Edit, S: Slot> History<E, S> {
         {
             self.saved = None;
             self.record.saved = Some(saved);
-            self.record.socket.emit(Signal::Saved(true));
+            self.record.socket.emit(|| Signal::Saved(true));
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At::new(old, saved));
             self.record.saved = None;
-            self.record.socket.emit(Signal::Saved(false));
+            self.record.socket.emit(|| Signal::Saved(false));
         }
     }
 
