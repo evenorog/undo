@@ -19,18 +19,19 @@ pub struct Entry<E> {
 impl<E: Edit> Entry<E> {
     pub fn undo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
-        {
-            self.updated_at = SystemTime::now();
-        }
+        self.updated_now();
         self.edit.undo(target)
     }
 
     pub fn redo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
-        {
-            self.updated_at = SystemTime::now();
-        }
+        self.updated_now();
         self.edit.redo(target)
+    }
+
+    #[cfg(feature = "std")]
+    fn updated_now(&mut self) {
+        self.updated_at = SystemTime::now();
     }
 }
 
