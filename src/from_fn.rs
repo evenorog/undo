@@ -66,16 +66,21 @@ where
     }
 }
 
-impl<F, T> Debug for FromFn<F, T> {
+impl<F, T> Debug for FromFn<F, T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("FromFn").finish_non_exhaustive()
+        f.debug_struct("FromFn")
+            .field("target", &self.target)
+            .finish_non_exhaustive()
     }
 }
 
 /// An [`Edit`] command made from a fallible function.
 ///
 /// Same as [`FromFn`] but for functions that outputs [`Result`].
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TryFromFn<F, T> {
     f: F,
     target: Option<T>,
@@ -113,5 +118,16 @@ where
             mem::swap(new, target);
         }
         Ok(())
+    }
+}
+
+impl<F, T> Debug for TryFromFn<F, T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("TryFromFn")
+            .field("target", &self.target)
+            .finish_non_exhaustive()
     }
 }

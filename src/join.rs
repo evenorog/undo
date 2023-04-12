@@ -3,7 +3,7 @@ use core::fmt::{self, Display, Formatter};
 
 /// Two [`Edit`] commands joined together.
 ///
-/// Can be used to build more complex edits from simpler ones.
+/// Can be used to build more complex edit commands from simpler ones.
 ///
 /// # Examples
 /// ```

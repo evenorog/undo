@@ -179,18 +179,18 @@ impl Format {
     }
 
     #[cfg(feature = "std")]
-    pub fn text(self, f: &mut fmt::Formatter, text: &str, i: usize) -> fmt::Result {
+    pub fn text(self, f: &mut fmt::Formatter, text: &str, level: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
-            return write!(f, "{}", text.color(color_of_level(i)));
+            return write!(f, "{}", text.color(color_of_level(level)));
         }
         f.write_str(text)
     }
 }
 
 #[cfg(feature = "colored")]
-fn color_of_level(i: usize) -> Color {
-    match i % 6 {
+fn color_of_level(level: usize) -> Color {
+    match level % 6 {
         0 => Color::Cyan,
         1 => Color::Red,
         2 => Color::Magenta,

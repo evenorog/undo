@@ -31,7 +31,7 @@ pub struct Builder<E, S = Nop> {
 
 impl<E, S> Builder<E, S> {
     /// Returns a builder for a record.
-    pub fn new() -> Builder<E, S> {
+    pub(crate) fn new() -> Builder<E, S> {
         Builder {
             capacity: 0,
             limit: NonZeroUsize::new(usize::MAX).unwrap(),

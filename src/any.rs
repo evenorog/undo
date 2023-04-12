@@ -18,7 +18,8 @@ use core::fmt::{self, Debug, Display, Formatter};
 ///
 /// record.edit(&mut target, Any::new(Add('a')));
 /// record.edit(&mut target, Any::new(FromFn::new(|s: &mut String| s.push('b'))));
-/// assert_eq!(target, "ab");
+/// record.edit(&mut target, Any::new(FromFn::new(|s: &mut String| s.push('c'))));
+/// assert_eq!(target, "abc");
 /// # }
 /// ```
 pub struct Any<T, O> {

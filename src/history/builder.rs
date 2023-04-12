@@ -22,7 +22,7 @@ pub struct Builder<E, S = Nop>(RecordBuilder<E, S>);
 
 impl<E, S> Builder<E, S> {
     /// Returns a builder for a history.
-    pub fn new() -> Builder<E, S> {
+    pub(crate) fn new() -> Builder<E, S> {
         Builder(RecordBuilder::new())
     }
 
