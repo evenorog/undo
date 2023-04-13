@@ -1,9 +1,11 @@
 //! **An undo-redo library.**
 //!
-//! It is an implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
-//! where all modifications are done by creating objects that applies the modifications.
-//! All objects knows how to undo the changes it applies, and by using the provided data
-//! structures it is easy to undo and redo edits made to a target.
+//! > It is an implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
+//! > where all edits are done by creating objects that applies the modifications.
+//! > All objects knows how to undo the changes it applies, and by using the provided data
+//! > structures it is easy to undo and redo edits made to a target.
+//!
+//! See the [examples](https://github.com/evenorog/undo/tree/master/examples) for more information.
 //!
 //! # Features
 //!
@@ -79,7 +81,7 @@ pub trait Edit {
     /// The output type.
     type Output;
 
-    /// Applies the edit on the target.
+    /// Applies the edit command on the target.
     fn edit(&mut self, target: &mut Self::Target) -> Self::Output;
 
     /// Restores the state of the target as it was before the edit was applied.

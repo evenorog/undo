@@ -198,7 +198,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
             }
             // If edits are not merged or annulled push it onto the storage.
             Merged::No(edit) => {
-                // If limit is reached, pop off the first edit.
+                // If limit is reached, pop off the first edit command.
                 if self.limit() == self.current {
                     self.entries.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
