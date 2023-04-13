@@ -4,6 +4,10 @@ use core::mem;
 
 /// An [`Edit`] command made from a function.
 ///
+/// This is a convenient way to make simple edits without having to
+/// create a new type for each one. But for more complex edits it is
+/// probably better to create a custom edit command.
+///
 /// # Examples
 /// ```
 /// # include!("doctest.rs");
@@ -72,61 +76,6 @@ where
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("FromFn")
-            .field("target", &self.target)
-            .finish_non_exhaustive()
-    }
-}
-
-/// An [`Edit`] command made from a fallible function.
-///
-/// Same as [`FromFn`] but for functions that outputs [`Result`].
-#[derive(Clone)]
-pub struct TryFromFn<F, T> {
-    f: F,
-    target: Option<T>,
-}
-
-impl<F, T> TryFromFn<F, T> {
-    /// Creates a new `TryFromFn` from `f`.
-    pub const fn new(f: F) -> Self {
-        TryFromFn { f, target: None }
-    }
-}
-
-impl<F, T, E> Edit for TryFromFn<F, T>
-where
-    F: FnMut(&mut T) -> Result<(), E>,
-    T: Clone,
-{
-    type Target = T;
-    type Output = Result<(), E>;
-
-    fn edit(&mut self, target: &mut Self::Target) -> Self::Output {
-        self.target = Some(target.clone());
-        (self.f)(target)
-    }
-
-    fn undo(&mut self, target: &mut Self::Target) -> Self::Output {
-        if let Some(old) = self.target.as_mut() {
-            mem::swap(old, target);
-        }
-        Ok(())
-    }
-
-    fn redo(&mut self, target: &mut Self::Target) -> Self::Output {
-        if let Some(new) = self.target.as_mut() {
-            mem::swap(new, target);
-        }
-        Ok(())
-    }
-}
-
-impl<F, T> Debug for TryFromFn<F, T>
-where
-    T: Debug,
-{
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("TryFromFn")
             .field("target", &self.target)
             .finish_non_exhaustive()
     }

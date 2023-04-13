@@ -3,7 +3,8 @@ use core::fmt::{self, Display, Formatter};
 
 /// Two [`Edit`] commands joined together.
 ///
-/// Can be used to build more complex edit commands from simpler ones.
+/// This is a convenient way to build more complex edit commands from simpler ones,
+/// but for more complex edits it is probably better to create a custom edit command.
 ///
 /// # Examples
 /// ```
@@ -68,64 +69,6 @@ where
 }
 
 impl<A, B> Display for Join<A, B>
-where
-    A: Display,
-    B: Display,
-{
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} & {}", self.a, self.b)
-    }
-}
-
-/// Two fallible [`Edit`] commands joined together.
-///
-/// Same as [`Join`] but for edits that outputs [`Result`].
-#[derive(Clone, Debug)]
-pub struct TryJoin<A, B> {
-    a: A,
-    b: B,
-}
-
-impl<A, B> TryJoin<A, B> {
-    /// Creates a new [`TryJoin`] from `a` and `b`.
-    pub const fn new(a: A, b: B) -> Self {
-        TryJoin { a, b }
-    }
-
-    /// Joins `self` with `c`.
-    pub const fn join<C>(self, c: C) -> TryJoin<Self, C> {
-        TryJoin::new(self, c)
-    }
-}
-
-impl<A, B, T, E> Edit for TryJoin<A, B>
-where
-    A: Edit<Output = Result<T, E>>,
-    B: Edit<Target = A::Target, Output = A::Output>,
-{
-    type Target = A::Target;
-    type Output = A::Output;
-
-    /// The output of a will be discarded if success.
-    fn edit(&mut self, target: &mut A::Target) -> Self::Output {
-        self.a.edit(target)?;
-        self.b.edit(target)
-    }
-
-    /// The output of b will be discarded if success.
-    fn undo(&mut self, target: &mut A::Target) -> Self::Output {
-        self.b.undo(target)?;
-        self.a.undo(target)
-    }
-
-    /// The output of a will be discarded if success.
-    fn redo(&mut self, target: &mut A::Target) -> Self::Output {
-        self.a.redo(target)?;
-        self.b.redo(target)
-    }
-}
-
-impl<A, B> Display for TryJoin<A, B>
 where
     A: Display,
     B: Display,

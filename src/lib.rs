@@ -1,6 +1,6 @@
 //! **An undo-redo library.**
 //!
-//! > It is an implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
+//! > An implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
 //! > where all edits are done by creating objects that applies the modifications.
 //! > All objects knows how to undo the changes it applies, and by using the provided data
 //! > structures it is easy to undo and redo edits made to a target.
@@ -9,8 +9,8 @@
 //!
 //! # Features
 //!
-//! * [`Edit`] provides the base functionality for all edit commands. Multiple [`Edit`]s can be merged into a single edit
-//!   by implementing the [`Edit::merge`] method on the edit. This allows smaller edits to be used to build
+//! * [`Edit`] provides the base functionality for all edit commands. Multiple edit commands can be merged into a single edit
+//!   by implementing the [`merge`](Edit::merge) method on the edit. This allows smaller edits to be used to build
 //!   more complex operations, or smaller incremental changes to be merged into larger changes that can be undone and
 //!   redone in a single step.
 //! * [`Record`] provides basic stack based undo-redo functionality.
@@ -65,10 +65,10 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "alloc")]
 pub use any::Any;
-pub use from_fn::{FromFn, TryFromFn};
+pub use from_fn::FromFn;
 #[cfg(feature = "alloc")]
 pub use history::History;
-pub use join::{Join, TryJoin};
+pub use join::Join;
 #[cfg(feature = "alloc")]
 pub use record::Record;
 #[cfg(feature = "alloc")]

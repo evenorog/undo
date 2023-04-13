@@ -1,5 +1,5 @@
 use crate::record::Builder as RecordBuilder;
-use crate::{History, Nop, Slot};
+use crate::{History, Nop};
 
 /// Builder for a [`History`].
 ///
@@ -21,11 +21,6 @@ use crate::{History, Nop, Slot};
 pub struct Builder<E, S = Nop>(RecordBuilder<E, S>);
 
 impl<E, S> Builder<E, S> {
-    /// Returns a builder for a history.
-    pub(crate) fn new() -> Builder<E, S> {
-        Builder(RecordBuilder::new())
-    }
-
     /// Sets the capacity for the history.
     pub fn capacity(self, capacity: usize) -> Builder<E, S> {
         Builder(self.0.capacity(capacity))
@@ -45,21 +40,19 @@ impl<E, S> Builder<E, S> {
         Builder(self.0.saved(saved))
     }
 
+    /// Connects the slot.
+    pub fn connect(self, slot: S) -> Builder<E, S> {
+        Builder(self.0.connect(slot))
+    }
+
     /// Builds the history.
     pub fn build(self) -> History<E, S> {
         History::from(self.0.build())
     }
 }
 
-impl<E, S: Slot> Builder<E, S> {
-    /// Connects the slot.
-    pub fn connect(self, slot: S) -> Builder<E, S> {
-        Builder(self.0.connect(slot))
-    }
-}
-
-impl<E> Default for Builder<E> {
+impl<E, S> Default for Builder<E, S> {
     fn default() -> Self {
-        Builder::new()
+        Builder(RecordBuilder::default())
     }
 }

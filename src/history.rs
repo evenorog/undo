@@ -36,11 +36,16 @@ use serde::{Deserialize, Serialize};
 /// history.edit(&mut target, Add('c'));
 /// let abc = history.branch();
 ///
-/// history.go_to(&mut target, abc, 1);
+/// history.undo(&mut target);
+/// history.undo(&mut target);
+/// assert_eq!(target, "a");
+///
+/// // Instead of discarding 'b' and 'c', a new branch is created.
 /// history.edit(&mut target, Add('f'));
 /// history.edit(&mut target, Add('g'));
 /// assert_eq!(target, "afg");
 ///
+/// // We can now switch back to the original branch.
 /// history.go_to(&mut target, abc, 3);
 /// assert_eq!(target, "abc");
 /// # }
@@ -65,7 +70,7 @@ impl<E> History<E> {
 impl<E, S> History<E, S> {
     /// Returns a new history builder.
     pub fn builder() -> Builder<E, S> {
-        Builder::new()
+        Builder::default()
     }
 
     /// Reserves capacity for at least `additional` more edits.

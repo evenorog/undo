@@ -50,8 +50,11 @@ use serde::{Deserialize, Serialize};
 ///
 /// record.redo(&mut target);
 /// record.redo(&mut target);
-/// record.redo(&mut target);
-/// assert_eq!(target, "abc");
+/// assert_eq!(target, "ab");
+///
+/// // 'c' will be discarded.
+/// record.edit(&mut target, Add('d'));
+/// assert_eq!(target, "abd");
 /// # }
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -74,7 +77,7 @@ impl<E> Record<E> {
 impl<E, S> Record<E, S> {
     /// Returns a new record builder.
     pub fn builder() -> Builder<E, S> {
-        Builder::new()
+        Builder::default()
     }
 
     /// Reserves capacity for at least `additional` more edits.

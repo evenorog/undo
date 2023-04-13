@@ -1,5 +1,5 @@
 use super::Socket;
-use crate::{Nop, Record, Slot};
+use crate::{Nop, Record};
 use alloc::collections::VecDeque;
 use core::marker::PhantomData;
 use core::num::NonZeroUsize;
@@ -30,17 +30,6 @@ pub struct Builder<E, S = Nop> {
 }
 
 impl<E, S> Builder<E, S> {
-    /// Returns a builder for a record.
-    pub(crate) fn new() -> Builder<E, S> {
-        Builder {
-            capacity: 0,
-            limit: NonZeroUsize::new(usize::MAX).unwrap(),
-            saved: true,
-            socket: Socket::default(),
-            pd: PhantomData,
-        }
-    }
-
     /// Sets the capacity for the record.
     pub fn capacity(mut self, capacity: usize) -> Builder<E, S> {
         self.capacity = capacity;
@@ -63,6 +52,12 @@ impl<E, S> Builder<E, S> {
         self
     }
 
+    /// Connects the slot.
+    pub fn connect(mut self, slot: S) -> Builder<E, S> {
+        self.socket = Socket::new(slot);
+        self
+    }
+
     /// Builds the record.
     pub fn build(self) -> Record<E, S> {
         Record {
@@ -75,16 +70,14 @@ impl<E, S> Builder<E, S> {
     }
 }
 
-impl<E, S: Slot> Builder<E, S> {
-    /// Connects the slot.
-    pub fn connect(mut self, slot: S) -> Builder<E, S> {
-        self.socket = Socket::new(slot);
-        self
-    }
-}
-
-impl<E> Default for Builder<E> {
+impl<E, S> Default for Builder<E, S> {
     fn default() -> Self {
-        Builder::new()
+        Builder {
+            capacity: 0,
+            limit: NonZeroUsize::new(usize::MAX).unwrap(),
+            saved: true,
+            socket: Socket::default(),
+            pd: PhantomData,
+        }
     }
 }
