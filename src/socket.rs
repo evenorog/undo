@@ -32,7 +32,7 @@ impl<S> Default for Socket<S> {
 impl<S: Slot> Socket<S> {
     pub fn emit(&mut self, signal: impl FnOnce() -> Signal) {
         if let Some(slot) = &mut self.0 {
-            slot.emit(signal());
+            slot.on_emit(signal());
         }
     }
 
@@ -43,22 +43,49 @@ impl<S: Slot> Socket<S> {
     }
 }
 
-/// Use this to receive signals from [`History`](crate::History) or [`Record`](crate::Record).
+/// Use this to handle signals emitted.
+///
+/// This allows you to trigger events on certain state changes.
+///
+/// # Examples
+/// ```
+/// # include!("doctest.rs");
+/// # use std::sync::mpsc;
+/// # use undo::{FromFn, Record, Signal};
+/// # fn main() {
+/// let (sender, receiver) = mpsc::channel();
+/// let mut iter = receiver.try_iter();
+///
+/// let mut target = String::new();
+/// let mut record = Record::builder()
+///     .connect(|s| sender.send(s).unwrap())
+///     .build();
+///
+/// record.edit(&mut target, Add('a'));
+/// assert_eq!(iter.next(), Some(Signal::Undo(true)));
+/// assert_eq!(iter.next(), Some(Signal::Saved(false)));
+///
+/// record.undo(&mut target);
+/// assert_eq!(iter.next(), Some(Signal::Undo(false)));
+/// assert_eq!(iter.next(), Some(Signal::Redo(true)));
+/// assert_eq!(iter.next(), Some(Signal::Saved(true)));
+/// assert_eq!(iter.next(), None);
+/// # }
+/// ```
 pub trait Slot {
     /// Receives a signal that describes the state change done to the data structures.
-    fn emit(&mut self, signal: Signal);
+    fn on_emit(&mut self, signal: Signal);
 }
 
 impl<F: FnMut(Signal)> Slot for F {
-    fn emit(&mut self, signal: Signal) {
+    fn on_emit(&mut self, signal: Signal) {
         self(signal)
     }
 }
 
-/// The signal used for communicating state changes.
+/// The `Signal` describes the state change done to the data structures.
 ///
-/// For example, if the history tree can no longer redo any edits,
-/// it sends a `Redo(false)` signal to tell the user.
+/// See [`Slot`] for more information.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Signal {
@@ -76,5 +103,5 @@ pub enum Signal {
 pub struct Nop;
 
 impl Slot for Nop {
-    fn emit(&mut self, _: Signal) {}
+    fn on_emit(&mut self, _: Signal) {}
 }

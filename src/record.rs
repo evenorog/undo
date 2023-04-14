@@ -228,9 +228,9 @@ impl<E: Edit, S: Slot> Record<E, S> {
             let output = self.entries[self.current - 1].undo(target);
             self.current -= 1;
             let is_saved = self.is_saved();
+            self.socket.emit_if(old == 1, || Signal::Undo(false));
             self.socket
                 .emit_if(old == self.entries.len(), || Signal::Redo(true));
-            self.socket.emit_if(old == 1, || Signal::Undo(false));
             self.socket
                 .emit_if(was_saved != is_saved, || Signal::Saved(is_saved));
             output
@@ -246,9 +246,9 @@ impl<E: Edit, S: Slot> Record<E, S> {
             let output = self.entries[self.current].redo(target);
             self.current += 1;
             let is_saved = self.is_saved();
+            self.socket.emit_if(old == 0, || Signal::Undo(true));
             self.socket
                 .emit_if(old == self.len() - 1, || Signal::Redo(false));
-            self.socket.emit_if(old == 0, || Signal::Undo(true));
             self.socket
                 .emit_if(was_saved != is_saved, || Signal::Saved(is_saved));
             output
