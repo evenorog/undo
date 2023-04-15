@@ -18,21 +18,22 @@ pub struct Entry<E> {
 
 impl<E: Edit> Entry<E> {
     pub fn undo(&mut self, target: &mut E::Target) -> E::Output {
-        #[cfg(feature = "std")]
-        self.updated_now();
+        self.pre_edit();
         self.edit.undo(target)
     }
 
     pub fn redo(&mut self, target: &mut E::Target) -> E::Output {
-        #[cfg(feature = "std")]
-        self.updated_now();
+        self.pre_edit();
         self.edit.redo(target)
     }
 
     #[cfg(feature = "std")]
-    fn updated_now(&mut self) {
+    fn pre_edit(&mut self) {
         self.updated_at = SystemTime::now();
     }
+
+    #[cfg(not(feature = "std"))]
+    fn pre_edit(&mut self) {}
 }
 
 impl<E> From<E> for Entry<E> {

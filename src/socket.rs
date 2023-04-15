@@ -3,6 +3,8 @@
 use core::mem;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::sync::mpsc::{Sender, SyncSender};
 
 /// Slot wrapper that adds some additional functionality.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -58,12 +60,13 @@ impl<S: Slot> Socket<S> {
 ///
 /// let mut target = String::new();
 /// let mut record = Record::builder()
-///     .connect(|s| sender.send(s).unwrap())
+///     .connect(sender)
 ///     .build();
 ///
 /// record.edit(&mut target, Add('a'));
 /// assert_eq!(iter.next(), Some(Signal::Undo(true)));
 /// assert_eq!(iter.next(), Some(Signal::Saved(false)));
+/// assert_eq!(iter.next(), None);
 ///
 /// record.undo(&mut target);
 /// assert_eq!(iter.next(), Some(Signal::Undo(false)));
@@ -80,6 +83,20 @@ pub trait Slot {
 impl<F: FnMut(Signal)> Slot for F {
     fn on_emit(&mut self, signal: Signal) {
         self(signal)
+    }
+}
+
+#[cfg(feature = "std")]
+impl Slot for Sender<Signal> {
+    fn on_emit(&mut self, signal: Signal) {
+        self.send(signal).ok();
+    }
+}
+
+#[cfg(feature = "std")]
+impl Slot for SyncSender<Signal> {
+    fn on_emit(&mut self, signal: Signal) {
+        self.send(signal).ok();
     }
 }
 
