@@ -62,7 +62,7 @@ use serde::{Deserialize, Serialize};
 pub struct Record<E, S = Nop> {
     pub(crate) entries: VecDeque<Entry<E>>,
     pub(crate) limit: NonZeroUsize,
-    pub(crate) current: usize,
+    pub(crate) index: usize,
     pub(crate) saved: Option<usize>,
     pub(crate) socket: Socket<S>,
 }
@@ -125,22 +125,22 @@ impl<E, S> Record<E, S> {
 
     /// Returns `true` if the record can undo.
     pub fn can_undo(&self) -> bool {
-        self.current > 0
+        self.index > 0
     }
 
     /// Returns `true` if the record can redo.
     pub fn can_redo(&self) -> bool {
-        self.current < self.len()
+        self.index < self.len()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
     pub fn is_saved(&self) -> bool {
-        self.saved == Some(self.current)
+        self.saved == Some(self.index)
     }
 
-    /// Returns the position of the current edit.
-    pub fn current(&self) -> usize {
-        self.current
+    /// Returns the index of the next edit.
+    pub fn index(&self) -> usize {
+        self.index
     }
 
     /// Returns a structure for configurable formatting of the record.
@@ -178,14 +178,14 @@ impl<E: Edit, S: Slot> Record<E, S> {
     ) -> (E::Output, bool, VecDeque<Entry<E>>) {
         let output = edit.edit(target);
         // We store the state of the stack before adding the entry.
-        let current = self.current;
+        let index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Pop off all elements after len from entries.
-        let tail = self.entries.split_off(current);
+        let tail = self.entries.split_off(index);
         // Check if the saved state was popped off.
-        self.saved = self.saved.filter(|&saved| saved <= current);
+        self.saved = self.saved.filter(|&saved| saved <= index);
         // Try to merge edits unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
             Some(last) if !was_saved => last.edit.merge(edit),
@@ -196,17 +196,17 @@ impl<E: Edit, S: Slot> Record<E, S> {
             Merged::Yes => true,
             Merged::Annul => {
                 self.entries.pop_back();
-                self.current -= 1;
+                self.index -= 1;
                 true
             }
             // If edits are not merged or annulled push it onto the storage.
             Merged::No(edit) => {
                 // If limit is reached, pop off the first edit command.
-                if self.limit() == self.current {
+                if self.limit() == self.index {
                     self.entries.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                 } else {
-                    self.current += 1;
+                    self.index += 1;
                 }
                 self.entries.push_back(Entry::from(edit));
                 false
@@ -224,9 +224,9 @@ impl<E: Edit, S: Slot> Record<E, S> {
     pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.can_undo().then(|| {
             let was_saved = self.is_saved();
-            let old = self.current;
-            let output = self.entries[self.current - 1].undo(target);
-            self.current -= 1;
+            let old = self.index;
+            let output = self.entries[self.index - 1].undo(target);
+            self.index -= 1;
             let is_saved = self.is_saved();
             self.socket.emit_if(old == 1, || Signal::Undo(false));
             self.socket
@@ -242,9 +242,9 @@ impl<E: Edit, S: Slot> Record<E, S> {
     pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.can_redo().then(|| {
             let was_saved = self.is_saved();
-            let old = self.current;
-            let output = self.entries[self.current].redo(target);
-            self.current += 1;
+            let old = self.index;
+            let output = self.entries[self.index].redo(target);
+            self.index += 1;
             let is_saved = self.is_saved();
             self.socket.emit_if(old == 0, || Signal::Undo(true));
             self.socket
@@ -259,7 +259,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
     pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
         if saved {
-            self.saved = Some(self.current);
+            self.saved = Some(self.index);
             self.socket.emit_if(!was_saved, || Signal::Saved(true));
         } else {
             self.saved = None;
@@ -273,7 +273,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
         let could_redo = self.can_redo();
         self.entries.clear();
         self.saved = self.is_saved().then_some(0);
-        self.current = 0;
+        self.index = 0;
         self.socket.emit_if(could_undo, || Signal::Undo(false));
         self.socket.emit_if(could_redo, || Signal::Redo(false));
     }
@@ -284,9 +284,9 @@ impl<E: Edit, S: Slot> Record<E, S> {
             .map_or_else(Vec::new, |saved| self.go_to(target, saved))
     }
 
-    /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `current` is reached.
-    pub fn go_to(&mut self, target: &mut E::Target, current: usize) -> Vec<E::Output> {
-        if current > self.len() {
+    /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `index` is reached.
+    pub fn go_to(&mut self, target: &mut E::Target, index: usize) -> Vec<E::Output> {
+        if index > self.len() {
             return Vec::new();
         }
 
@@ -295,16 +295,16 @@ impl<E: Edit, S: Slot> Record<E, S> {
         let was_saved = self.is_saved();
         // Temporarily remove slot so they are not called each iteration.
         let slot = self.socket.disconnect();
-        // Decide if we need to undo or redo to reach current.
-        let undo_or_redo = if current > self.current {
+        // Decide if we need to undo or redo to reach index.
+        let undo_or_redo = if index > self.index {
             Record::redo
         } else {
             Record::undo
         };
 
-        let capacity = self.current.abs_diff(current);
+        let capacity = self.index.abs_diff(index);
         let mut outputs = Vec::with_capacity(capacity);
-        while self.current != current {
+        while self.index != index {
             let output = undo_or_redo(self, target).unwrap();
             outputs.push(output);
         }
@@ -328,13 +328,13 @@ impl<E: ToString, S> Record<E, S> {
     /// Returns the string of the edit which will be undone
     /// in the next call to [`Record::undo`].
     pub fn undo_string(&self) -> Option<String> {
-        self.current.checked_sub(1).and_then(|i| self.string_at(i))
+        self.index.checked_sub(1).and_then(|i| self.string_at(i))
     }
 
     /// Returns the string of the edit which will be redone
     /// in the next call to [`Record::redo`].
     pub fn redo_string(&self) -> Option<String> {
-        self.string_at(self.current)
+        self.string_at(self.index)
     }
 
     fn string_at(&self, i: usize) -> Option<String> {
@@ -439,25 +439,25 @@ mod tests {
         record.edit(&mut target, Add('e'));
 
         record.go_to(&mut target, 0);
-        assert_eq!(record.current(), 0);
+        assert_eq!(record.index(), 0);
         assert_eq!(target, "");
         record.go_to(&mut target, 5);
-        assert_eq!(record.current(), 5);
+        assert_eq!(record.index(), 5);
         assert_eq!(target, "abcde");
         record.go_to(&mut target, 1);
-        assert_eq!(record.current(), 1);
+        assert_eq!(record.index(), 1);
         assert_eq!(target, "a");
         record.go_to(&mut target, 4);
-        assert_eq!(record.current(), 4);
+        assert_eq!(record.index(), 4);
         assert_eq!(target, "abcd");
         record.go_to(&mut target, 2);
-        assert_eq!(record.current(), 2);
+        assert_eq!(record.index(), 2);
         assert_eq!(target, "ab");
         record.go_to(&mut target, 3);
-        assert_eq!(record.current(), 3);
+        assert_eq!(record.index(), 3);
         assert_eq!(target, "abc");
         assert!(record.go_to(&mut target, 6).is_empty());
-        assert_eq!(record.current(), 3);
+        assert_eq!(record.index(), 3);
     }
 
     #[test]

@@ -63,7 +63,7 @@ impl<E, S> Builder<E, S> {
         Record {
             entries: VecDeque::with_capacity(self.capacity),
             limit: self.limit,
-            current: 0,
+            index: 0,
             saved: self.saved.then_some(0),
             socket: self.socket,
         }

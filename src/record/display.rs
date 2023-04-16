@@ -67,7 +67,7 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         self.format.labels(
             f,
             at,
-            At::root(self.record.current()),
+            At::root(self.record.index()),
             self.record.saved.map(At::root),
         )?;
 

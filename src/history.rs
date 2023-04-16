@@ -136,9 +136,9 @@ impl<E, S> History<E, S> {
         self.root
     }
 
-    /// Returns the position of the current edit.
-    pub fn current(&self) -> usize {
-        self.record.current()
+    /// Returns the index of the next edit.
+    pub fn index(&self) -> usize {
+        self.record.index()
     }
 
     /// Returns a structure for configurable formatting of the history.
@@ -162,7 +162,7 @@ impl<E, S> History<E, S> {
     }
 
     pub(crate) fn at(&self) -> At {
-        At::new(self.root, self.current())
+        At::new(self.root, self.index())
     }
 }
 
@@ -173,7 +173,7 @@ impl<E: Edit, S: Slot> History<E, S> {
         let saved = self.record.saved.filter(|&saved| saved > at.current);
         let (output, merged, tail) = self.record.edit_inner(target, edit);
         // Check if the limit has been reached.
-        if !merged && at.current == self.current() {
+        if !merged && at.current == self.index() {
             let root = self.branch();
             self.rm_child(root, 0);
             self.branches
@@ -222,7 +222,7 @@ impl<E: Edit, S: Slot> History<E, S> {
     pub(crate) fn jump_to(&mut self, root: usize) {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.at());
-        let current = self.current();
+        let current = self.index();
         let saved = self.record.saved.filter(|&saved| saved > current);
         let tail = self.record.entries.split_off(current);
         self.record.entries.append(&mut branch.entries);
@@ -327,7 +327,7 @@ impl<E: Edit, S: Slot> History<E, S> {
             outputs.extend(o);
             // Apply the edits in the branch and move older edits into their own branch.
             for entry in branch.entries {
-                let current = self.current();
+                let current = self.index();
                 let saved = self.record.saved.filter(|&saved| saved > current);
                 let (_, _, entries) = self.record.edit_inner(target, entry.edit);
                 if !entries.is_empty() {

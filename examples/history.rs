@@ -32,7 +32,7 @@ fn main() {
     assert_eq!(target, "abc");
 
     let abc_branch = history.branch();
-    let abc_current = history.current();
+    let abc_current = history.index();
 
     history.undo(&mut target);
     assert_eq!(target, "ab");
@@ -43,7 +43,7 @@ fn main() {
     assert_eq!(target, "abdef");
 
     let abdef_branch = history.branch();
-    let abdef_current = history.current();
+    let abdef_current = history.index();
 
     history.go_to(&mut target, abc_branch, abc_current);
     assert_eq!(target, "abc");
