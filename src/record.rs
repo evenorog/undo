@@ -10,7 +10,7 @@ pub use checkpoint::Checkpoint;
 pub use display::Display;
 pub use queue::Queue;
 
-use crate::socket::{Nop, Slot, Socket};
+use crate::socket::{Slot, Socket};
 use crate::{Edit, Entry, History, Merged, Signal};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
@@ -59,7 +59,7 @@ use serde::{Deserialize, Serialize};
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct Record<E, S = Nop> {
+pub struct Record<E, S = ()> {
     pub(crate) entries: VecDeque<Entry<E>>,
     pub(crate) limit: NonZeroUsize,
     pub(crate) index: usize,

@@ -1,5 +1,5 @@
 use crate::record::Builder as RecordBuilder;
-use crate::{History, Nop};
+use crate::History;
 
 /// Builder for a [`History`].
 ///
@@ -18,7 +18,7 @@ use crate::{History, Nop};
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<E, S = Nop>(RecordBuilder<E, S>);
+pub struct Builder<E, S = ()>(RecordBuilder<E, S>);
 
 impl<E, S> Builder<E, S> {
     /// Sets the capacity for the history.

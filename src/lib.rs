@@ -72,7 +72,7 @@ pub use join::Join;
 #[cfg(feature = "alloc")]
 pub use record::Record;
 #[cfg(feature = "alloc")]
-pub use socket::{Nop, Signal, Slot};
+pub use socket::{Signal, Slot};
 
 /// Base functionality for all edit commands.
 pub trait Edit {

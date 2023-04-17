@@ -10,7 +10,7 @@ pub use checkpoint::Checkpoint;
 pub use display::Display;
 pub use queue::Queue;
 
-use crate::socket::{Nop, Signal, Slot};
+use crate::socket::{Signal, Slot};
 use crate::{At, Edit, Entry, Record};
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
@@ -52,7 +52,7 @@ use serde::{Deserialize, Serialize};
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct History<E, S = Nop> {
+pub struct History<E, S = ()> {
     root: usize,
     next: usize,
     saved: Option<At>,

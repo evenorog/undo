@@ -45,6 +45,20 @@ impl<S: Slot> Socket<S> {
     }
 }
 
+/// The `Signal` describes the state change done to the data structures.
+///
+/// See [`Slot`] for more information.
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum Signal {
+    /// Says if the structures can undo.
+    Undo(bool),
+    /// Says if the structures can redo.
+    Redo(bool),
+    /// Says if the target is in a saved state.
+    Saved(bool),
+}
+
 /// Use this to handle signals emitted.
 ///
 /// This allows you to trigger events on certain state changes.
@@ -80,6 +94,10 @@ pub trait Slot {
     fn on_emit(&mut self, signal: Signal);
 }
 
+impl Slot for () {
+    fn on_emit(&mut self, _: Signal) {}
+}
+
 impl<F: FnMut(Signal)> Slot for F {
     fn on_emit(&mut self, signal: Signal) {
         self(signal)
@@ -98,27 +116,4 @@ impl Slot for SyncSender<Signal> {
     fn on_emit(&mut self, signal: Signal) {
         self.send(signal).ok();
     }
-}
-
-/// The `Signal` describes the state change done to the data structures.
-///
-/// See [`Slot`] for more information.
-#[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
-pub enum Signal {
-    /// Says if the structures can undo.
-    Undo(bool),
-    /// Says if the structures can redo.
-    Redo(bool),
-    /// Says if the target is in a saved state.
-    Saved(bool),
-}
-
-/// Default [`Slot`] that does nothing.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub struct Nop;
-
-impl Slot for Nop {
-    fn on_emit(&mut self, _: Signal) {}
 }

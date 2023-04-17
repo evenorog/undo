@@ -1,5 +1,5 @@
 use super::Socket;
-use crate::{Nop, Record};
+use crate::Record;
 use alloc::collections::VecDeque;
 use core::marker::PhantomData;
 use core::num::NonZeroUsize;
@@ -21,7 +21,7 @@ use core::num::NonZeroUsize;
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Builder<E, S = Nop> {
+pub struct Builder<E, S = ()> {
     capacity: usize,
     limit: NonZeroUsize,
     saved: bool,
