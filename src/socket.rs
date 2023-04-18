@@ -51,12 +51,14 @@ impl<S: Slot> Socket<S> {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Signal {
-    /// Says if the structures can undo.
+    /// Emitted when the structures ability to undo has changed.
     Undo(bool),
-    /// Says if the structures can redo.
+    /// Emitted when the structures ability to redo has changed.
     Redo(bool),
-    /// Says if the target is in a saved state.
+    /// Emitted when the saved state has changed.
     Saved(bool),
+    /// Emitted when the index has changed.
+    Index(usize),
 }
 
 /// Use this to handle signals emitted.
@@ -80,12 +82,14 @@ pub enum Signal {
 /// record.edit(&mut target, Add('a'));
 /// assert_eq!(iter.next(), Some(Signal::Undo(true)));
 /// assert_eq!(iter.next(), Some(Signal::Saved(false)));
+/// assert_eq!(iter.next(), Some(Signal::Index(1)));
 /// assert_eq!(iter.next(), None);
 ///
 /// record.undo(&mut target);
 /// assert_eq!(iter.next(), Some(Signal::Undo(false)));
 /// assert_eq!(iter.next(), Some(Signal::Redo(true)));
 /// assert_eq!(iter.next(), Some(Signal::Saved(true)));
+/// assert_eq!(iter.next(), Some(Signal::Index(0)));
 /// assert_eq!(iter.next(), None);
 /// # }
 /// ```

@@ -162,6 +162,13 @@ impl<E, S> Record<E, S> {
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         Checkpoint::from(self)
     }
+
+    /// Remove all elements after the index.
+    fn rm_tail(&mut self) -> VecDeque<Entry<E>> {
+        // Check if the saved edit will be removed.
+        self.saved = self.saved.filter(|&saved| saved <= self.index);
+        self.entries.split_off(self.index)
+    }
 }
 
 impl<E: Edit, S: Slot> Record<E, S> {
@@ -178,14 +185,12 @@ impl<E: Edit, S: Slot> Record<E, S> {
     ) -> (E::Output, bool, VecDeque<Entry<E>>) {
         let output = edit.edit(target);
         // We store the state of the stack before adding the entry.
-        let index = self.index;
+        let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
-        // Pop off all elements after len from entries.
-        let tail = self.entries.split_off(index);
-        // Check if the saved state was popped off.
-        self.saved = self.saved.filter(|&saved| saved <= index);
+
+        let tail = self.rm_tail();
         // Try to merge edits unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
             Some(last) if !was_saved => last.edit.merge(edit),
@@ -216,6 +221,8 @@ impl<E: Edit, S: Slot> Record<E, S> {
         self.socket.emit_if(could_redo, || Signal::Redo(false));
         self.socket.emit_if(!could_undo, || Signal::Undo(true));
         self.socket.emit_if(was_saved, || Signal::Saved(false));
+        self.socket
+            .emit_if(old_index != self.index, || Signal::Index(self.index));
         (output, merged_or_annulled, tail)
     }
 
@@ -223,16 +230,17 @@ impl<E: Edit, S: Slot> Record<E, S> {
     /// the previous one as the new active one.
     pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.can_undo().then(|| {
+            let old_index = self.index;
             let was_saved = self.is_saved();
-            let old = self.index;
             let output = self.entries[self.index - 1].undo(target);
             self.index -= 1;
             let is_saved = self.is_saved();
-            self.socket.emit_if(old == 1, || Signal::Undo(false));
+            self.socket.emit_if(old_index == 1, || Signal::Undo(false));
             self.socket
-                .emit_if(old == self.entries.len(), || Signal::Redo(true));
+                .emit_if(old_index == self.entries.len(), || Signal::Redo(true));
             self.socket
                 .emit_if(was_saved != is_saved, || Signal::Saved(is_saved));
+            self.socket.emit(|| Signal::Index(self.index));
             output
         })
     }
@@ -241,16 +249,17 @@ impl<E: Edit, S: Slot> Record<E, S> {
     /// the next one as the new active one.
     pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.can_redo().then(|| {
+            let old_index = self.index;
             let was_saved = self.is_saved();
-            let old = self.index;
             let output = self.entries[self.index].redo(target);
             self.index += 1;
             let is_saved = self.is_saved();
-            self.socket.emit_if(old == 0, || Signal::Undo(true));
+            self.socket.emit_if(old_index == 0, || Signal::Undo(true));
             self.socket
-                .emit_if(old == self.len() - 1, || Signal::Redo(false));
+                .emit_if(old_index == self.len() - 1, || Signal::Redo(false));
             self.socket
                 .emit_if(was_saved != is_saved, || Signal::Saved(is_saved));
+            self.socket.emit(|| Signal::Index(self.index));
             output
         })
     }
@@ -269,6 +278,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
 
     /// Removes all edits from the record without undoing them.
     pub fn clear(&mut self) {
+        let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         self.entries.clear();
@@ -276,6 +286,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
         self.index = 0;
         self.socket.emit_if(could_undo, || Signal::Undo(false));
         self.socket.emit_if(could_redo, || Signal::Redo(false));
+        self.socket.emit_if(old_index != 0, || Signal::Index(0));
     }
 
     /// Revert the changes done to the target since the saved state.
@@ -290,6 +301,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
             return Vec::new();
         }
 
+        let old_index = self.index();
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
@@ -319,6 +331,8 @@ impl<E: Edit, S: Slot> Record<E, S> {
             .emit_if(could_redo != can_redo, || Signal::Redo(can_redo));
         self.socket
             .emit_if(was_saved != is_saved, || Signal::Saved(is_saved));
+        self.socket
+            .emit_if(old_index != self.index, || Signal::Index(self.index));
 
         outputs
     }
