@@ -115,7 +115,7 @@ impl Format {
     ) -> fmt::Result {
         match (
             self.current && at == current,
-            self.saved && saved.map_or(false, |saved| saved == at),
+            self.saved && matches!(saved, Some(saved) if saved == at),
         ) {
             (true, true) => {
                 #[cfg(feature = "colored")]
