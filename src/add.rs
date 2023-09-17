@@ -1,9 +1,10 @@
-// This file is included in the documentation examples to avoid some boilerplate.
-
 /// This is the edit used in all the examples.
-pub struct Add(char);
+///
+/// Not part of the API and can change at any time.
+#[doc(hidden)]
+pub struct Add(pub char);
 
-impl undo::Edit for Add {
+impl crate::Edit for Add {
     type Target = String;
     type Output = ();
 

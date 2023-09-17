@@ -25,9 +25,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples
 /// ```
-/// # include!("doctest.rs");
 /// # fn main() {
-/// # use undo::History;
+/// # use undo::{Add, History};
 /// let mut target = String::new();
 /// let mut history = History::new();
 ///
@@ -318,7 +317,7 @@ impl<E: Edit, S: Slot> History<E, S> {
 
         // Walk the path from `root` to `branch`.
         let mut outputs = Vec::new();
-        let  Some(path) = self.mk_path(branch) else {
+        let Some(path) = self.mk_path(branch) else {
             return Vec::new();
         };
         for (new, branch) in path {

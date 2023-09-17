@@ -13,9 +13,8 @@ enum QueueEntry<E> {
 ///
 /// # Examples
 /// ```
-/// # include!("../doctest.rs");
 /// # fn main() {
-/// # use undo::History;
+/// # use undo::{Add, History};
 /// let mut string = String::new();
 /// let mut record = History::new();
 /// let mut queue = record.queue();

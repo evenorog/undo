@@ -67,9 +67,8 @@ pub enum Signal {
 ///
 /// # Examples
 /// ```
-/// # include!("doctest.rs");
 /// # use std::sync::mpsc;
-/// # use undo::{FromFn, Record, Signal};
+/// # use undo::{Add, Record, Signal};
 /// # fn main() {
 /// let (sender, receiver) = mpsc::channel();
 /// let mut iter = receiver.try_iter();

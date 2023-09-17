@@ -13,9 +13,8 @@ enum QueueEntry<E> {
 ///
 /// # Examples
 /// ```
-/// # include!("../doctest.rs");
 /// # fn main() {
-/// # use undo::Record;
+/// # use undo::{Add, Record};
 /// let mut string = String::new();
 /// let mut record = Record::new();
 /// let mut queue = record.queue();
@@ -90,12 +89,12 @@ impl<'a, E, S> From<&'a mut Record<E, S>> for Queue<'a, E, S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{FromFn, Record};
+    use crate::{Add, Record};
     use alloc::string::String;
 
-    const A: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('a'));
-    const B: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('b'));
-    const C: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('c'));
+    const A: Add = Add('a');
+    const B: Add = Add('b');
+    const C: Add = Add('c');
 
     #[test]
     fn queue_commit() {

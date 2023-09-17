@@ -32,9 +32,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples
 /// ```
-/// # include!("doctest.rs");
 /// # fn main() {
-/// # use undo::Record;
+/// # use undo::{Add, Record};
 /// let mut target = String::new();
 /// let mut record = Record::new();
 ///

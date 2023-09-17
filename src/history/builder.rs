@@ -5,9 +5,8 @@ use crate::History;
 ///
 /// # Examples
 /// ```
-/// # include!("../doctest.rs");
 /// # fn main() {
-/// # use undo::History;
+/// # use undo::{Add, History};
 /// # let mut target = String::new();
 /// let mut history = History::builder()
 ///     .limit(100)

@@ -88,11 +88,11 @@ impl<'a, E, S> From<&'a mut History<E, S>> for Checkpoint<'a, E, S> {
 mod tests {
     use crate::*;
 
-    const A: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('a'));
-    const B: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('b'));
-    const C: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('c'));
-    const D: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('d'));
-    const E: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('e'));
+    const A: Add = Add('a');
+    const B: Add = Add('b');
+    const C: Add = Add('c');
+    const D: Add = Add('d');
+    const E: Add = Add('e');
 
     #[test]
     fn checkpoint() {

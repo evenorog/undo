@@ -86,17 +86,17 @@ impl<'a, E, S> From<&'a mut Record<E, S>> for Checkpoint<'a, E, S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{FromFn, Record};
+    use crate::{add::Add, Record};
 
-    const A: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('a'));
-    const B: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('b'));
-    const C: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('c'));
-    const D: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('d'));
-    const E: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('e'));
-    const F: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('f'));
-    const G: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('g'));
-    const H: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('h'));
-    const I: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('i'));
+    const A: Add = Add('a');
+    const B: Add = Add('b');
+    const C: Add = Add('c');
+    const D: Add = Add('d');
+    const E: Add = Add('e');
+    const F: Add = Add('f');
+    const G: Add = Add('g');
+    const H: Add = Add('h');
+    const I: Add = Add('i');
 
     #[test]
     fn checkpoint_commit() {

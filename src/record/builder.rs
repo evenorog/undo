@@ -8,9 +8,8 @@ use core::num::NonZeroUsize;
 ///
 /// # Examples
 /// ```
-/// # include!("../doctest.rs");
 /// # fn main() {
-/// # use undo::Record;
+/// # use undo::{Add, Record};
 /// # let mut target = String::new();
 /// let mut record = Record::builder()
 ///     .limit(100)
