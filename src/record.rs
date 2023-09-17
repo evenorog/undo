@@ -173,27 +173,28 @@ impl<E, S> Record<E, S> {
 impl<E: Edit, S: Slot> Record<E, S> {
     /// Pushes the edit on top of the record and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let (output, _, _) = self.edit_inner(target, edit);
+        let (output, _, _) = self.push(target, Entry::from(edit), E::edit);
         output
     }
 
-    pub(crate) fn edit_inner(
+    pub(crate) fn push(
         &mut self,
         target: &mut E::Target,
-        mut edit: E,
+        mut entry: Entry<E>,
+        f: impl FnOnce(&mut E, &mut E::Target) -> E::Output,
     ) -> (E::Output, bool, VecDeque<Entry<E>>) {
-        let output = edit.edit(target);
-        // We store the state of the stack before adding the entry.
+        let output = f(&mut entry.edit, target);
+
         let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
 
         let tail = self.rm_tail();
-        // Try to merge edits unless the target is in a saved state.
+        // Try to merge unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
-            Some(last) if !was_saved => last.edit.merge(edit),
-            _ => Merged::No(edit),
+            Some(last) if !was_saved => last.edit.merge(entry.edit),
+            _ => Merged::No(entry.edit),
         };
 
         let merged_or_annulled = match merged {
@@ -203,7 +204,6 @@ impl<E: Edit, S: Slot> Record<E, S> {
                 self.index -= 1;
                 true
             }
-            // If edits are not merged or annulled push it onto the storage.
             Merged::No(edit) => {
                 // If limit is reached, pop off the first edit command.
                 if self.limit() == self.index {
@@ -212,7 +212,8 @@ impl<E: Edit, S: Slot> Record<E, S> {
                 } else {
                     self.index += 1;
                 }
-                self.entries.push_back(Entry::from(edit));
+                entry.edit = edit;
+                self.entries.push_back(entry);
                 false
             }
         };

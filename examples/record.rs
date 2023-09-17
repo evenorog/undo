@@ -1,26 +1,4 @@
-use core::fmt::{self, Display, Formatter};
-use undo::{Edit, Record};
-
-struct Add(char);
-
-impl Edit for Add {
-    type Target = String;
-    type Output = ();
-
-    fn edit(&mut self, target: &mut String) {
-        target.push(self.0);
-    }
-
-    fn undo(&mut self, target: &mut String) {
-        self.0 = target.pop().expect("cannot pop empty string");
-    }
-}
-
-impl Display for Add {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "Add '{}'", self.0)
-    }
-}
+use undo::{Add, Record};
 
 fn main() {
     let mut target = String::new();

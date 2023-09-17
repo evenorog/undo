@@ -33,7 +33,7 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
     /// Calls the `apply` method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let saved = self.record.saved;
-        let (output, _, tail) = self.record.edit_inner(target, edit);
+        let (output, _, tail) = self.record.push(target, Entry::from(edit), E::edit);
         self.entries.push(CheckpointEntry::Edit(saved, tail));
         output
     }

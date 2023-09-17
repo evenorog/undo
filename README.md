@@ -29,7 +29,7 @@ impl Edit for Add {
     }
 
     fn undo(&mut self, target: &mut String) {
-        self.0 = target.pop().expect("cannot pop empty string");
+        self.0 = target.pop().unwrap();
     }
 }
 
