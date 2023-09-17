@@ -19,21 +19,15 @@ impl<E, S> Display<'_, E, S> {
         self
     }
 
-    /// Show the current position in the output (on by default).
-    pub fn current(&mut self, on: bool) -> &mut Self {
-        self.format.current = on;
-        self
-    }
-
     /// Show detailed output (on by default).
     pub fn detailed(&mut self, on: bool) -> &mut Self {
         self.format.detailed = on;
         self
     }
 
-    /// Show the position of the edit (on by default).
-    pub fn position(&mut self, on: bool) -> &mut Self {
-        self.format.position = on;
+    /// Show the current position in the output (on by default).
+    pub fn head(&mut self, on: bool) -> &mut Self {
+        self.format.head = on;
         self
     }
 

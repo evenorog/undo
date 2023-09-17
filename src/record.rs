@@ -59,11 +59,11 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Record<E, S = ()> {
-    pub(crate) entries: VecDeque<Entry<E>>,
     pub(crate) limit: NonZeroUsize,
     pub(crate) index: usize,
     pub(crate) saved: Option<usize>,
     pub(crate) socket: Socket<S>,
+    pub(crate) entries: VecDeque<Entry<E>>,
 }
 
 impl<E> Record<E> {

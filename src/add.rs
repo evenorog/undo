@@ -4,6 +4,7 @@ use core::fmt::{self, Display, Formatter};
 ///
 /// Not part of the API and can change at any time.
 #[doc(hidden)]
+#[derive(Clone, Copy, Debug)]
 pub struct Add(pub char);
 
 impl crate::Edit for Add {

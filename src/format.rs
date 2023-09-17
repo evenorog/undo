@@ -12,9 +12,8 @@ use std::time::SystemTime;
 pub(crate) struct Format {
     #[cfg(feature = "colored")]
     pub colored: bool,
-    pub current: bool,
     pub detailed: bool,
-    pub position: bool,
+    pub head: bool,
     pub saved: bool,
 }
 
@@ -23,9 +22,8 @@ impl Default for Format {
         Format {
             #[cfg(feature = "colored")]
             colored: true,
-            current: true,
             detailed: true,
-            position: true,
+            head: true,
             saved: true,
         }
     }
@@ -86,23 +84,19 @@ impl Format {
     }
 
     pub fn position(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
-        if self.position {
-            #[cfg(feature = "colored")]
-            if self.colored {
-                let position = if use_branch {
-                    alloc::format!("{}:{}", at.branch, at.current)
-                } else {
-                    alloc::format!("{}", at.current)
-                };
-                return write!(f, "{}", position.yellow().bold());
-            }
-            if use_branch {
-                write!(f, "{}:{}", at.branch, at.current)
+        #[cfg(feature = "colored")]
+        if self.colored {
+            let position = if use_branch {
+                alloc::format!("{}:{}", at.branch, at.current)
             } else {
-                write!(f, "{}", at.current)
-            }
+                alloc::format!("{}", at.current)
+            };
+            return write!(f, "{}", position.yellow().bold());
+        }
+        if use_branch {
+            write!(f, "{}:{}", at.branch, at.current)
         } else {
-            Ok(())
+            write!(f, "{}", at.current)
         }
     }
 
@@ -114,7 +108,7 @@ impl Format {
         saved: Option<At>,
     ) -> fmt::Result {
         match (
-            self.current && at == current,
+            self.head && at == current,
             self.saved && matches!(saved, Some(saved) if saved == at),
         ) {
             (true, true) => {
@@ -123,14 +117,14 @@ impl Format {
                     return write!(
                         f,
                         " {}{}{} {}{}",
-                        "(".yellow(),
-                        "current".cyan().bold(),
+                        "[".yellow(),
+                        "HEAD".cyan().bold(),
                         ",".yellow(),
-                        "saved".green().bold(),
-                        ")".yellow()
+                        "SAVED".green().bold(),
+                        "]".yellow()
                     );
                 }
-                f.write_str(" (current, saved)")
+                f.write_str(" [HEAD, SAVED]")
             }
             (true, false) => {
                 #[cfg(feature = "colored")]
@@ -138,12 +132,12 @@ impl Format {
                     return write!(
                         f,
                         " {}{}{}",
-                        "(".yellow(),
-                        "current".cyan().bold(),
-                        ")".yellow()
+                        "[".yellow(),
+                        "HEAD".cyan().bold(),
+                        "]".yellow()
                     );
                 }
-                f.write_str(" (current)")
+                f.write_str(" [HEAD]")
             }
             (false, true) => {
                 #[cfg(feature = "colored")]
@@ -151,12 +145,12 @@ impl Format {
                     return write!(
                         f,
                         " {}{}{}",
-                        "(".yellow(),
-                        "saved".green().bold(),
-                        ")".yellow()
+                        "[".yellow(),
+                        "SAVED".green().bold(),
+                        "]".yellow()
                     );
                 }
-                f.write_str(" (saved)")
+                f.write_str(" [SAVED]")
             }
             (false, false) => Ok(()),
         }

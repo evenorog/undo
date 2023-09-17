@@ -60,11 +60,11 @@ impl<E, S> Builder<E, S> {
     /// Builds the record.
     pub fn build(self) -> Record<E, S> {
         Record {
-            entries: VecDeque::with_capacity(self.capacity),
             limit: self.limit,
             index: 0,
             saved: self.saved.then_some(0),
             socket: self.socket,
+            entries: VecDeque::with_capacity(self.capacity),
         }
     }
 }
