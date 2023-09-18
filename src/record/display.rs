@@ -7,9 +7,11 @@ use std::time::SystemTime;
 pub struct Display<'a, E, S> {
     record: &'a Record<E, S>,
     format: Format,
+    #[cfg(feature = "std")]
+    st_fmt: &'a dyn Fn(SystemTime, SystemTime) -> String,
 }
 
-impl<E, S> Display<'_, E, S> {
+impl<'a, E, S> Display<'a, E, S> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -36,6 +38,18 @@ impl<E, S> Display<'_, E, S> {
         self.format.saved = on;
         self
     }
+
+    /// Set the function used to format the elapsed time.
+    ///
+    /// The first input parameter is the current system time.
+    /// The second input parameter is the system time of the event.
+    pub fn set_st_fmt(
+        &mut self,
+        st_fmt: &'a dyn Fn(SystemTime, SystemTime) -> String,
+    ) -> &mut Self {
+        self.st_fmt = st_fmt;
+        self
+    }
 }
 
 impl<E: fmt::Display, S> Display<'_, E, S> {
@@ -52,9 +66,10 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         #[cfg(feature = "std")]
         if let Some(entry) = entry {
             if self.format.detailed {
-                self.format.elapsed(f, now, entry.created_at)?;
+                let st_fmt = self.st_fmt;
+                self.format.elapsed(f, st_fmt(now, entry.created_at))?;
                 self.format.text(f, ",", 3)?;
-                self.format.elapsed(f, now, entry.updated_at)?;
+                self.format.elapsed(f, st_fmt(now, entry.updated_at))?;
             }
         }
 
@@ -84,6 +99,8 @@ impl<'a, E, S> From<&'a Record<E, S>> for Display<'a, E, S> {
         Display {
             record,
             format: Format::default(),
+            #[cfg(feature = "std")]
+            st_fmt: &crate::format::default_st_fmt,
         }
     }
 }

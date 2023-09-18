@@ -1,4 +1,11 @@
+use chrono::{DateTime, Local};
+use std::time::SystemTime;
 use undo::{Add, History};
+
+fn custom_st_fmt(_: SystemTime, at: SystemTime) -> String {
+    let time: DateTime<Local> = at.into();
+    time.time().to_string()
+}
 
 fn main() {
     let mut target = String::new();
@@ -29,5 +36,5 @@ fn main() {
     history.go_to(&mut target, abdef_branch, abdef_current);
     assert_eq!(target, "abdef");
 
-    println!("{}", history.display());
+    println!("{}", history.display().set_st_fmt(&custom_st_fmt));
 }

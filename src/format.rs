@@ -8,6 +8,12 @@ use core::fmt::{self, Write};
 #[cfg(feature = "std")]
 use std::time::SystemTime;
 
+#[cfg(feature = "std")]
+pub(crate) fn default_st_fmt(now: SystemTime, at: SystemTime) -> String {
+    let elapsed = now.duration_since(at).unwrap_or_else(|e| e.duration());
+    format!("{elapsed:.1?}")
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Format {
     #[cfg(feature = "colored")]
@@ -157,14 +163,7 @@ impl Format {
     }
 
     #[cfg(feature = "std")]
-    pub fn elapsed(
-        self,
-        f: &mut fmt::Formatter,
-        now: SystemTime,
-        earlier: SystemTime,
-    ) -> fmt::Result {
-        let elapsed = now.duration_since(earlier).unwrap_or_else(|e| e.duration());
-        let string = format!("{elapsed:.1?}");
+    pub fn elapsed(self, f: &mut fmt::Formatter, string: String) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
             return write!(f, " {}", string.yellow());
