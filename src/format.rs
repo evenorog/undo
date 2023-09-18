@@ -93,16 +93,16 @@ impl Format {
         #[cfg(feature = "colored")]
         if self.colored {
             let position = if use_branch {
-                alloc::format!("{}:{}", at.branch, at.current)
+                alloc::format!("{}:{}", at.branch, at.index)
             } else {
-                alloc::format!("{}", at.current)
+                alloc::format!("{}", at.index)
             };
             return write!(f, "{}", position.yellow().bold());
         }
         if use_branch {
-            write!(f, "{}:{}", at.branch, at.current)
+            write!(f, "{}:{}", at.branch, at.index)
         } else {
-            write!(f, "{}", at.current)
+            write!(f, "{}", at.index)
         }
     }
 
@@ -110,11 +110,11 @@ impl Format {
         self,
         f: &mut fmt::Formatter,
         at: At,
-        current: At,
+        head: At,
         saved: Option<At>,
     ) -> fmt::Result {
         match (
-            self.head && at == current,
+            self.head && at == head,
             self.saved && matches!(saved, Some(saved) if saved == at),
         ) {
             (true, true) => {

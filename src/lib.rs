@@ -124,16 +124,16 @@ pub enum Merged<E> {
 #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq)]
 struct At {
     branch: usize,
-    current: usize,
+    index: usize,
 }
 
 #[cfg(feature = "alloc")]
 impl At {
-    const fn new(branch: usize, current: usize) -> At {
-        At { branch, current }
+    const fn new(branch: usize, index: usize) -> At {
+        At { branch, index }
     }
 
-    const fn root(current: usize) -> At {
-        At::new(0, current)
+    const fn root(index: usize) -> At {
+        At::new(0, index)
     }
 }

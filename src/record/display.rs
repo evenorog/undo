@@ -57,11 +57,11 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
-        current: usize,
+        index: usize,
         entry: Option<&Entry<E>>,
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
-        let at = At::root(current);
+        let at = At::root(index);
         self.format.position(f, at, false)?;
 
         #[cfg(feature = "std")]

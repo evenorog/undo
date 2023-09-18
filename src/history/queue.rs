@@ -16,8 +16,8 @@ enum QueueEntry<E> {
 /// # fn main() {
 /// # use undo::{Add, History};
 /// let mut string = String::new();
-/// let mut record = History::new();
-/// let mut queue = record.queue();
+/// let mut history = History::new();
+/// let mut queue = history.queue();
 ///
 /// queue.edit(Add('a'));
 /// queue.edit(Add('b'));

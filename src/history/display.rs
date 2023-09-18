@@ -114,7 +114,7 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
             .filter(|(_, branch)| branch.parent == at)
         {
             for (j, entry) in branch.entries.iter().enumerate().rev() {
-                let at = At::new(i, j + branch.parent.current + 1);
+                let at = At::new(i, j + branch.parent.index + 1);
                 self.fmt_graph(
                     f,
                     at,

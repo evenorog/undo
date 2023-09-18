@@ -8,6 +8,7 @@ use std::sync::mpsc::{Sender, SyncSender};
 
 /// Slot wrapper that adds some additional functionality.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[repr(transparent)]
 #[derive(Clone, Debug)]
 pub(crate) struct Socket<S>(Option<S>);
 
