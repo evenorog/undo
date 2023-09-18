@@ -43,6 +43,7 @@ impl<'a, E, S> Display<'a, E, S> {
     ///
     /// The first input parameter is the current system time.
     /// The second input parameter is the system time of the event.
+    #[cfg(feature = "std")]
     pub fn set_st_fmt(
         &mut self,
         st_fmt: &'a dyn Fn(SystemTime, SystemTime) -> String,

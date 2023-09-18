@@ -1,3 +1,4 @@
+use alloc::string::String;
 use core::fmt::{self, Display, Formatter};
 
 /// This is the edit used in all the examples.

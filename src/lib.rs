@@ -41,6 +41,7 @@ extern crate alloc;
 #[doc = include_str!("../README.md")]
 pub struct ReadmeDocTest;
 
+#[cfg(feature = "alloc")]
 mod add;
 #[cfg(feature = "alloc")]
 mod entry;
@@ -61,6 +62,7 @@ use format::Format;
 use serde::{Deserialize, Serialize};
 
 #[doc(hidden)]
+#[cfg(feature = "alloc")]
 pub use add::Add;
 #[cfg(feature = "alloc")]
 pub use history::History;
