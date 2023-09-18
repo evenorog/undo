@@ -173,18 +173,31 @@ impl<E, S> Record<E, S> {
 impl<E: Edit, S: Slot> Record<E, S> {
     /// Pushes the edit on top of the record and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let (output, _, _) = self.push(target, Entry::from(edit), E::edit);
+        let (output, _, _) = self.edit_and_push(target, edit.into());
         output
     }
 
-    pub(crate) fn push(
+    pub(crate) fn edit_and_push(
         &mut self,
         target: &mut E::Target,
         mut entry: Entry<E>,
-        f: impl FnOnce(&mut E, &mut E::Target) -> E::Output,
     ) -> (E::Output, bool, VecDeque<Entry<E>>) {
-        let output = f(&mut entry.edit, target);
+        let output = entry.edit.edit(target);
+        let (merged_or_annulled, tail) = self.push(entry);
+        (output, merged_or_annulled, tail)
+    }
 
+    pub(crate) fn redo_and_push(
+        &mut self,
+        target: &mut E::Target,
+        mut entry: Entry<E>,
+    ) -> (E::Output, bool, VecDeque<Entry<E>>) {
+        let output = entry.redo(target);
+        let (merged_or_annulled, tail) = self.push(entry);
+        (output, merged_or_annulled, tail)
+    }
+
+    fn push(&mut self, entry: Entry<E>) -> (bool, VecDeque<Entry<E>>) {
         let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -212,8 +225,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
                 } else {
                     self.index += 1;
                 }
-                entry.edit = edit;
-                self.entries.push_back(entry);
+                self.entries.push_back(Entry { edit, ..entry });
                 false
             }
         };
@@ -223,7 +235,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
         self.socket.emit_if(was_saved, || Signal::Saved(false));
         self.socket
             .emit_if(old_index != self.index, || Signal::Index(self.index));
-        (output, merged_or_annulled, tail)
+        (merged_or_annulled, tail)
     }
 
     /// Calls the [`Edit::undo`] method for the active edit and sets

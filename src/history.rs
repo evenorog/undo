@@ -170,7 +170,7 @@ impl<E: Edit, S: Slot> History<E, S> {
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let at = self.at();
         let saved = self.record.saved.filter(|&saved| saved > at.current);
-        let (output, merged, tail) = self.record.push(target, Entry::from(edit), E::edit);
+        let (output, merged, tail) = self.record.edit_and_push(target, edit.into());
         // Check if the limit has been reached.
         if !merged && at.current == self.index() {
             let root = self.branch();
@@ -328,7 +328,7 @@ impl<E: Edit, S: Slot> History<E, S> {
             for entry in branch.entries {
                 let current = self.index();
                 let saved = self.record.saved.filter(|&saved| saved > current);
-                let (_, _, entries) = self.record.push(target, entry, E::redo);
+                let (_, _, entries) = self.record.redo_and_push(target, entry);
                 if !entries.is_empty() {
                     self.branches
                         .insert(self.root, Branch::new(new, current, entries));
