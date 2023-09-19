@@ -1,4 +1,4 @@
-use crate::Edit;
+use crate::{Edit, Merged};
 use core::fmt::{self, Debug, Display, Formatter};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use std::time::SystemTime;
 /// Wrapper around an [`Edit`] command that contains additional metadata.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct Entry<E> {
+pub(crate) struct Entry<E> {
     pub edit: E,
     #[cfg(feature = "std")]
     pub created_at: SystemTime,
@@ -17,23 +17,42 @@ pub struct Entry<E> {
 }
 
 impl<E: Edit> Entry<E> {
+    pub fn edit(&mut self, target: &mut E::Target) -> E::Output {
+        self.edit.edit(target)
+    }
+
     pub fn undo(&mut self, target: &mut E::Target) -> E::Output {
-        self.pre_edit();
+        #[cfg(feature = "std")]
+        {
+            self.updated_at = SystemTime::now();
+        }
         self.edit.undo(target)
     }
 
     pub fn redo(&mut self, target: &mut E::Target) -> E::Output {
-        self.pre_edit();
+        #[cfg(feature = "std")]
+        {
+            self.updated_at = SystemTime::now();
+        }
         self.edit.redo(target)
     }
 
-    #[cfg(feature = "std")]
-    fn pre_edit(&mut self) {
-        self.updated_at = SystemTime::now();
+    pub fn merge(&mut self, other: Self) -> Merged<Self>
+    where
+        Self: Sized,
+    {
+        match self.edit.merge(other.edit) {
+            Merged::Yes => {
+                #[cfg(feature = "std")]
+                {
+                    self.updated_at = other.updated_at;
+                }
+                Merged::Yes
+            }
+            Merged::No(edit) => Merged::No(Self { edit, ..other }),
+            Merged::Annul => Merged::Annul,
+        }
     }
-
-    #[cfg(not(feature = "std"))]
-    fn pre_edit(&mut self) {}
 }
 
 impl<E> From<E> for Entry<E> {

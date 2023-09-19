@@ -182,7 +182,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
         target: &mut E::Target,
         mut entry: Entry<E>,
     ) -> (E::Output, bool, VecDeque<Entry<E>>) {
-        let output = entry.edit.edit(target);
+        let output = entry.edit(target);
         let (merged_or_annulled, tail) = self.push(entry);
         (output, merged_or_annulled, tail)
     }
@@ -206,8 +206,8 @@ impl<E: Edit, S: Slot> Record<E, S> {
         let tail = self.rm_tail();
         // Try to merge unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
-            Some(last) if !was_saved => last.edit.merge(entry.edit),
-            _ => Merged::No(entry.edit),
+            Some(last) if !was_saved => last.merge(entry),
+            _ => Merged::No(entry),
         };
 
         let merged_or_annulled = match merged {
@@ -217,7 +217,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
                 self.index -= 1;
                 true
             }
-            Merged::No(edit) => {
+            Merged::No(entry) => {
                 // If limit is reached, pop off the first edit command.
                 if self.limit() == self.index {
                     self.entries.pop_front();
@@ -225,7 +225,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
                 } else {
                     self.index += 1;
                 }
-                self.entries.push_back(Entry { edit, ..entry });
+                self.entries.push_back(entry);
                 false
             }
         };
