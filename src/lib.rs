@@ -137,7 +137,7 @@ impl At {
     }
 
     /// Used for records to create a rootless `At`.
-    const fn rootless(index: usize) -> At {
+    const fn no_root(index: usize) -> At {
         At::new(0, index)
     }
 }

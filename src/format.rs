@@ -81,21 +81,22 @@ impl Format {
         self.level_text(f, "/", level + 1)
     }
 
-    pub fn at(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
+    pub fn index(self, f: &mut fmt::Formatter, index: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
-            let position = if use_branch {
-                alloc::format!("{}-{}", at.root, at.index)
-            } else {
-                alloc::format!("{}", at.index)
-            };
-            return write!(f, "{}", position.yellow());
+            let string = index.to_string();
+            return write!(f, "{}", string.yellow());
         }
-        if use_branch {
-            write!(f, "{}-{}", at.root, at.index)
-        } else {
-            write!(f, "{}", at.index)
+        write!(f, "{index}")
+    }
+
+    pub fn at(self, f: &mut fmt::Formatter, at: At) -> fmt::Result {
+        #[cfg(feature = "colored")]
+        if self.colored {
+            let string = alloc::format!("{}-{}", at.root, at.index);
+            return write!(f, "{}", string.yellow());
         }
+        write!(f, "{}-{}", at.root, at.index)
     }
 
     pub fn labels(

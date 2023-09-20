@@ -63,7 +63,7 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
         self.format.mark(f, level)?;
-        self.format.at(f, at, true)?;
+        self.format.at(f, at)?;
 
         #[cfg(feature = "std")]
         if let Some(entry) = entry {
@@ -164,9 +164,9 @@ impl<E: fmt::Display, S> fmt::Display for Display<'_, E, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         #[cfg(feature = "std")]
         let now = SystemTime::now();
-        let branch = self.history.root;
+        let root = self.history.root;
         for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
-            let at = At::new(branch, i + 1);
+            let at = At::new(root, i + 1);
             self.fmt_graph(
                 f,
                 at,
@@ -178,7 +178,7 @@ impl<E: fmt::Display, S> fmt::Display for Display<'_, E, S> {
         }
         self.fmt_graph(
             f,
-            At::new(branch, 0),
+            At::new(root, 0),
             None,
             0,
             #[cfg(feature = "std")]
