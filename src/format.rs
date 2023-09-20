@@ -97,40 +97,37 @@ impl Format {
         head: At,
         saved: Option<At>,
     ) -> fmt::Result {
-        match (
-            self.head && at == head,
-            self.saved && matches!(saved, Some(saved) if saved == at),
-        ) {
-            (true, true) => {
-                #[cfg(feature = "colored")]
-                if self.colored {
-                    return write!(
-                        f,
-                        " {}{}{} {}{}",
-                        "[".yellow(),
-                        "HEAD".cyan(),
-                        ",".yellow(),
-                        "SAVED".green(),
-                        "]".yellow()
-                    );
-                }
-                f.write_str(" [HEAD, SAVED]")
+        let at_head = self.head && at == head;
+        let at_saved = self.saved && matches!(saved, Some(saved) if saved == at);
+
+        if at_head && at_saved {
+            #[cfg(feature = "colored")]
+            if self.colored {
+                return write!(
+                    f,
+                    " {}{}{} {}{}",
+                    "[".yellow(),
+                    "HEAD".cyan(),
+                    ",".yellow(),
+                    "SAVED".green(),
+                    "]".yellow()
+                );
             }
-            (true, false) => {
-                #[cfg(feature = "colored")]
-                if self.colored {
-                    return write!(f, " {}{}{}", "[".yellow(), "HEAD".cyan(), "]".yellow());
-                }
-                f.write_str(" [HEAD]")
+            f.write_str(" [HEAD, SAVED]")
+        } else if at_head {
+            #[cfg(feature = "colored")]
+            if self.colored {
+                return write!(f, " {}{}{}", "[".yellow(), "HEAD".cyan(), "]".yellow());
             }
-            (false, true) => {
-                #[cfg(feature = "colored")]
-                if self.colored {
-                    return write!(f, " {}{}{}", "[".yellow(), "SAVED".green(), "]".yellow());
-                }
-                f.write_str(" [SAVED]")
+            f.write_str(" [HEAD]")
+        } else if at_saved {
+            #[cfg(feature = "colored")]
+            if self.colored {
+                return write!(f, " {}{}{}", "[".yellow(), "SAVED".green(), "]".yellow());
             }
-            (false, false) => Ok(()),
+            f.write_str(" [SAVED]")
+        } else {
+            Ok(())
         }
     }
 
