@@ -10,7 +10,7 @@ pub use checkpoint::Checkpoint;
 pub use display::Display;
 pub use queue::Queue;
 
-use crate::socket::{Signal, Slot};
+use crate::socket::{Event, Slot};
 use crate::{At, Edit, Entry, Record};
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
@@ -105,7 +105,7 @@ impl<E, S> History<E, S> {
         self.record.limit()
     }
 
-    /// Sets how the signal should be handled when the state changes.
+    /// Sets how the event should be handled when the state changes.
     pub fn connect(&mut self, slot: S) -> Option<S> {
         self.record.connect(slot)
     }
@@ -260,11 +260,11 @@ impl<E: Edit, S: Slot> History<E, S> {
         {
             self.saved = None;
             self.record.saved = Some(saved);
-            self.record.socket.emit(|| Signal::Saved(true));
+            self.record.socket.emit(|| Event::Saved(true));
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At::new(old, saved));
             self.record.saved = None;
-            self.record.socket.emit(|| Signal::Saved(false));
+            self.record.socket.emit(|| Event::Saved(false));
         }
     }
 

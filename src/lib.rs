@@ -69,7 +69,7 @@ pub use history::History;
 #[cfg(feature = "alloc")]
 pub use record::Record;
 #[cfg(feature = "alloc")]
-pub use socket::{Signal, Slot};
+pub use socket::{Event, Slot};
 
 /// Base functionality for all edit commands.
 pub trait Edit {
