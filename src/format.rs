@@ -36,6 +36,14 @@ impl Default for Format {
 }
 
 impl Format {
+    pub fn level_text(self, f: &mut fmt::Formatter, text: &str, level: usize) -> fmt::Result {
+        #[cfg(feature = "colored")]
+        if self.colored {
+            return write!(f, "{}", text.color(color_of_level(level)));
+        }
+        f.write_str(text)
+    }
+
     pub fn message(
         self,
         f: &mut fmt::Formatter,
@@ -61,30 +69,30 @@ impl Format {
     }
 
     pub fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        self.text(f, "* ", level)
+        self.level_text(f, "* ", level)
     }
 
     pub fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        self.text(f, "|", level)
+        self.level_text(f, "|", level)
     }
 
     pub fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        self.text(f, "|", level)?;
-        self.text(f, "/", level + 1)
+        self.level_text(f, "|", level)?;
+        self.level_text(f, "/", level + 1)
     }
 
-    pub fn position(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
+    pub fn at(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
             let position = if use_branch {
-                alloc::format!("{}:{}", at.root, at.index)
+                alloc::format!("{}-{}", at.root, at.index)
             } else {
                 alloc::format!("{}", at.index)
             };
             return write!(f, "{}", position.yellow());
         }
         if use_branch {
-            write!(f, "{}:{}", at.root, at.index)
+            write!(f, "{}-{}", at.root, at.index)
         } else {
             write!(f, "{}", at.index)
         }
@@ -138,14 +146,6 @@ impl Format {
             return write!(f, " {}", string.yellow());
         }
         write!(f, " {string}")
-    }
-
-    pub fn text(self, f: &mut fmt::Formatter, text: &str, level: usize) -> fmt::Result {
-        #[cfg(feature = "colored")]
-        if self.colored {
-            return write!(f, "{}", text.color(color_of_level(level)));
-        }
-        f.write_str(text)
     }
 }
 

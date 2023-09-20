@@ -63,7 +63,7 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
         self.format.mark(f, level)?;
-        self.format.position(f, at, true)?;
+        self.format.at(f, at, true)?;
 
         #[cfg(feature = "std")]
         if let Some(entry) = entry {
