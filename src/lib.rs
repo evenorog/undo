@@ -1,9 +1,9 @@
 //! **An undo-redo library.**
 //!
-//! > An implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
-//! > where all edits are done by creating objects that applies the modifications.
-//! > All objects knows how to undo the changes it applies, and by using the provided data
-//! > structures it is easy to undo and redo edits made to a target.
+//! An implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
+//! where all edits are done by creating objects that applies the modifications.
+//! All objects knows how to undo the changes it applies, and by using the provided data
+//! structures it is easy to undo and redo edits made to a target.
 //!
 //! See the [examples](https://github.com/evenorog/undo/tree/master/examples) for more information.
 //!
@@ -122,18 +122,22 @@ pub enum Merged<E> {
 #[cfg(feature = "alloc")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq)]
-struct At {
-    branch: usize,
-    index: usize,
+pub struct At {
+    /// The root branch.
+    pub root: usize,
+    /// The index of edit.
+    pub index: usize,
 }
 
 #[cfg(feature = "alloc")]
 impl At {
-    const fn new(branch: usize, index: usize) -> At {
-        At { branch, index }
+    /// Creates a new `At` with the provided root and index.
+    pub const fn new(root: usize, index: usize) -> At {
+        At { root, index }
     }
 
-    const fn root(index: usize) -> At {
+    /// Used for records to create a rootless `At`.
+    const fn rootless(index: usize) -> At {
         At::new(0, index)
     }
 }

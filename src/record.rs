@@ -313,7 +313,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
             return Vec::new();
         }
 
-        let old_index = self.index();
+        let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();

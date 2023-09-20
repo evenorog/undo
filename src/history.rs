@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 /// history.edit(&mut target, Add('a'));
 /// history.edit(&mut target, Add('b'));
 /// history.edit(&mut target, Add('c'));
-/// let abc = history.branch();
+/// let abc = history.head();
 ///
 /// history.undo(&mut target);
 /// history.undo(&mut target);
@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 /// assert_eq!(target, "afg");
 ///
 /// // We can now switch back to the original branch.
-/// history.go_to(&mut target, abc, 3);
+/// history.go_to(&mut target, abc);
 /// assert_eq!(target, "abc");
 /// # }
 /// ```
@@ -130,14 +130,9 @@ impl<E, S> History<E, S> {
         self.record.can_redo()
     }
 
-    /// Returns the current branch.
-    pub fn branch(&self) -> usize {
-        self.root
-    }
-
-    /// Returns the index of the next edit.
-    pub fn index(&self) -> usize {
-        self.record.index()
+    /// Returns the current position in the history.
+    pub fn head(&self) -> At {
+        At::new(self.root, self.record.index)
     }
 
     /// Returns a structure for configurable formatting of the history.
@@ -159,26 +154,22 @@ impl<E, S> History<E, S> {
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         Checkpoint::from(self)
     }
-
-    pub(crate) fn at(&self) -> At {
-        At::new(self.root, self.index())
-    }
 }
 
 impl<E: Edit, S: Slot> History<E, S> {
     /// Pushes the [`Edit`] to the top of the history and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let at = self.at();
-        let saved = self.record.saved.filter(|&saved| saved > at.index);
+        let head = self.head();
+        let saved = self.record.saved.filter(|&saved| saved > head.index);
         let (output, merged, tail) = self.record.edit_and_push(target, edit.into());
 
         // Check if the limit has been reached.
-        if !merged && at.index == self.index() {
-            let root = self.branch();
+        if !merged && head.index == self.record.index {
+            let root = self.root;
             self.rm_child(root, 0);
             self.branches
                 .values_mut()
-                .filter(|branch| branch.parent.branch == root)
+                .filter(|branch| branch.parent.root == root)
                 .for_each(|branch| branch.parent.index -= 1);
         }
 
@@ -187,8 +178,8 @@ impl<E: Edit, S: Slot> History<E, S> {
             let new = self.next;
             self.next += 1;
             self.branches
-                .insert(at.branch, Branch::new(new, at.index, tail));
-            self.set_root(new, at.index, saved);
+                .insert(head.root, Branch::new(new, head.index, tail));
+            self.set_root(new, head.index, saved);
         }
         output
     }
@@ -222,8 +213,8 @@ impl<E: Edit, S: Slot> History<E, S> {
 
     pub(crate) fn jump_to(&mut self, root: usize) {
         let mut branch = self.branches.remove(&root).unwrap();
-        debug_assert_eq!(branch.parent, self.at());
-        let index = self.index();
+        debug_assert_eq!(branch.parent, self.head());
+        let index = self.record.index;
         let saved = self.record.saved.filter(|&saved| saved > index);
         let tail = self.record.entries.split_off(index);
         self.record.entries.append(&mut branch.entries);
@@ -233,14 +224,14 @@ impl<E: Edit, S: Slot> History<E, S> {
     }
 
     fn set_root(&mut self, root: usize, index: usize, saved: Option<usize>) {
-        let old = self.branch();
+        let old = self.root;
         self.root = root;
         debug_assert_ne!(old, root);
         // Handle the child branches.
         self.branches
             .values_mut()
-            .filter(|branch| branch.parent.branch == old && branch.parent.index <= index)
-            .for_each(|branch| branch.parent.branch = root);
+            .filter(|branch| branch.parent.root == old && branch.parent.index <= index)
+            .for_each(|branch| branch.parent.root = root);
         match (self.record.saved, saved, self.saved) {
             (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(root, old, index),
             (None, Some(_), None) => {
@@ -254,9 +245,8 @@ impl<E: Edit, S: Slot> History<E, S> {
 
     fn swap_saved(&mut self, old: usize, new: usize, index: usize) {
         debug_assert_ne!(old, new);
-        if let Some(At { index: saved, .. }) = self
-            .saved
-            .filter(|at| at.branch == new && at.index <= index)
+        if let Some(At { index: saved, .. }) =
+            self.saved.filter(|at| at.root == new && at.index <= index)
         {
             self.saved = None;
             self.record.saved = Some(saved);
@@ -279,26 +269,26 @@ impl<E: Edit, S: Slot> History<E, S> {
         while let Some(parent) = dead.pop() {
             // Remove the dead branch.
             self.branches.remove(&parent).unwrap();
-            self.saved = self.saved.filter(|saved| saved.branch != parent);
+            self.saved = self.saved.filter(|saved| saved.root != parent);
             // Add the children of the dead branch so they are removed too.
             dead.extend(
                 self.branches
                     .iter()
-                    .filter(|&(_, child)| child.parent.branch == parent)
+                    .filter(|&(_, child)| child.parent.root == parent)
                     .map(|(&id, _)| id),
             )
         }
     }
 
     fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<E>)>> {
-        debug_assert_ne!(self.branch(), to);
+        debug_assert_ne!(self.root, to);
         let mut dest = self.branches.remove(&to)?;
-        let mut i = dest.parent.branch;
+        let mut i = dest.parent.root;
         let mut path = alloc::vec![(to, dest)];
-        while i != self.branch() {
+        while i != self.root {
             dest = self.branches.remove(&i).unwrap();
             to = i;
-            i = dest.parent.branch;
+            i = dest.parent.root;
             path.push((to, dest));
         }
 
@@ -306,15 +296,15 @@ impl<E: Edit, S: Slot> History<E, S> {
     }
 
     /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit in `branch` at `index` is reached.
-    pub fn go_to(&mut self, target: &mut E::Target, branch: usize, index: usize) -> Vec<E::Output> {
+    pub fn go_to(&mut self, target: &mut E::Target, at: At) -> Vec<E::Output> {
         let root = self.root;
-        if root == branch {
-            return self.record.go_to(target, index);
+        if root == at.root {
+            return self.record.go_to(target, at.index);
         }
 
         // Walk the path from `root` to `branch`.
         let mut outputs = Vec::new();
-        let Some(path) = self.mk_path(branch) else {
+        let Some(path) = self.mk_path(at.root) else {
             return Vec::new();
         };
 
@@ -323,7 +313,7 @@ impl<E: Edit, S: Slot> History<E, S> {
             outputs.extend(o);
             // Apply the edits in the branch and move older edits into their own branch.
             for entry in branch.entries {
-                let index = self.index();
+                let index = self.record.index;
                 let saved = self.record.saved.filter(|&saved| saved > index);
                 let (_, _, entries) = self.record.redo_and_push(target, entry);
                 if !entries.is_empty() {
@@ -333,7 +323,7 @@ impl<E: Edit, S: Slot> History<E, S> {
                 }
             }
         }
-        let o = self.record.go_to(target, index);
+        let o = self.record.go_to(target, at.index);
         outputs.extend(o);
         outputs
     }
@@ -435,51 +425,56 @@ mod tests {
         history.undo(&mut target).unwrap();
         history.undo(&mut target).unwrap();
         assert_eq!(target, "abc");
-        let abcde = history.branch();
+        let abc = history.head();
+
         history.edit(&mut target, Add('f'));
         history.edit(&mut target, Add('g'));
         assert_eq!(target, "abcfg");
+        let abcfg = history.head();
+
         history.undo(&mut target).unwrap();
-        let abcfg = history.branch();
         history.edit(&mut target, Add('h'));
         history.edit(&mut target, Add('i'));
         history.edit(&mut target, Add('j'));
         assert_eq!(target, "abcfhij");
+        let abcfhij = history.head();
+
         history.undo(&mut target).unwrap();
-        let abcfhij = history.branch();
         history.edit(&mut target, Add('k'));
         assert_eq!(target, "abcfhik");
+        let abcfhik = history.head();
+
         history.undo(&mut target).unwrap();
-        let abcfhik = history.branch();
         history.edit(&mut target, Add('l'));
         assert_eq!(target, "abcfhil");
         history.edit(&mut target, Add('m'));
         assert_eq!(target, "abcfhilm");
-        let abcfhilm = history.branch();
-        history.go_to(&mut target, abcde, 2);
+        let abcfhilm = history.head();
+        history.go_to(&mut target, At::new(abc.root, 2));
         history.edit(&mut target, Add('n'));
         history.edit(&mut target, Add('o'));
         assert_eq!(target, "abno");
+        let abno = history.head();
+
         history.undo(&mut target).unwrap();
-        let abno = history.branch();
         history.edit(&mut target, Add('p'));
         history.edit(&mut target, Add('q'));
         assert_eq!(target, "abnpq");
 
-        let abnpq = history.branch();
-        history.go_to(&mut target, abcde, 5);
-        assert_eq!(target, "abcde");
-        history.go_to(&mut target, abcfg, 5);
+        let abnpq = history.head();
+        history.go_to(&mut target, abc);
+        assert_eq!(target, "abc");
+        history.go_to(&mut target, abcfg);
         assert_eq!(target, "abcfg");
-        history.go_to(&mut target, abcfhij, 7);
+        history.go_to(&mut target, abcfhij);
         assert_eq!(target, "abcfhij");
-        history.go_to(&mut target, abcfhik, 7);
+        history.go_to(&mut target, abcfhik);
         assert_eq!(target, "abcfhik");
-        history.go_to(&mut target, abcfhilm, 8);
+        history.go_to(&mut target, abcfhilm);
         assert_eq!(target, "abcfhilm");
-        history.go_to(&mut target, abno, 4);
+        history.go_to(&mut target, abno);
         assert_eq!(target, "abno");
-        history.go_to(&mut target, abnpq, 5);
+        history.go_to(&mut target, abnpq);
         assert_eq!(target, "abnpq");
     }
 }

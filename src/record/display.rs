@@ -61,7 +61,7 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         entry: Option<&Entry<E>>,
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
-        let at = At::root(index);
+        let at = At::rootless(index);
         self.format.position(f, at, false)?;
 
         #[cfg(feature = "std")]
@@ -77,8 +77,8 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         self.format.labels(
             f,
             at,
-            At::root(self.record.index()),
-            self.record.saved.map(At::root),
+            At::rootless(self.record.index),
+            self.record.saved.map(At::rootless),
         )?;
 
         if let Some(entry) = entry {

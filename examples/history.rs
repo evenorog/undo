@@ -16,8 +16,7 @@ fn main() {
     history.edit(&mut target, Add('c'));
     assert_eq!(target, "abc");
 
-    let abc_branch = history.branch();
-    let abc_index = history.index();
+    let abc = history.head();
 
     history.undo(&mut target);
     assert_eq!(target, "ab");
@@ -27,13 +26,12 @@ fn main() {
     history.edit(&mut target, Add('f'));
     assert_eq!(target, "abdef");
 
-    let abdef_branch = history.branch();
-    let abdef_index = history.index();
+    let abdef = history.head();
 
-    history.go_to(&mut target, abc_branch, abc_index);
+    history.go_to(&mut target, abc);
     assert_eq!(target, "abc");
 
-    history.go_to(&mut target, abdef_branch, abdef_index);
+    history.go_to(&mut target, abdef);
     assert_eq!(target, "abdef");
 
     println!("{}", history.display().set_st_fmt(&custom_st_fmt));

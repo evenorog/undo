@@ -6,10 +6,10 @@
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 
-> An implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
-> where all edits are done by creating objects that applies the modifications.
-> All objects knows how to undo the changes it applies, and by using the provided data
-> structures it is easy to undo and redo edits made to a target.
+An implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
+where all edits are done by creating objects that applies the modifications.
+All objects knows how to undo the changes it applies, and by using the provided data
+structures it is easy to undo and redo edits made to a target.
 
 See the [documentation](https://docs.rs/undo) and [examples](https://github.com/evenorog/undo/tree/master/examples) for more information.
 

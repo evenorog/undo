@@ -78,11 +78,11 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         self.format.labels(
             f,
             at,
-            self.history.at(),
+            self.history.head(),
             self.history
                 .record
                 .saved
-                .map(|saved| At::new(self.history.branch(), saved))
+                .map(|saved| At::new(self.history.root, saved))
                 .or(self.history.saved),
         )?;
 
@@ -165,7 +165,7 @@ impl<E: fmt::Display, S> fmt::Display for Display<'_, E, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         #[cfg(feature = "std")]
         let now = SystemTime::now();
-        let branch = self.history.branch();
+        let branch = self.history.root;
         for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
             let at = At::new(branch, i + 1);
             self.fmt_graph(

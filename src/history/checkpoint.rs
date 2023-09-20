@@ -31,8 +31,8 @@ impl<E, S> Checkpoint<'_, E, S> {
 impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
     /// Calls the [`History::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let branch = self.history.branch();
-        self.entries.push(CheckpointEntry::Edit(branch));
+        let root = self.history.root;
+        self.entries.push(CheckpointEntry::Edit(root));
         self.history.edit(target, edit)
     }
 
@@ -59,7 +59,7 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
             .filter_map(|entry| match entry {
                 CheckpointEntry::Edit(branch) => {
                     let output = self.history.undo(target)?;
-                    let root = self.history.branch();
+                    let root = self.history.root;
                     if root == branch {
                         self.history.record.entries.pop_back();
                     } else {
