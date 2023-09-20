@@ -3,8 +3,8 @@ use std::time::SystemTime;
 use undo::{Add, History};
 
 fn custom_st_fmt(_: SystemTime, at: SystemTime) -> String {
-    let time: DateTime<Local> = at.into();
-    time.time().to_string()
+    let dt = DateTime::<Local>::from(at);
+    dt.time().to_string()
 }
 
 fn main() {

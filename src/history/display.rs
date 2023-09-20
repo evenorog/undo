@@ -39,7 +39,7 @@ impl<'a, E, S> Display<'a, E, S> {
         self
     }
 
-    /// Set the function used to format the elapsed time.
+    /// Sets the format used to display [`SystemTime`]s.
     ///
     /// The first input parameter is the current system time.
     /// The second input parameter is the system time of the event.
