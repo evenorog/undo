@@ -4,7 +4,7 @@ use undo::{Add, History};
 
 fn custom_st_fmt(_: SystemTime, at: SystemTime) -> String {
     let dt = DateTime::<Local>::from(at);
-    dt.time().to_string()
+    dt.format("%H:%M:%S").to_string()
 }
 
 fn main() {

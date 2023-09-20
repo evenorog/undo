@@ -58,11 +58,11 @@ impl<E: Edit> Entry<E> {
 impl<E> From<E> for Entry<E> {
     #[cfg(feature = "std")]
     fn from(edit: E) -> Self {
-        let at = SystemTime::now();
+        let now = SystemTime::now();
         Entry {
             edit,
-            created_at: at,
-            updated_at: at,
+            created_at: now,
+            updated_at: now,
         }
     }
 

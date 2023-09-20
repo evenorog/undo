@@ -61,32 +61,16 @@ impl Format {
     }
 
     pub fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        #[cfg(feature = "colored")]
-        if self.colored {
-            return write!(f, "{} ", "*".color(color_of_level(level)));
-        }
-        f.write_str("* ")
+        self.text(f, "* ", level)
     }
 
     pub fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        #[cfg(feature = "colored")]
-        if self.colored {
-            return write!(f, "{}", "|".color(color_of_level(level)));
-        }
-        f.write_char('|')
+        self.text(f, "|", level)
     }
 
     pub fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        #[cfg(feature = "colored")]
-        if self.colored {
-            return write!(
-                f,
-                "{}{}",
-                "|".color(color_of_level(level)),
-                "/".color(color_of_level(level + 1))
-            );
-        }
-        f.write_str("|/")
+        self.text(f, "|", level)?;
+        self.text(f, "/", level + 1)
     }
 
     pub fn position(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
@@ -97,7 +81,7 @@ impl Format {
             } else {
                 alloc::format!("{}", at.index)
             };
-            return write!(f, "{}", position.yellow().bold());
+            return write!(f, "{}", position.yellow());
         }
         if use_branch {
             write!(f, "{}:{}", at.root, at.index)
@@ -124,9 +108,9 @@ impl Format {
                         f,
                         " {}{}{} {}{}",
                         "[".yellow(),
-                        "HEAD".cyan().bold(),
+                        "HEAD".cyan(),
                         ",".yellow(),
-                        "SAVED".green().bold(),
+                        "SAVED".green(),
                         "]".yellow()
                     );
                 }
@@ -135,26 +119,14 @@ impl Format {
             (true, false) => {
                 #[cfg(feature = "colored")]
                 if self.colored {
-                    return write!(
-                        f,
-                        " {}{}{}",
-                        "[".yellow(),
-                        "HEAD".cyan().bold(),
-                        "]".yellow()
-                    );
+                    return write!(f, " {}{}{}", "[".yellow(), "HEAD".cyan(), "]".yellow());
                 }
                 f.write_str(" [HEAD]")
             }
             (false, true) => {
                 #[cfg(feature = "colored")]
                 if self.colored {
-                    return write!(
-                        f,
-                        " {}{}{}",
-                        "[".yellow(),
-                        "SAVED".green().bold(),
-                        "]".yellow()
-                    );
+                    return write!(f, " {}{}{}", "[".yellow(), "SAVED".green(), "]".yellow());
                 }
                 f.write_str(" [SAVED]")
             }
@@ -171,7 +143,6 @@ impl Format {
         write!(f, " {string}")
     }
 
-    #[cfg(feature = "std")]
     pub fn text(self, f: &mut fmt::Formatter, text: &str, level: usize) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
