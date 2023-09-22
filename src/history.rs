@@ -23,6 +23,9 @@ use serde::{Deserialize, Serialize};
 /// Unlike [`Record`] which maintains a linear undo history,
 /// [`History`] maintains an undo tree containing every edit made to the target.
 ///
+/// See [this](https://github.com/evenorog/undo/blob/master/examples/history.rs)
+/// for an interactive example of the history tree.
+///
 /// # Examples
 /// ```
 /// # fn main() {

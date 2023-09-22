@@ -17,8 +17,8 @@ fn main() -> io::Result<()> {
         println!(
             "Enter a string. Use '<' to undo, '>' to redo, '*' to save, and '! i-j' for goto: "
         );
-        let mut string = String::new();
-        let n = stdin.read_line(&mut string)?;
+        let mut buf = String::new();
+        let n = stdin.read_line(&mut buf)?;
         if n == 0 {
             return Ok(());
         }
@@ -26,20 +26,18 @@ fn main() -> io::Result<()> {
         // Clears the terminal.
         print!("{}c", 27 as char);
 
-        let mut chars = string.trim().chars();
+        let mut chars = buf.trim().chars();
         while let Some(c) = chars.next() {
             if c == '!' {
-                let rest = chars.collect::<String>();
-                let mut at = rest
+                let tail = chars.collect::<String>();
+                let mut at = tail
                     .trim()
                     .split('-')
                     .filter_map(|n| n.parse::<usize>().ok());
 
-                if let (Some(root), Some(index)) = (at.next(), at.next()) {
-                    history.go_to(&mut target, At::new(root, index));
-                } else {
-                    println!("Expected input as '! i-j', e.g. '! 1-5'.");
-                }
+                let root = at.next().unwrap_or_default();
+                let index = at.next().unwrap_or_default();
+                history.go_to(&mut target, At::new(root, index));
                 break;
             } else if c == '<' {
                 history.undo(&mut target);
