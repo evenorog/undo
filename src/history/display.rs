@@ -3,13 +3,15 @@ use core::fmt::{self, Write};
 #[cfg(feature = "std")]
 use std::time::SystemTime;
 
-/// Configurable display formatting for the history.
-pub struct Display<'a, A, S> {
-    history: &'a History<A, S>,
+/// Configurable display formatting for the [`History`].
+pub struct Display<'a, E, S> {
+    history: &'a History<E, S>,
     format: Format,
+    #[cfg(feature = "std")]
+    st_fmt: &'a dyn Fn(SystemTime, SystemTime) -> String,
 }
 
-impl<A, S> Display<'_, A, S> {
+impl<'a, E, S> Display<'a, E, S> {
     /// Show colored output (on by default).
     ///
     /// Requires the `colored` feature to be enabled.
@@ -19,60 +21,67 @@ impl<A, S> Display<'_, A, S> {
         self
     }
 
-    /// Show the current position in the output (on by default).
-    pub fn current(&mut self, on: bool) -> &mut Self {
-        self.format.current = on;
-        self
-    }
-
     /// Show detailed output (on by default).
     pub fn detailed(&mut self, on: bool) -> &mut Self {
         self.format.detailed = on;
         self
     }
 
-    /// Show the position of the action (on by default).
-    pub fn position(&mut self, on: bool) -> &mut Self {
-        self.format.position = on;
+    /// Show the current position in the output (on by default).
+    pub fn head(&mut self, on: bool) -> &mut Self {
+        self.format.head = on;
         self
     }
 
-    /// Show the saved action (on by default).
+    /// Show the saved edit (on by default).
     pub fn saved(&mut self, on: bool) -> &mut Self {
         self.format.saved = on;
         self
     }
+
+    /// Sets the format used to display [`SystemTime`]s.
+    ///
+    /// The first input parameter is the current system time.
+    /// The second input parameter is the system time of the event.
+    #[cfg(feature = "std")]
+    pub fn set_st_fmt(
+        &mut self,
+        st_fmt: &'a dyn Fn(SystemTime, SystemTime) -> String,
+    ) -> &mut Self {
+        self.st_fmt = st_fmt;
+        self
+    }
 }
 
-impl<A: fmt::Display, S> Display<'_, A, S> {
+impl<E: fmt::Display, S> Display<'_, E, S> {
     fn fmt_list(
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: Option<&Entry<A>>,
+        entry: Option<&Entry<E>>,
         level: usize,
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
         self.format.mark(f, level)?;
-        self.format.position(f, at, true)?;
+        self.format.at(f, at)?;
 
         #[cfg(feature = "std")]
         if let Some(entry) = entry {
             if self.format.detailed {
-                self.format.elapsed(f, now, entry.created_at)?;
-                self.format.text(f, ",", 3)?;
-                self.format.elapsed(f, now, entry.updated_at)?;
+                let st_fmt = self.st_fmt;
+                let updated_at = st_fmt(now, entry.updated_at);
+                self.format.elapsed(f, updated_at)?;
             }
         }
 
         self.format.labels(
             f,
             at,
-            self.history.at(),
+            self.history.head(),
             self.history
                 .record
                 .saved
-                .map(|saved| At::new(self.history.branch(), saved))
+                .map(|saved| At::new(self.history.root, saved))
                 .or(self.history.saved),
         )?;
 
@@ -93,7 +102,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
         &self,
         f: &mut fmt::Formatter,
         at: At,
-        entry: Option<&Entry<A>>,
+        entry: Option<&Entry<E>>,
         level: usize,
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
@@ -104,7 +113,7 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
             .filter(|(_, branch)| branch.parent == at)
         {
             for (j, entry) in branch.entries.iter().enumerate().rev() {
-                let at = At::new(i, j + branch.parent.current + 1);
+                let at = At::new(i, j + branch.parent.index + 1);
                 self.fmt_graph(
                     f,
                     at,
@@ -140,22 +149,24 @@ impl<A: fmt::Display, S> Display<'_, A, S> {
     }
 }
 
-impl<'a, A, S> From<&'a History<A, S>> for Display<'a, A, S> {
-    fn from(history: &'a History<A, S>) -> Self {
+impl<'a, E, S> From<&'a History<E, S>> for Display<'a, E, S> {
+    fn from(history: &'a History<E, S>) -> Self {
         Display {
             history,
             format: Format::default(),
+            #[cfg(feature = "std")]
+            st_fmt: &crate::format::default_st_fmt,
         }
     }
 }
 
-impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
+impl<E: fmt::Display, S> fmt::Display for Display<'_, E, S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         #[cfg(feature = "std")]
         let now = SystemTime::now();
-        let branch = self.history.branch();
+        let root = self.history.root;
         for (i, entry) in self.history.record.entries.iter().enumerate().rev() {
-            let at = At::new(branch, i + 1);
+            let at = At::new(root, i + 1);
             self.fmt_graph(
                 f,
                 at,
@@ -167,7 +178,7 @@ impl<A: fmt::Display, S> fmt::Display for Display<'_, A, S> {
         }
         self.fmt_graph(
             f,
-            At::new(branch, 0),
+            At::new(root, 0),
             None,
             0,
             #[cfg(feature = "std")]

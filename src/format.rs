@@ -8,13 +8,18 @@ use core::fmt::{self, Write};
 #[cfg(feature = "std")]
 use std::time::SystemTime;
 
+#[cfg(feature = "std")]
+pub(crate) fn default_st_fmt(now: SystemTime, at: SystemTime) -> String {
+    let elapsed = now.duration_since(at).unwrap_or_else(|e| e.duration());
+    format!("{elapsed:.1?}")
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Format {
     #[cfg(feature = "colored")]
     pub colored: bool,
-    pub current: bool,
     pub detailed: bool,
-    pub position: bool,
+    pub head: bool,
     pub saved: bool,
 }
 
@@ -23,15 +28,22 @@ impl Default for Format {
         Format {
             #[cfg(feature = "colored")]
             colored: true,
-            current: true,
             detailed: true,
-            position: true,
+            head: true,
             saved: true,
         }
     }
 }
 
 impl Format {
+    pub fn level_text(self, f: &mut fmt::Formatter, text: &str, level: usize) -> fmt::Result {
+        #[cfg(feature = "colored")]
+        if self.colored {
+            return write!(f, "{}", text.color(color_of_level(level)));
+        }
+        f.write_str(text)
+    }
+
     pub fn message(
         self,
         f: &mut fmt::Formatter,
@@ -57,140 +69,90 @@ impl Format {
     }
 
     pub fn mark(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        #[cfg(feature = "colored")]
-        if self.colored {
-            return write!(f, "{} ", "*".color(color_of_level(level)));
-        }
-        f.write_str("* ")
+        self.level_text(f, "* ", level)
     }
 
     pub fn edge(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        #[cfg(feature = "colored")]
-        if self.colored {
-            return write!(f, "{}", "|".color(color_of_level(level)));
-        }
-        f.write_char('|')
+        self.level_text(f, "|", level)
     }
 
     pub fn split(self, f: &mut fmt::Formatter, level: usize) -> fmt::Result {
-        #[cfg(feature = "colored")]
-        if self.colored {
-            return write!(
-                f,
-                "{}{}",
-                "|".color(color_of_level(level)),
-                "/".color(color_of_level(level + 1))
-            );
-        }
-        f.write_str("|/")
+        self.level_text(f, "|", level)?;
+        self.level_text(f, "/", level + 1)
     }
 
-    pub fn position(self, f: &mut fmt::Formatter, at: At, use_branch: bool) -> fmt::Result {
-        if self.position {
-            #[cfg(feature = "colored")]
-            if self.colored {
-                let position = if use_branch {
-                    alloc::format!("{}:{}", at.branch, at.current)
-                } else {
-                    alloc::format!("{}", at.current)
-                };
-                return write!(f, "{}", position.yellow().bold());
-            }
-            if use_branch {
-                write!(f, "{}:{}", at.branch, at.current)
-            } else {
-                write!(f, "{}", at.current)
-            }
-        } else {
-            Ok(())
+    pub fn index(self, f: &mut fmt::Formatter, index: usize) -> fmt::Result {
+        #[cfg(feature = "colored")]
+        if self.colored {
+            let string = index.to_string();
+            return write!(f, "{}", string.yellow());
         }
+        write!(f, "{index}")
+    }
+
+    pub fn at(self, f: &mut fmt::Formatter, at: At) -> fmt::Result {
+        #[cfg(feature = "colored")]
+        if self.colored {
+            let string = alloc::format!("{}-{}", at.root, at.index);
+            return write!(f, "{}", string.yellow());
+        }
+        write!(f, "{}-{}", at.root, at.index)
     }
 
     pub fn labels(
         self,
         f: &mut fmt::Formatter,
         at: At,
-        current: At,
+        head: At,
         saved: Option<At>,
     ) -> fmt::Result {
-        match (
-            self.current && at == current,
-            self.saved && saved.map_or(false, |saved| saved == at),
-        ) {
-            (true, true) => {
-                #[cfg(feature = "colored")]
-                if self.colored {
-                    return write!(
-                        f,
-                        " {}{}{} {}{}",
-                        "(".yellow(),
-                        "current".cyan().bold(),
-                        ",".yellow(),
-                        "saved".green().bold(),
-                        ")".yellow()
-                    );
-                }
-                f.write_str(" (current, saved)")
+        let at_head = self.head && at == head;
+        let at_saved = self.saved && matches!(saved, Some(saved) if saved == at);
+
+        if at_head && at_saved {
+            #[cfg(feature = "colored")]
+            if self.colored {
+                return write!(
+                    f,
+                    " {}{}{} {}{}",
+                    "[".yellow(),
+                    "HEAD".cyan(),
+                    ",".yellow(),
+                    "SAVED".green(),
+                    "]".yellow()
+                );
             }
-            (true, false) => {
-                #[cfg(feature = "colored")]
-                if self.colored {
-                    return write!(
-                        f,
-                        " {}{}{}",
-                        "(".yellow(),
-                        "current".cyan().bold(),
-                        ")".yellow()
-                    );
-                }
-                f.write_str(" (current)")
+            f.write_str(" [HEAD, SAVED]")
+        } else if at_head {
+            #[cfg(feature = "colored")]
+            if self.colored {
+                return write!(f, " {}{}{}", "[".yellow(), "HEAD".cyan(), "]".yellow());
             }
-            (false, true) => {
-                #[cfg(feature = "colored")]
-                if self.colored {
-                    return write!(
-                        f,
-                        " {}{}{}",
-                        "(".yellow(),
-                        "saved".green().bold(),
-                        ")".yellow()
-                    );
-                }
-                f.write_str(" (saved)")
+            f.write_str(" [HEAD]")
+        } else if at_saved {
+            #[cfg(feature = "colored")]
+            if self.colored {
+                return write!(f, " {}{}{}", "[".yellow(), "SAVED".green(), "]".yellow());
             }
-            (false, false) => Ok(()),
+            f.write_str(" [SAVED]")
+        } else {
+            Ok(())
         }
     }
 
     #[cfg(feature = "std")]
-    pub fn elapsed(
-        self,
-        f: &mut fmt::Formatter,
-        now: SystemTime,
-        earlier: SystemTime,
-    ) -> fmt::Result {
-        let elapsed = now.duration_since(earlier).unwrap_or_else(|e| e.duration());
-        let string = format!("{elapsed:.1?}");
+    pub fn elapsed(self, f: &mut fmt::Formatter, string: String) -> fmt::Result {
         #[cfg(feature = "colored")]
         if self.colored {
             return write!(f, " {}", string.yellow());
         }
         write!(f, " {string}")
     }
-
-    #[cfg(feature = "std")]
-    pub fn text(self, f: &mut fmt::Formatter, text: &str, i: usize) -> fmt::Result {
-        #[cfg(feature = "colored")]
-        if self.colored {
-            return write!(f, "{}", text.color(color_of_level(i)));
-        }
-        f.write_str(text)
-    }
 }
 
 #[cfg(feature = "colored")]
-fn color_of_level(i: usize) -> Color {
-    match i % 6 {
+fn color_of_level(level: usize) -> Color {
+    match level % 6 {
         0 => Color::Cyan,
         1 => Color::Red,
         2 => Color::Magenta,

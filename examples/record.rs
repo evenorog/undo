@@ -1,43 +1,22 @@
-use core::fmt::{self, Display, Formatter};
-use undo::{Action, Record};
-
-struct Push(char);
-
-impl Action for Push {
-    type Target = String;
-    type Output = ();
-
-    fn apply(&mut self, target: &mut String) {
-        target.push(self.0);
-    }
-
-    fn undo(&mut self, target: &mut String) {
-        self.0 = target.pop().expect("cannot pop empty string");
-    }
-}
-
-impl Display for Push {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "Push '{}'", self.0)
-    }
-}
+use undo::{Add, Record};
 
 fn main() {
-    let mut record = Record::new();
     let mut target = String::new();
+    let mut record = Record::new();
 
-    record.apply(&mut target, Push('a'));
-    record.apply(&mut target, Push('b'));
-    record.apply(&mut target, Push('c'));
-    assert_eq!(target, "abc");
+    record.edit(&mut target, Add('a'));
+    record.edit(&mut target, Add('b'));
+    record.edit(&mut target, Add('c'));
+    record.edit(&mut target, Add('d'));
+    record.edit(&mut target, Add('e'));
+    record.edit(&mut target, Add('f'));
+    assert_eq!(target, "abcdef");
+
+    record.set_saved(true);
 
     record.undo(&mut target);
     record.undo(&mut target);
-    assert_eq!(target, "a");
-
-    record.redo(&mut target);
-    record.redo(&mut target);
-    assert_eq!(target, "abc");
+    assert_eq!(target, "abcd");
 
     println!("{}", record.display());
 }

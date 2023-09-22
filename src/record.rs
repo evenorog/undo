@@ -1,4 +1,4 @@
-//! A linear record of actions.
+//! A linear record of edit commands.
 
 mod builder;
 mod checkpoint;
@@ -10,8 +10,8 @@ pub use checkpoint::Checkpoint;
 pub use display::Display;
 pub use queue::Queue;
 
-use crate::socket::{Nop, Slot, Socket};
-use crate::{Action, Entry, History, Merged, Signal};
+use crate::socket::{Slot, Socket};
+use crate::{Edit, Entry, Event, History, Merged};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -19,25 +19,27 @@ use core::num::NonZeroUsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// A linear record of actions.
+/// A linear record of [`Edit`] commands.
 ///
 /// The record can roll the targets state backwards and forwards by using
 /// the undo and redo methods. In addition, the record can notify the user
-/// about changes to the stack or the target through [`Signal`].
+/// about changes to the stack or the target through [`Event`].
 /// The user can give the record a function that is called each time the state
 /// changes by using the [`Builder`].
 ///
+/// When adding a new edit command to the record the previously undone commands
+/// will be discarded. If you want to keep all edits you can use [`History`] instead.
+///
 /// # Examples
 /// ```
-/// # include!("doctest.rs");
 /// # fn main() {
-/// # use undo::Record;
+/// # use undo::{Add, Record};
 /// let mut target = String::new();
 /// let mut record = Record::new();
 ///
-/// record.apply(&mut target, Push('a'));
-/// record.apply(&mut target, Push('b'));
-/// record.apply(&mut target, Push('c'));
+/// record.edit(&mut target, Add('a'));
+/// record.edit(&mut target, Add('b'));
+/// record.edit(&mut target, Add('c'));
 /// assert_eq!(target, "abc");
 ///
 /// record.undo(&mut target);
@@ -47,34 +49,37 @@ use serde::{Deserialize, Serialize};
 ///
 /// record.redo(&mut target);
 /// record.redo(&mut target);
-/// record.redo(&mut target);
-/// assert_eq!(target, "abc");
+/// assert_eq!(target, "ab");
+///
+/// // 'c' will be discarded.
+/// record.edit(&mut target, Add('d'));
+/// assert_eq!(target, "abd");
 /// # }
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub struct Record<A, S = Nop> {
-    pub(crate) entries: VecDeque<Entry<A>>,
+pub struct Record<E, S = ()> {
     pub(crate) limit: NonZeroUsize,
-    pub(crate) current: usize,
+    pub(crate) index: usize,
     pub(crate) saved: Option<usize>,
     pub(crate) socket: Socket<S>,
+    pub(crate) entries: VecDeque<Entry<E>>,
 }
 
-impl<A> Record<A> {
+impl<E> Record<E> {
     /// Returns a new record.
-    pub fn new() -> Record<A> {
+    pub fn new() -> Record<E> {
         Record::builder().build()
     }
 }
 
-impl<A, S> Record<A, S> {
+impl<E, S> Record<E, S> {
     /// Returns a new record builder.
-    pub fn builder() -> Builder<A, S> {
-        Builder::new()
+    pub fn builder() -> Builder<E, S> {
+        Builder::default()
     }
 
-    /// Reserves capacity for at least `additional` more actions.
+    /// Reserves capacity for at least `additional` more edits.
     ///
     /// # Panics
     /// Panics if the new capacity overflows usize.
@@ -92,7 +97,7 @@ impl<A, S> Record<A, S> {
         self.entries.shrink_to_fit();
     }
 
-    /// Returns the number of actions in the record.
+    /// Returns the number of edits in the record.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -107,7 +112,7 @@ impl<A, S> Record<A, S> {
         self.limit.get()
     }
 
-    /// Sets how the signal should be handled when the state changes.
+    /// Sets how the event should be handled when the state changes.
     pub fn connect(&mut self, slot: S) -> Option<S> {
         self.socket.connect(Some(slot))
     }
@@ -119,132 +124,154 @@ impl<A, S> Record<A, S> {
 
     /// Returns `true` if the record can undo.
     pub fn can_undo(&self) -> bool {
-        self.current > 0
+        self.index > 0
     }
 
     /// Returns `true` if the record can redo.
     pub fn can_redo(&self) -> bool {
-        self.current < self.len()
+        self.index < self.len()
     }
 
     /// Returns `true` if the target is in a saved state, `false` otherwise.
     pub fn is_saved(&self) -> bool {
-        self.saved == Some(self.current)
+        self.saved == Some(self.index)
     }
 
-    /// Returns the position of the current action.
-    pub fn current(&self) -> usize {
-        self.current
+    /// Returns the index of the next edit.
+    pub fn index(&self) -> usize {
+        self.index
     }
 
     /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<A, S> {
+    pub fn display(&self) -> Display<E, S> {
         Display::from(self)
     }
 
-    /// Returns an iterator over the actions.
-    pub fn actions(&self) -> impl Iterator<Item = &A> {
-        self.entries.iter().map(|e| &e.action)
+    /// Returns an iterator over the edits.
+    pub fn edits(&self) -> impl Iterator<Item = &E> {
+        self.entries.iter().map(|e| &e.edit)
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
+    pub fn queue(&mut self) -> Queue<E, S> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         Checkpoint::from(self)
+    }
+
+    /// Remove all elements after the index.
+    fn rm_tail(&mut self) -> VecDeque<Entry<E>> {
+        // Check if the saved edit will be removed.
+        self.saved = self.saved.filter(|&saved| saved <= self.index);
+        self.entries.split_off(self.index)
     }
 }
 
-impl<A: Action, S: Slot> Record<A, S> {
-    /// Pushes the action on top of the record and executes its [`Action::apply`] method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
-        let (output, _, _) = self.__apply(target, action);
+impl<E: Edit, S: Slot> Record<E, S> {
+    /// Pushes the edit on top of the record and executes its [`Edit::edit`] method.
+    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
+        let (output, _, _) = self.edit_and_push(target, edit.into());
         output
     }
 
-    pub(crate) fn __apply(
+    pub(crate) fn edit_and_push(
         &mut self,
-        target: &mut A::Target,
-        mut action: A,
-    ) -> (A::Output, bool, VecDeque<Entry<A>>) {
-        let output = action.apply(target);
-        // We store the state of the stack before adding the entry.
-        let current = self.current;
+        target: &mut E::Target,
+        mut entry: Entry<E>,
+    ) -> (E::Output, bool, VecDeque<Entry<E>>) {
+        let output = entry.edit(target);
+        let (merged_or_annulled, tail) = self.push(entry);
+        (output, merged_or_annulled, tail)
+    }
+
+    pub(crate) fn redo_and_push(
+        &mut self,
+        target: &mut E::Target,
+        mut entry: Entry<E>,
+    ) -> (E::Output, bool, VecDeque<Entry<E>>) {
+        let output = entry.redo(target);
+        let (merged_or_annulled, tail) = self.push(entry);
+        (output, merged_or_annulled, tail)
+    }
+
+    fn push(&mut self, entry: Entry<E>) -> (bool, VecDeque<Entry<E>>) {
+        let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
-        // Pop off all elements after len from entries.
-        let tail = self.entries.split_off(current);
-        // Check if the saved state was popped off.
-        self.saved = self.saved.filter(|&saved| saved <= current);
-        // Try to merge actions unless the target is in a saved state.
+
+        let tail = self.rm_tail();
+        // Try to merge unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
-            Some(last) if !was_saved => last.action.merge(action),
-            _ => Merged::No(action),
+            Some(last) if !was_saved => last.merge(entry),
+            _ => Merged::No(entry),
         };
 
         let merged_or_annulled = match merged {
             Merged::Yes => true,
             Merged::Annul => {
                 self.entries.pop_back();
-                self.current -= 1;
+                self.index -= 1;
                 true
             }
-            // If actions are not merged or annulled push it onto the storage.
-            Merged::No(action) => {
-                // If limit is reached, pop off the first action.
-                if self.limit() == self.current {
+            Merged::No(entry) => {
+                // If limit is reached, pop off the first edit command.
+                if self.limit() == self.index {
                     self.entries.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
                 } else {
-                    self.current += 1;
+                    self.index += 1;
                 }
-                self.entries.push_back(Entry::from(action));
+                self.entries.push_back(entry);
                 false
             }
         };
 
-        self.socket.emit_if(could_redo, Signal::Redo(false));
-        self.socket.emit_if(!could_undo, Signal::Undo(true));
-        self.socket.emit_if(was_saved, Signal::Saved(false));
-        (output, merged_or_annulled, tail)
+        self.socket.emit_if(could_redo, || Event::Redo(false));
+        self.socket.emit_if(!could_undo, || Event::Undo(true));
+        self.socket.emit_if(was_saved, || Event::Saved(false));
+        self.socket
+            .emit_if(old_index != self.index, || Event::Index(self.index));
+        (merged_or_annulled, tail)
     }
 
-    /// Calls the [`Action::undo`] method for the active action and sets
+    /// Calls the [`Edit::undo`] method for the active edit and sets
     /// the previous one as the new active one.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.can_undo().then(|| {
+            let old_index = self.index;
             let was_saved = self.is_saved();
-            let old = self.current;
-            let output = self.entries[self.current - 1].undo(target);
-            self.current -= 1;
+            let output = self.entries[self.index - 1].undo(target);
+            self.index -= 1;
             let is_saved = self.is_saved();
+            self.socket.emit_if(old_index == 1, || Event::Undo(false));
             self.socket
-                .emit_if(old == self.entries.len(), Signal::Redo(true));
-            self.socket.emit_if(old == 1, Signal::Undo(false));
+                .emit_if(old_index == self.entries.len(), || Event::Redo(true));
             self.socket
-                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+                .emit_if(was_saved != is_saved, || Event::Saved(is_saved));
+            self.socket.emit(|| Event::Index(self.index));
             output
         })
     }
 
-    /// Calls the [`Action::redo`] method for the active action and sets
+    /// Calls the [`Edit::redo`] method for the active edit and sets
     /// the next one as the new active one.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.can_redo().then(|| {
+            let old_index = self.index;
             let was_saved = self.is_saved();
-            let old = self.current;
-            let output = self.entries[self.current].redo(target);
-            self.current += 1;
+            let output = self.entries[self.index].redo(target);
+            self.index += 1;
             let is_saved = self.is_saved();
+            self.socket.emit_if(old_index == 0, || Event::Undo(true));
             self.socket
-                .emit_if(old == self.len() - 1, Signal::Redo(false));
-            self.socket.emit_if(old == 0, Signal::Undo(true));
+                .emit_if(old_index == self.len() - 1, || Event::Redo(false));
             self.socket
-                .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+                .emit_if(was_saved != is_saved, || Event::Saved(is_saved));
+            self.socket.emit(|| Event::Index(self.index));
             output
         })
     }
@@ -253,52 +280,55 @@ impl<A: Action, S: Slot> Record<A, S> {
     pub fn set_saved(&mut self, saved: bool) {
         let was_saved = self.is_saved();
         if saved {
-            self.saved = Some(self.current);
-            self.socket.emit_if(!was_saved, Signal::Saved(true));
+            self.saved = Some(self.index);
+            self.socket.emit_if(!was_saved, || Event::Saved(true));
         } else {
             self.saved = None;
-            self.socket.emit_if(was_saved, Signal::Saved(false));
+            self.socket.emit_if(was_saved, || Event::Saved(false));
         }
     }
 
-    /// Removes all actions from the record without undoing them.
+    /// Removes all edits from the record without undoing them.
     pub fn clear(&mut self) {
+        let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         self.entries.clear();
         self.saved = self.is_saved().then_some(0);
-        self.current = 0;
-        self.socket.emit_if(could_undo, Signal::Undo(false));
-        self.socket.emit_if(could_redo, Signal::Redo(false));
+        self.index = 0;
+        self.socket.emit_if(could_undo, || Event::Undo(false));
+        self.socket.emit_if(could_redo, || Event::Redo(false));
+        self.socket.emit_if(old_index != 0, || Event::Index(0));
     }
 
     /// Revert the changes done to the target since the saved state.
-    pub fn revert(&mut self, target: &mut A::Target) -> Vec<A::Output> {
+    pub fn revert(&mut self, target: &mut E::Target) -> Vec<E::Output> {
         self.saved
             .map_or_else(Vec::new, |saved| self.go_to(target, saved))
     }
 
-    /// Repeatedly calls [`Action::undo`] or [`Action::redo`] until the action at `current` is reached.
-    pub fn go_to(&mut self, target: &mut A::Target, current: usize) -> Vec<A::Output> {
-        if current > self.len() {
+    /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `index` is reached.
+    pub fn go_to(&mut self, target: &mut E::Target, index: usize) -> Vec<E::Output> {
+        if index > self.len() {
             return Vec::new();
         }
 
+        let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
         // Temporarily remove slot so they are not called each iteration.
         let slot = self.socket.disconnect();
-        // Decide if we need to undo or redo to reach current.
-        let undo_or_redo = if current > self.current {
+        // Decide if we need to undo or redo to reach index.
+        let undo_or_redo = if index > self.index {
             Record::redo
         } else {
             Record::undo
         };
 
-        let capacity = self.current.abs_diff(current);
+        let capacity = self.index.abs_diff(index);
         let mut outputs = Vec::with_capacity(capacity);
-        while self.current != current {
+        while self.index != index {
             let output = undo_or_redo(self, target).unwrap();
             outputs.push(output);
         }
@@ -308,42 +338,44 @@ impl<A: Action, S: Slot> Record<A, S> {
         let is_saved = self.is_saved();
         self.socket.connect(slot);
         self.socket
-            .emit_if(could_undo != can_undo, Signal::Undo(can_undo));
+            .emit_if(could_undo != can_undo, || Event::Undo(can_undo));
         self.socket
-            .emit_if(could_redo != can_redo, Signal::Redo(can_redo));
+            .emit_if(could_redo != can_redo, || Event::Redo(can_redo));
         self.socket
-            .emit_if(was_saved != is_saved, Signal::Saved(is_saved));
+            .emit_if(was_saved != is_saved, || Event::Saved(is_saved));
+        self.socket
+            .emit_if(old_index != self.index, || Event::Index(self.index));
 
         outputs
     }
 }
 
-impl<A: ToString, S> Record<A, S> {
-    /// Returns the string of the action which will be undone
+impl<E: ToString, S> Record<E, S> {
+    /// Returns the string of the edit which will be undone
     /// in the next call to [`Record::undo`].
     pub fn undo_string(&self) -> Option<String> {
-        self.current.checked_sub(1).and_then(|i| self.string_at(i))
+        self.index.checked_sub(1).and_then(|i| self.string_at(i))
     }
 
-    /// Returns the string of the action which will be redone
+    /// Returns the string of the edit which will be redone
     /// in the next call to [`Record::redo`].
     pub fn redo_string(&self) -> Option<String> {
-        self.string_at(self.current)
+        self.string_at(self.index)
     }
 
     fn string_at(&self, i: usize) -> Option<String> {
-        self.entries.get(i).map(|e| e.action.to_string())
+        self.entries.get(i).map(|e| e.edit.to_string())
     }
 }
 
-impl<A> Default for Record<A> {
-    fn default() -> Record<A> {
+impl<E> Default for Record<E> {
+    fn default() -> Record<E> {
         Record::new()
     }
 }
 
-impl<A, F> From<History<A, F>> for Record<A, F> {
-    fn from(history: History<A, F>) -> Record<A, F> {
+impl<E, F> From<History<E, F>> for Record<E, F> {
+    fn from(history: History<E, F>) -> Record<E, F> {
         history.record
     }
 }
@@ -354,26 +386,26 @@ mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    enum Edit {
-        Push(Push),
-        Pop(Pop),
+    enum Op {
+        Add(Add),
+        Del(Del),
     }
 
-    impl Action for Edit {
+    impl Edit for Op {
         type Target = String;
         type Output = ();
 
-        fn apply(&mut self, s: &mut String) {
+        fn edit(&mut self, s: &mut String) {
             match self {
-                Edit::Push(add) => add.apply(s),
-                Edit::Pop(del) => del.apply(s),
+                Op::Add(add) => add.edit(s),
+                Op::Del(del) => del.edit(s),
             }
         }
 
         fn undo(&mut self, s: &mut String) {
             match self {
-                Edit::Push(add) => add.undo(s),
-                Edit::Pop(del) => del.undo(s),
+                Op::Add(add) => add.undo(s),
+                Op::Del(del) => del.undo(s),
             }
         }
 
@@ -382,21 +414,21 @@ mod tests {
             Self: Sized,
         {
             match (self, edit) {
-                (Edit::Push(_), Edit::Pop(_)) => Merged::Annul,
-                (Edit::Pop(Pop(Some(a))), Edit::Push(Push(b))) if a == &b => Merged::Annul,
+                (Op::Add(_), Op::Del(_)) => Merged::Annul,
+                (Op::Del(Del(Some(a))), Op::Add(Add(b))) if a == &b => Merged::Annul,
                 (_, edit) => Merged::No(edit),
             }
         }
     }
 
     #[derive(Debug, PartialEq)]
-    struct Push(char);
+    struct Add(char);
 
-    impl Action for Push {
+    impl Edit for Add {
         type Target = String;
         type Output = ();
 
-        fn apply(&mut self, s: &mut String) {
+        fn edit(&mut self, s: &mut String) {
             s.push(self.0);
         }
 
@@ -406,13 +438,13 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct Pop(Option<char>);
+    struct Del(Option<char>);
 
-    impl Action for Pop {
+    impl Edit for Del {
         type Target = String;
         type Output = ();
 
-        fn apply(&mut self, s: &mut String) {
+        fn edit(&mut self, s: &mut String) {
             self.0 = s.pop();
         }
 
@@ -426,51 +458,51 @@ mod tests {
     fn go_to() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Push('a'));
-        record.apply(&mut target, Push('b'));
-        record.apply(&mut target, Push('c'));
-        record.apply(&mut target, Push('d'));
-        record.apply(&mut target, Push('e'));
+        record.edit(&mut target, Add('a'));
+        record.edit(&mut target, Add('b'));
+        record.edit(&mut target, Add('c'));
+        record.edit(&mut target, Add('d'));
+        record.edit(&mut target, Add('e'));
 
         record.go_to(&mut target, 0);
-        assert_eq!(record.current(), 0);
+        assert_eq!(record.index(), 0);
         assert_eq!(target, "");
         record.go_to(&mut target, 5);
-        assert_eq!(record.current(), 5);
+        assert_eq!(record.index(), 5);
         assert_eq!(target, "abcde");
         record.go_to(&mut target, 1);
-        assert_eq!(record.current(), 1);
+        assert_eq!(record.index(), 1);
         assert_eq!(target, "a");
         record.go_to(&mut target, 4);
-        assert_eq!(record.current(), 4);
+        assert_eq!(record.index(), 4);
         assert_eq!(target, "abcd");
         record.go_to(&mut target, 2);
-        assert_eq!(record.current(), 2);
+        assert_eq!(record.index(), 2);
         assert_eq!(target, "ab");
         record.go_to(&mut target, 3);
-        assert_eq!(record.current(), 3);
+        assert_eq!(record.index(), 3);
         assert_eq!(target, "abc");
         assert!(record.go_to(&mut target, 6).is_empty());
-        assert_eq!(record.current(), 3);
+        assert_eq!(record.index(), 3);
     }
 
     #[test]
     fn annul() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Edit::Push(Push('a')));
-        record.apply(&mut target, Edit::Pop(Pop::default()));
-        record.apply(&mut target, Edit::Push(Push('b')));
+        record.edit(&mut target, Op::Add(Add('a')));
+        record.edit(&mut target, Op::Del(Del::default()));
+        record.edit(&mut target, Op::Add(Add('b')));
         assert_eq!(record.len(), 1);
     }
 
     #[test]
-    fn actions() {
+    fn edits() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, Push('a'));
-        record.apply(&mut target, Push('b'));
-        let collected = record.actions().collect::<Vec<_>>();
-        assert_eq!(&collected[..], &[&Push('a'), &Push('b')][..]);
+        record.edit(&mut target, Add('a'));
+        record.edit(&mut target, Add('b'));
+        let collected = record.edits().collect::<Vec<_>>();
+        assert_eq!(&collected[..], &[&Add('a'), &Add('b')][..]);
     }
 }

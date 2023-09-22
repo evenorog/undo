@@ -1,49 +1,49 @@
 use super::Queue;
-use crate::{Action, History, Slot};
+use crate::{Edit, History, Slot};
 use alloc::vec::Vec;
 
 #[derive(Debug)]
 enum CheckpointEntry {
-    Apply(usize),
+    Edit(usize),
     Undo,
     Redo,
 }
 
-/// Wraps a history and gives it checkpoint functionality.
+/// Wraps a [`History`] and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, A, S> {
-    history: &'a mut History<A, S>,
+pub struct Checkpoint<'a, E, S> {
+    history: &'a mut History<E, S>,
     entries: Vec<CheckpointEntry>,
 }
 
-impl<A, S> Checkpoint<'_, A, S> {
+impl<E, S> Checkpoint<'_, E, S> {
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
+    pub fn queue(&mut self) -> Queue<E, S> {
         self.history.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.history.checkpoint()
     }
 }
 
-impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
-    /// Calls the `apply` method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
-        let branch = self.history.branch();
-        self.entries.push(CheckpointEntry::Apply(branch));
-        self.history.apply(target, action)
+impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
+    /// Calls the [`History::edit`] method.
+    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
+        let root = self.history.root;
+        self.entries.push(CheckpointEntry::Edit(root));
+        self.history.edit(target, edit)
     }
 
-    /// Calls the `undo` method.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    /// Calls the [`History::undo`] method.
+    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.entries.push(CheckpointEntry::Undo);
         self.history.undo(target)
     }
 
-    /// Calls the `redo` method.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    /// Calls the [`History::redo`] method.
+    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         self.entries.push(CheckpointEntry::Redo);
         self.history.redo(target)
     }
@@ -52,14 +52,14 @@ impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
     pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
-    pub fn cancel(self, target: &mut A::Target) -> Vec<A::Output> {
+    pub fn cancel(self, target: &mut E::Target) -> Vec<E::Output> {
         self.entries
             .into_iter()
             .rev()
             .filter_map(|entry| match entry {
-                CheckpointEntry::Apply(branch) => {
+                CheckpointEntry::Edit(branch) => {
                     let output = self.history.undo(target)?;
-                    let root = self.history.branch();
+                    let root = self.history.root;
                     if root == branch {
                         self.history.record.entries.pop_back();
                     } else {
@@ -75,8 +75,8 @@ impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
     }
 }
 
-impl<'a, A, S> From<&'a mut History<A, S>> for Checkpoint<'a, A, S> {
-    fn from(history: &'a mut History<A, S>) -> Self {
+impl<'a, E, S> From<&'a mut History<E, S>> for Checkpoint<'a, E, S> {
+    fn from(history: &'a mut History<E, S>) -> Self {
         Checkpoint {
             history,
             entries: Vec::new(),
@@ -88,11 +88,11 @@ impl<'a, A, S> From<&'a mut History<A, S>> for Checkpoint<'a, A, S> {
 mod tests {
     use crate::*;
 
-    const A: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('a'));
-    const B: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('b'));
-    const C: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('c'));
-    const D: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('d'));
-    const E: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('e'));
+    const A: Add = Add('a');
+    const B: Add = Add('b');
+    const C: Add = Add('c');
+    const D: Add = Add('d');
+    const E: Add = Add('e');
 
     #[test]
     fn checkpoint() {
@@ -100,17 +100,17 @@ mod tests {
         let mut history = History::new();
         let mut checkpoint = history.checkpoint();
 
-        checkpoint.apply(&mut target, A);
-        checkpoint.apply(&mut target, B);
-        checkpoint.apply(&mut target, C);
+        checkpoint.edit(&mut target, A);
+        checkpoint.edit(&mut target, B);
+        checkpoint.edit(&mut target, C);
         assert_eq!(target, "abc");
 
         checkpoint.undo(&mut target);
         checkpoint.undo(&mut target);
         assert_eq!(target, "a");
 
-        checkpoint.apply(&mut target, D);
-        checkpoint.apply(&mut target, E);
+        checkpoint.edit(&mut target, D);
+        checkpoint.edit(&mut target, E);
         assert_eq!(target, "ade");
 
         checkpoint.cancel(&mut target);

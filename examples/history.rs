@@ -1,55 +1,56 @@
-use core::fmt::{self, Display, Formatter};
-use undo::{Action, History};
+use chrono::{DateTime, Local};
+use std::io;
+use std::time::SystemTime;
+use undo::{Add, At, History};
 
-struct Push(char);
-
-impl Action for Push {
-    type Target = String;
-    type Output = ();
-
-    fn apply(&mut self, string: &mut String) {
-        string.push(self.0);
-    }
-
-    fn undo(&mut self, string: &mut String) {
-        self.0 = string.pop().expect("cannot pop empty string");
-    }
+fn custom_st_fmt(_: SystemTime, at: SystemTime) -> String {
+    let dt = DateTime::<Local>::from(at);
+    dt.format("%H:%M:%S").to_string()
 }
 
-impl Display for Push {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "Push '{}'", self.0)
-    }
-}
-
-fn main() {
-    let mut history = History::new();
+fn main() -> io::Result<()> {
+    let stdin = io::stdin();
     let mut target = String::new();
+    let mut history = History::<_>::builder().limit(10).capacity(10).build();
 
-    history.apply(&mut target, Push('a'));
-    history.apply(&mut target, Push('b'));
-    history.apply(&mut target, Push('c'));
-    assert_eq!(target, "abc");
+    loop {
+        println!(
+            "Enter a string. Use '<' to undo, '>' to redo, '*' to save, and '! i-j' for goto: "
+        );
+        let mut buf = String::new();
+        let n = stdin.read_line(&mut buf)?;
+        if n == 0 {
+            return Ok(());
+        }
 
-    let abc_branch = history.branch();
-    let abc_current = history.current();
+        // Clears the terminal.
+        print!("{}c", 27 as char);
 
-    history.undo(&mut target);
-    assert_eq!(target, "ab");
+        let mut chars = buf.trim().chars();
+        while let Some(c) = chars.next() {
+            if c == '!' {
+                let tail = chars.collect::<String>();
+                let mut at = tail
+                    .trim()
+                    .split('-')
+                    .filter_map(|n| n.parse::<usize>().ok());
 
-    history.apply(&mut target, Push('d'));
-    history.apply(&mut target, Push('e'));
-    history.apply(&mut target, Push('f'));
-    assert_eq!(target, "abdef");
+                let root = at.next().unwrap_or_default();
+                let index = at.next().unwrap_or_default();
+                history.go_to(&mut target, At::new(root, index));
+                break;
+            } else if c == '<' {
+                history.undo(&mut target);
+            } else if c == '>' {
+                history.redo(&mut target);
+            } else if c == '*' {
+                history.set_saved(true);
+            } else {
+                history.edit(&mut target, Add(c));
+            }
+        }
 
-    let abdef_branch = history.branch();
-    let abdef_current = history.current();
-
-    history.go_to(&mut target, abc_branch, abc_current);
-    assert_eq!(target, "abc");
-
-    history.go_to(&mut target, abdef_branch, abdef_current);
-    assert_eq!(target, "abdef");
-
-    println!("{}", history.display());
+        println!("{}\n", history.display().set_st_fmt(&custom_st_fmt));
+        println!("Target: {target}");
+    }
 }

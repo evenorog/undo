@@ -1,52 +1,52 @@
 use super::Queue;
-use crate::{Action, Entry, Record, Slot};
+use crate::{Edit, Entry, Record, Slot};
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 
 #[derive(Debug)]
-enum CheckpointEntry<A> {
-    Apply(Option<usize>, VecDeque<Entry<A>>),
+enum CheckpointEntry<E> {
+    Edit(Option<usize>, VecDeque<Entry<E>>),
     Undo,
     Redo,
 }
 
-/// Wraps a record and gives it checkpoint functionality.
+/// Wraps a [`Record`] and gives it checkpoint functionality.
 #[derive(Debug)]
-pub struct Checkpoint<'a, A, S> {
-    record: &'a mut Record<A, S>,
-    entries: Vec<CheckpointEntry<A>>,
+pub struct Checkpoint<'a, E, S> {
+    record: &'a mut Record<E, S>,
+    entries: Vec<CheckpointEntry<E>>,
 }
 
-impl<A, S> Checkpoint<'_, A, S> {
+impl<E, S> Checkpoint<'_, E, S> {
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
+    pub fn queue(&mut self) -> Queue<E, S> {
         self.record.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.record.checkpoint()
     }
 }
 
-impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
+impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
     /// Calls the `apply` method.
-    pub fn apply(&mut self, target: &mut A::Target, action: A) -> A::Output {
+    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let saved = self.record.saved;
-        let (output, _, tail) = self.record.__apply(target, action);
-        self.entries.push(CheckpointEntry::Apply(saved, tail));
+        let (output, _, tail) = self.record.edit_and_push(target, edit.into());
+        self.entries.push(CheckpointEntry::Edit(saved, tail));
         output
     }
 
     /// Calls the `undo` method.
-    pub fn undo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         let output = self.record.undo(target)?;
         self.entries.push(CheckpointEntry::Undo);
         Some(output)
     }
 
     /// Calls the `redo` method.
-    pub fn redo(&mut self, target: &mut A::Target) -> Option<A::Output> {
+    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
         let output = self.record.redo(target)?;
         self.entries.push(CheckpointEntry::Redo);
         Some(output)
@@ -56,12 +56,12 @@ impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
     pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
-    pub fn cancel(self, target: &mut A::Target) -> Vec<A::Output> {
+    pub fn cancel(self, target: &mut E::Target) -> Vec<E::Output> {
         self.entries
             .into_iter()
             .rev()
             .filter_map(|entry| match entry {
-                CheckpointEntry::Apply(saved, mut entries) => {
+                CheckpointEntry::Edit(saved, mut entries) => {
                     let output = self.record.undo(target)?;
                     self.record.entries.pop_back();
                     self.record.entries.append(&mut entries);
@@ -75,8 +75,8 @@ impl<A: Action, S: Slot> Checkpoint<'_, A, S> {
     }
 }
 
-impl<'a, A, S> From<&'a mut Record<A, S>> for Checkpoint<'a, A, S> {
-    fn from(record: &'a mut Record<A, S>) -> Self {
+impl<'a, E, S> From<&'a mut Record<E, S>> for Checkpoint<'a, E, S> {
+    fn from(record: &'a mut Record<E, S>) -> Self {
         Checkpoint {
             record,
             entries: Vec::new(),
@@ -86,36 +86,36 @@ impl<'a, A, S> From<&'a mut Record<A, S>> for Checkpoint<'a, A, S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{FromFn, Record};
+    use crate::{add::Add, Record};
 
-    const A: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('a'));
-    const B: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('b'));
-    const C: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('c'));
-    const D: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('d'));
-    const E: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('e'));
-    const F: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('f'));
-    const G: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('g'));
-    const H: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('h'));
-    const I: FromFn<fn(&mut String), String> = FromFn::new(|s| s.push('i'));
+    const A: Add = Add('a');
+    const B: Add = Add('b');
+    const C: Add = Add('c');
+    const D: Add = Add('d');
+    const E: Add = Add('e');
+    const F: Add = Add('f');
+    const G: Add = Add('g');
+    const H: Add = Add('h');
+    const I: Add = Add('i');
 
     #[test]
     fn checkpoint_commit() {
         let mut target = String::new();
         let mut record = Record::new();
         let mut cp1 = record.checkpoint();
-        cp1.apply(&mut target, A);
-        cp1.apply(&mut target, B);
-        cp1.apply(&mut target, C);
+        cp1.edit(&mut target, A);
+        cp1.edit(&mut target, B);
+        cp1.edit(&mut target, C);
         assert_eq!(target, "abc");
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(&mut target, D);
-        cp2.apply(&mut target, E);
-        cp2.apply(&mut target, F);
+        cp2.edit(&mut target, D);
+        cp2.edit(&mut target, E);
+        cp2.edit(&mut target, F);
         assert_eq!(target, "abcdef");
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(&mut target, G);
-        cp3.apply(&mut target, H);
-        cp3.apply(&mut target, I);
+        cp3.edit(&mut target, G);
+        cp3.edit(&mut target, H);
+        cp3.edit(&mut target, I);
         assert_eq!(target, "abcdefghi");
         cp3.commit();
         cp2.commit();
@@ -128,17 +128,17 @@ mod tests {
         let mut target = String::new();
         let mut record = Record::new();
         let mut cp1 = record.checkpoint();
-        cp1.apply(&mut target, A);
-        cp1.apply(&mut target, B);
-        cp1.apply(&mut target, C);
+        cp1.edit(&mut target, A);
+        cp1.edit(&mut target, B);
+        cp1.edit(&mut target, C);
         let mut cp2 = cp1.checkpoint();
-        cp2.apply(&mut target, D);
-        cp2.apply(&mut target, E);
-        cp2.apply(&mut target, F);
+        cp2.edit(&mut target, D);
+        cp2.edit(&mut target, E);
+        cp2.edit(&mut target, F);
         let mut cp3 = cp2.checkpoint();
-        cp3.apply(&mut target, G);
-        cp3.apply(&mut target, H);
-        cp3.apply(&mut target, I);
+        cp3.edit(&mut target, G);
+        cp3.edit(&mut target, H);
+        cp3.edit(&mut target, I);
         assert_eq!(target, "abcdefghi");
         cp3.cancel(&mut target);
         assert_eq!(target, "abcdef");
@@ -152,17 +152,17 @@ mod tests {
     fn checkpoint_saved() {
         let mut target = String::new();
         let mut record = Record::new();
-        record.apply(&mut target, A);
-        record.apply(&mut target, B);
-        record.apply(&mut target, C);
+        record.edit(&mut target, A);
+        record.edit(&mut target, B);
+        record.edit(&mut target, C);
         record.set_saved(true);
         record.undo(&mut target).unwrap();
         record.undo(&mut target).unwrap();
         record.undo(&mut target).unwrap();
         let mut cp = record.checkpoint();
-        cp.apply(&mut target, D);
-        cp.apply(&mut target, E);
-        cp.apply(&mut target, F);
+        cp.edit(&mut target, D);
+        cp.edit(&mut target, E);
+        cp.edit(&mut target, F);
         assert_eq!(target, "def");
         cp.cancel(&mut target);
         assert_eq!(target, "");

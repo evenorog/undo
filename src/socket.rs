@@ -3,9 +3,12 @@
 use core::mem;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::sync::mpsc::{Sender, SyncSender};
 
 /// Slot wrapper that adds some additional functionality.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[repr(transparent)]
 #[derive(Clone, Debug)]
 pub(crate) struct Socket<S>(Option<S>);
 
@@ -30,51 +33,89 @@ impl<S> Default for Socket<S> {
 }
 
 impl<S: Slot> Socket<S> {
-    pub fn emit(&mut self, signal: Signal) {
+    pub fn emit(&mut self, event: impl FnOnce() -> Event) {
         if let Some(slot) = &mut self.0 {
-            slot.emit(signal);
+            slot.on_emit(event());
         }
     }
 
-    pub fn emit_if(&mut self, cond: bool, signal: Signal) {
+    pub fn emit_if(&mut self, cond: bool, event: impl FnOnce() -> Event) {
         if cond {
-            self.emit(signal);
+            self.emit(event);
         }
     }
 }
 
-/// Use this to receive signals from [`History`](crate::History) or [`Record`](crate::Record).
-pub trait Slot {
-    /// Receives a signal that describes the state change done to the data structures.
-    fn emit(&mut self, signal: Signal);
+/// Describes an event on the structures.
+///
+/// See [`Slot`] for more information.
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum Event {
+    /// Emitted when the structures ability to undo has changed.
+    Undo(bool),
+    /// Emitted when the structures ability to redo has changed.
+    Redo(bool),
+    /// Emitted when the saved state has changed.
+    Saved(bool),
+    /// Emitted when the index has changed.
+    Index(usize),
 }
 
-impl<F: FnMut(Signal)> Slot for F {
-    fn emit(&mut self, signal: Signal) {
-        self(signal)
+/// Handles events.
+///
+/// # Examples
+/// ```
+/// # use std::sync::mpsc;
+/// # use undo::{Add, Record, Event};
+/// # fn main() {
+/// let (sender, receiver) = mpsc::channel();
+/// let mut iter = receiver.try_iter();
+///
+/// let mut target = String::new();
+/// let mut record = Record::builder()
+///     .connect(sender)
+///     .build();
+///
+/// record.edit(&mut target, Add('a'));
+/// assert_eq!(iter.next(), Some(Event::Undo(true)));
+/// assert_eq!(iter.next(), Some(Event::Saved(false)));
+/// assert_eq!(iter.next(), Some(Event::Index(1)));
+/// assert_eq!(iter.next(), None);
+///
+/// record.undo(&mut target);
+/// assert_eq!(iter.next(), Some(Event::Undo(false)));
+/// assert_eq!(iter.next(), Some(Event::Redo(true)));
+/// assert_eq!(iter.next(), Some(Event::Saved(true)));
+/// assert_eq!(iter.next(), Some(Event::Index(0)));
+/// assert_eq!(iter.next(), None);
+/// # }
+/// ```
+pub trait Slot {
+    /// Receives an event that describes the state change done to the structures.
+    fn on_emit(&mut self, event: Event);
+}
+
+impl Slot for () {
+    fn on_emit(&mut self, _: Event) {}
+}
+
+impl<F: FnMut(Event)> Slot for F {
+    fn on_emit(&mut self, event: Event) {
+        self(event)
     }
 }
 
-/// The signal used for communicating state changes.
-///
-/// For example, if the history tree can no longer redo any actions,
-/// it sends a `Redo(false)` signal to tell the user.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[non_exhaustive]
-pub enum Signal {
-    /// Says if the structures can undo.
-    Undo(bool),
-    /// Says if the structures can redo.
-    Redo(bool),
-    /// Says if the target is in a saved state.
-    Saved(bool),
+#[cfg(feature = "std")]
+impl Slot for Sender<Event> {
+    fn on_emit(&mut self, event: Event) {
+        self.send(event).ok();
+    }
 }
 
-/// Default slot that does nothing.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub struct Nop;
-
-impl Slot for Nop {
-    fn emit(&mut self, _: Signal) {}
+#[cfg(feature = "std")]
+impl Slot for SyncSender<Event> {
+    fn on_emit(&mut self, event: Event) {
+        self.send(event).ok();
+    }
 }

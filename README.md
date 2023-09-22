@@ -6,28 +6,30 @@
 [![Crates.io](https://img.shields.io/crates/v/undo.svg)](https://crates.io/crates/undo)
 [![Docs](https://docs.rs/undo/badge.svg)](https://docs.rs/undo)
 
-It is an implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
-where all modifications are done by creating objects that applies the modifications.
+An implementation of the [command pattern](https://en.wikipedia.org/wiki/Command_pattern),
+where all edits are done by creating objects that applies the modifications.
 All objects knows how to undo the changes it applies, and by using the provided data
-structures it is easy to apply, undo, and redo changes made to a target.
+structures it is easy to undo and redo edits made to a target.
+
+See the [documentation](https://docs.rs/undo) and [examples](https://github.com/evenorog/undo/tree/master/examples) for more information.
 
 ## Examples
 
 ```rust
-use undo::{Action, Record};
+use undo::{Edit, Record};
 
-struct Push(char);
+struct Add(char);
 
-impl Action for Push {
+impl Edit for Add {
     type Target = String;
     type Output = ();
 
-    fn apply(&mut self, target: &mut String) {
+    fn edit(&mut self, target: &mut String) {
         target.push(self.0);
     }
 
     fn undo(&mut self, target: &mut String) {
-        self.0 = target.pop().expect("cannot pop empty string");
+        self.0 = target.pop().unwrap();
     }
 }
 
@@ -35,9 +37,9 @@ fn main() {
     let mut target = String::new();
     let mut record = Record::new();
 
-    record.apply(&mut target, Push('a'));
-    record.apply(&mut target, Push('b'));
-    record.apply(&mut target, Push('c'));
+    record.edit(&mut target, Add('a'));
+    record.edit(&mut target, Add('b'));
+    record.edit(&mut target, Add('c'));
     assert_eq!(target, "abc");
 
     record.undo(&mut target);

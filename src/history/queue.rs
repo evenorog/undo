@@ -1,28 +1,27 @@
 use super::Checkpoint;
-use crate::{Action, History, Slot};
+use crate::{Edit, History, Slot};
 use alloc::vec::Vec;
 
 #[derive(Debug)]
-enum QueueEntry<A> {
-    Apply(A),
+enum QueueEntry<E> {
+    Edit(E),
     Undo,
     Redo,
 }
 
-/// Wraps a record and gives it batch queue functionality.
+/// Wraps a [`History`] and gives it batch queue functionality.
 ///
 /// # Examples
 /// ```
-/// # include!("../doctest.rs");
 /// # fn main() {
-/// # use undo::Record;
+/// # use undo::{Add, History};
 /// let mut string = String::new();
-/// let mut record = Record::new();
-/// let mut queue = record.queue();
+/// let mut history = History::new();
+/// let mut queue = history.queue();
 ///
-/// queue.apply(Push('a'));
-/// queue.apply(Push('b'));
-/// queue.apply(Push('c'));
+/// queue.edit(Add('a'));
+/// queue.edit(Add('b'));
+/// queue.edit(Add('c'));
 /// assert_eq!(string, "");
 ///
 /// queue.commit(&mut string);
@@ -30,57 +29,57 @@ enum QueueEntry<A> {
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Queue<'a, A, S> {
-    history: &'a mut History<A, S>,
-    entries: Vec<QueueEntry<A>>,
+pub struct Queue<'a, E, S> {
+    history: &'a mut History<E, S>,
+    entries: Vec<QueueEntry<E>>,
 }
 
-impl<A, S> Queue<'_, A, S> {
+impl<E, S> Queue<'_, E, S> {
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<A, S> {
+    pub fn queue(&mut self) -> Queue<E, S> {
         self.history.queue()
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<A, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.history.checkpoint()
     }
 }
 
-impl<A: Action, S: Slot> Queue<'_, A, S> {
-    /// Queues an `apply` action.
-    pub fn apply(&mut self, action: A) {
-        self.entries.push(QueueEntry::Apply(action));
+impl<E: Edit, S: Slot> Queue<'_, E, S> {
+    /// Queues a [`History::edit`] call.
+    pub fn edit(&mut self, edit: E) {
+        self.entries.push(QueueEntry::Edit(edit));
     }
 
-    /// Queues an `undo` action.
+    /// Queues a [`History::undo`] call.
     pub fn undo(&mut self) {
         self.entries.push(QueueEntry::Undo);
     }
 
-    /// Queues a `redo` action.
+    /// Queues a [`History::redo`] call.
     pub fn redo(&mut self) {
         self.entries.push(QueueEntry::Redo);
     }
 
-    /// Applies the queued actions.
-    pub fn commit(self, target: &mut A::Target) -> Vec<A::Output> {
+    /// Applies the queued edits.
+    pub fn commit(self, target: &mut E::Target) -> Vec<E::Output> {
         self.entries
             .into_iter()
             .filter_map(|entry| match entry {
-                QueueEntry::Apply(action) => Some(self.history.apply(target, action)),
+                QueueEntry::Edit(edit) => Some(self.history.edit(target, edit)),
                 QueueEntry::Undo => self.history.undo(target),
                 QueueEntry::Redo => self.history.redo(target),
             })
             .collect()
     }
 
-    /// Cancels the queued actions.
+    /// Cancels the queued edits.
     pub fn cancel(self) {}
 }
 
-impl<'a, A, S> From<&'a mut History<A, S>> for Queue<'a, A, S> {
-    fn from(history: &'a mut History<A, S>) -> Self {
+impl<'a, E, S> From<&'a mut History<E, S>> for Queue<'a, E, S> {
+    fn from(history: &'a mut History<E, S>) -> Self {
         Queue {
             history,
             entries: Vec::new(),
