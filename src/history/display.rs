@@ -69,8 +69,8 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         if let Some(entry) = entry {
             if self.format.detailed {
                 let st_fmt = self.st_fmt;
-                let updated_at = st_fmt(now, entry.updated_at);
-                self.format.elapsed(f, updated_at)?;
+                let string = st_fmt(now, entry.edit_at);
+                self.format.elapsed(f, string)?;
             }
         }
 

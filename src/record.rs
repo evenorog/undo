@@ -386,74 +386,6 @@ mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    enum Op {
-        Add(Add),
-        Del(Del),
-    }
-
-    impl Edit for Op {
-        type Target = String;
-        type Output = ();
-
-        fn edit(&mut self, s: &mut String) {
-            match self {
-                Op::Add(add) => add.edit(s),
-                Op::Del(del) => del.edit(s),
-            }
-        }
-
-        fn undo(&mut self, s: &mut String) {
-            match self {
-                Op::Add(add) => add.undo(s),
-                Op::Del(del) => del.undo(s),
-            }
-        }
-
-        fn merge(&mut self, edit: Self) -> Merged<Self>
-        where
-            Self: Sized,
-        {
-            match (self, edit) {
-                (Op::Add(_), Op::Del(_)) => Merged::Annul,
-                (Op::Del(Del(Some(a))), Op::Add(Add(b))) if a == &b => Merged::Annul,
-                (_, edit) => Merged::No(edit),
-            }
-        }
-    }
-
-    #[derive(Debug, PartialEq)]
-    struct Add(char);
-
-    impl Edit for Add {
-        type Target = String;
-        type Output = ();
-
-        fn edit(&mut self, s: &mut String) {
-            s.push(self.0);
-        }
-
-        fn undo(&mut self, s: &mut String) {
-            self.0 = s.pop().unwrap();
-        }
-    }
-
-    #[derive(Default)]
-    struct Del(Option<char>);
-
-    impl Edit for Del {
-        type Target = String;
-        type Output = ();
-
-        fn edit(&mut self, s: &mut String) {
-            self.0 = s.pop();
-        }
-
-        fn undo(&mut self, s: &mut String) {
-            let ch = self.0.unwrap();
-            s.push(ch);
-        }
-    }
-
     #[test]
     fn go_to() {
         let mut target = String::new();
@@ -484,16 +416,6 @@ mod tests {
         assert_eq!(target, "abc");
         assert!(record.go_to(&mut target, 6).is_empty());
         assert_eq!(record.index(), 3);
-    }
-
-    #[test]
-    fn annul() {
-        let mut target = String::new();
-        let mut record = Record::new();
-        record.edit(&mut target, Op::Add(Add('a')));
-        record.edit(&mut target, Op::Del(Del::default()));
-        record.edit(&mut target, Op::Add(Add('b')));
-        assert_eq!(record.len(), 1);
     }
 
     #[test]

@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// [`History`] maintains an undo tree containing every edit made to the target.
 ///
 /// See [this](https://github.com/evenorog/undo/blob/master/examples/history.rs)
-/// for an interactive example of the history tree.
+/// example for an interactive view of the history tree.
 ///
 /// # Examples
 /// ```
@@ -384,21 +384,6 @@ impl<E> Branch<E> {
 #[cfg(test)]
 mod tests {
     use crate::*;
-
-    struct Add(char);
-
-    impl Edit for Add {
-        type Target = String;
-        type Output = ();
-
-        fn edit(&mut self, s: &mut String) {
-            s.push(self.0);
-        }
-
-        fn undo(&mut self, s: &mut String) {
-            self.0 = s.pop().unwrap();
-        }
-    }
 
     #[test]
     fn go_to() {
