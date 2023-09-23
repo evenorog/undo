@@ -138,7 +138,7 @@ impl<E, S> Record<E, S> {
     }
 
     /// Returns the current position in the record.
-    pub fn index(&self) -> usize {
+    pub fn head(&self) -> usize {
         self.index
     }
 
@@ -397,25 +397,25 @@ mod tests {
         record.edit(&mut target, Add('e'));
 
         record.go_to(&mut target, 0);
-        assert_eq!(record.index(), 0);
+        assert_eq!(record.head(), 0);
         assert_eq!(target, "");
         record.go_to(&mut target, 5);
-        assert_eq!(record.index(), 5);
+        assert_eq!(record.head(), 5);
         assert_eq!(target, "abcde");
         record.go_to(&mut target, 1);
-        assert_eq!(record.index(), 1);
+        assert_eq!(record.head(), 1);
         assert_eq!(target, "a");
         record.go_to(&mut target, 4);
-        assert_eq!(record.index(), 4);
+        assert_eq!(record.head(), 4);
         assert_eq!(target, "abcd");
         record.go_to(&mut target, 2);
-        assert_eq!(record.index(), 2);
+        assert_eq!(record.head(), 2);
         assert_eq!(target, "ab");
         record.go_to(&mut target, 3);
-        assert_eq!(record.index(), 3);
+        assert_eq!(record.head(), 3);
         assert_eq!(target, "abc");
         assert!(record.go_to(&mut target, 6).is_empty());
-        assert_eq!(record.index(), 3);
+        assert_eq!(record.head(), 3);
     }
 
     #[test]
