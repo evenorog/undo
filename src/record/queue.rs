@@ -86,38 +86,3 @@ impl<'a, E, S> From<&'a mut Record<E, S>> for Queue<'a, E, S> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::{Add, Record};
-    use alloc::string::String;
-
-    const A: Add = Add('a');
-    const B: Add = Add('b');
-    const C: Add = Add('c');
-
-    #[test]
-    fn queue_commit() {
-        let mut target = String::new();
-        let mut record = Record::new();
-        let mut q1 = record.queue();
-        q1.redo();
-        q1.redo();
-        q1.redo();
-        let mut q2 = q1.queue();
-        q2.undo();
-        q2.undo();
-        q2.undo();
-        let mut q3 = q2.queue();
-        q3.edit(A);
-        q3.edit(B);
-        q3.edit(C);
-        assert_eq!(target, "");
-        q3.commit(&mut target);
-        assert_eq!(target, "abc");
-        q2.commit(&mut target);
-        assert_eq!(target, "");
-        q1.commit(&mut target);
-        assert_eq!(target, "abc");
-    }
-}

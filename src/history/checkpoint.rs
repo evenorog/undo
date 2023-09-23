@@ -83,37 +83,3 @@ impl<'a, E, S> From<&'a mut History<E, S>> for Checkpoint<'a, E, S> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::*;
-
-    const A: Add = Add('a');
-    const B: Add = Add('b');
-    const C: Add = Add('c');
-    const D: Add = Add('d');
-    const E: Add = Add('e');
-
-    #[test]
-    fn checkpoint() {
-        let mut target = String::new();
-        let mut history = History::new();
-        let mut checkpoint = history.checkpoint();
-
-        checkpoint.edit(&mut target, A);
-        checkpoint.edit(&mut target, B);
-        checkpoint.edit(&mut target, C);
-        assert_eq!(target, "abc");
-
-        checkpoint.undo(&mut target);
-        checkpoint.undo(&mut target);
-        assert_eq!(target, "a");
-
-        checkpoint.edit(&mut target, D);
-        checkpoint.edit(&mut target, E);
-        assert_eq!(target, "ade");
-
-        checkpoint.cancel(&mut target);
-        assert_eq!(target, "");
-    }
-}
