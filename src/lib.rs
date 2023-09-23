@@ -102,7 +102,7 @@ pub trait Edit {
 
 /// Says if the [`Edit`] command have been merged with another command.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub enum Merged<E> {
     /// The edits have been merged.
     ///
@@ -121,7 +121,7 @@ pub enum Merged<E> {
 /// A position in a history tree.
 #[cfg(feature = "alloc")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct At {
     /// The root branch.
     pub root: usize,

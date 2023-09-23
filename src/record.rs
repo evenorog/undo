@@ -137,7 +137,7 @@ impl<E, S> Record<E, S> {
         self.saved == Some(self.index)
     }
 
-    /// Returns the index of the next edit.
+    /// Returns the current position in the record.
     pub fn index(&self) -> usize {
         self.index
     }

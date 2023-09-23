@@ -163,7 +163,7 @@ impl<E: Edit, S: Slot> History<E, S> {
     /// Pushes the [`Edit`] to the top of the history and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let head = self.head();
-        let saved = self.record.saved.filter(|&saved| saved > head.index);
+        let was_saved = self.record.saved.filter(|&saved| saved > head.index);
         let (output, merged, tail) = self.record.edit_and_push(target, edit.into());
 
         // Check if the limit has been reached.
@@ -180,9 +180,9 @@ impl<E: Edit, S: Slot> History<E, S> {
         if !tail.is_empty() {
             let new = self.next;
             self.next += 1;
-            self.branches
-                .insert(head.root, Branch::new(new, head.index, tail));
-            self.set_root(new, head.index, saved);
+            let parent = At::new(new, head.index);
+            self.branches.insert(head.root, Branch::new(parent, tail));
+            self.set_root(parent, was_saved);
         }
         output
     }
@@ -217,42 +217,42 @@ impl<E: Edit, S: Slot> History<E, S> {
     pub(crate) fn jump_to(&mut self, root: usize) {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.head());
-        let index = self.record.index;
-        let saved = self.record.saved.filter(|&saved| saved > index);
-        let tail = self.record.entries.split_off(index);
+        let parent = At::new(root, self.record.index);
+        let was_saved = self.record.saved.filter(|&saved| saved > parent.index);
+        let tail = self.record.entries.split_off(parent.index);
         self.record.entries.append(&mut branch.entries);
-        self.branches
-            .insert(self.root, Branch::new(root, index, tail));
-        self.set_root(root, index, saved);
+        self.branches.insert(self.root, Branch::new(parent, tail));
+        self.set_root(parent, was_saved);
     }
 
-    fn set_root(&mut self, root: usize, index: usize, saved: Option<usize>) {
+    fn set_root(&mut self, at: At, was_saved: Option<usize>) {
         let old = self.root;
-        self.root = root;
-        debug_assert_ne!(old, root);
+        self.root = at.root;
+        debug_assert_ne!(old, at.root);
         // Handle the child branches.
         self.branches
             .values_mut()
-            .filter(|branch| branch.parent.root == old && branch.parent.index <= index)
-            .for_each(|branch| branch.parent.root = root);
-        match (self.record.saved, saved, self.saved) {
-            (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(root, old, index),
-            (None, Some(_), None) => {
-                self.record.saved = saved;
-                self.swap_saved(old, root, index);
+            .filter(|branch| branch.parent.root == old && branch.parent.index <= at.index)
+            .for_each(|branch| branch.parent.root = at.root);
+
+        match (self.record.saved, was_saved, self.saved) {
+            (Some(_), None, None) | (None, None, Some(_)) => {
+                self.swap_saved(at.root, old, at.index)
             }
-            (None, None, None) => (),
-            _ => unreachable!(),
+            (None, Some(_), None) => {
+                self.record.saved = was_saved;
+                self.swap_saved(old, at.root, at.index);
+            }
+            _ => (),
         }
     }
 
     fn swap_saved(&mut self, old: usize, new: usize, index: usize) {
         debug_assert_ne!(old, new);
-        if let Some(At { index: saved, .. }) =
-            self.saved.filter(|at| at.root == new && at.index <= index)
-        {
+        let saved_in_new_root = self.saved.filter(|at| at.root == new && at.index <= index);
+        if let Some(saved) = saved_in_new_root {
             self.saved = None;
-            self.record.saved = Some(saved);
+            self.record.saved = Some(saved.index);
             self.record.socket.emit(|| Event::Saved(true));
         } else if let Some(saved) = self.record.saved {
             self.saved = Some(At::new(old, saved));
@@ -312,22 +312,23 @@ impl<E: Edit, S: Slot> History<E, S> {
         };
 
         for (new, branch) in path {
-            let o = self.record.go_to(target, branch.parent.index);
-            outputs.extend(o);
+            let mut outs = self.record.go_to(target, branch.parent.index);
+            outputs.append(&mut outs);
             // Apply the edits in the branch and move older edits into their own branch.
             for entry in branch.entries {
                 let index = self.record.index;
-                let saved = self.record.saved.filter(|&saved| saved > index);
+                let was_saved = self.record.saved.filter(|&saved| saved > index);
                 let (_, _, entries) = self.record.redo_and_push(target, entry);
                 if !entries.is_empty() {
+                    let parent = At::new(new, index);
                     self.branches
-                        .insert(self.root, Branch::new(new, index, entries));
-                    self.set_root(new, index, saved);
+                        .insert(self.root, Branch::new(parent, entries));
+                    self.set_root(parent, was_saved);
                 }
             }
         }
-        let o = self.record.go_to(target, at.index);
-        outputs.extend(o);
+        let mut outs = self.record.go_to(target, at.index);
+        outputs.append(&mut outs);
         outputs
     }
 }
@@ -366,18 +367,15 @@ impl<E, S> From<Record<E, S>> for History<E, S> {
 
 /// A branch in the history.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) struct Branch<E> {
     pub(crate) parent: At,
     pub(crate) entries: VecDeque<Entry<E>>,
 }
 
 impl<E> Branch<E> {
-    fn new(branch: usize, index: usize, entries: VecDeque<Entry<E>>) -> Branch<E> {
-        Branch {
-            parent: At::new(branch, index),
-            entries,
-        }
+    fn new(parent: At, entries: VecDeque<Entry<E>>) -> Branch<E> {
+        Branch { parent, entries }
     }
 }
 

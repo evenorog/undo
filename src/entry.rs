@@ -7,7 +7,7 @@ use std::time::SystemTime;
 
 /// Wrapper around an [`Edit`] command that contains additional metadata.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) struct Entry<E> {
     pub edit: E,
     #[cfg(feature = "std")]
