@@ -123,6 +123,14 @@ impl<E, S> History<E, S> {
         self.record.is_saved()
     }
 
+    /// Return the position of the saved state.
+    pub fn saved(&self) -> Option<At> {
+        self.record
+            .saved
+            .map(|index| At::new(self.root, index))
+            .or(self.saved)
+    }
+
     /// Returns `true` if the history can undo.
     pub fn can_undo(&self) -> bool {
         self.record.can_undo()

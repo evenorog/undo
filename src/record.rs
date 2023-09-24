@@ -137,7 +137,10 @@ impl<E, S> Record<E, S> {
         self.saved == Some(self.index)
     }
 
-    // TODO: Add saved method.
+    /// Returns the index of the saved state.
+    pub fn saved(&self) -> Option<usize> {
+        self.saved
+    }
 
     /// Returns the index of the current edit in the record.
     pub fn head(&self) -> usize {
