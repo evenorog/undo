@@ -58,7 +58,7 @@ pub struct History<E, S = ()> {
     root: usize,
     next: usize,
     saved: Option<At>,
-    pub(crate) record: Record<E, S>,
+    record: Record<E, S>,
     branches: BTreeMap<usize, Branch<E>>,
 }
 
@@ -163,13 +163,12 @@ impl<E: Edit, S: Slot> History<E, S> {
     /// Pushes the [`Edit`] to the top of the history and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let head = self.head();
-        let was_saved = self.record.saved.filter(|&saved| saved > head.index);
-        let (output, merged, tail) = self.record.edit_and_push(target, edit.into());
+        let (output, merged, tail, rm_saved) = self.record.edit_and_push(target, edit.into());
 
         // Check if the limit has been reached.
         if !merged && head.index == self.record.index {
             let root = self.root;
-            self.rm_child(root, 0);
+            self.rm_child_of(At::no_index(root));
             self.branches
                 .values_mut()
                 .filter(|branch| branch.parent.root == root)
@@ -182,7 +181,7 @@ impl<E: Edit, S: Slot> History<E, S> {
             self.next += 1;
             let parent = At::new(new, head.index);
             self.branches.insert(head.root, Branch::new(parent, tail));
-            self.set_root(parent, was_saved);
+            self.set_root(parent, rm_saved);
         }
         output
     }
@@ -218,14 +217,14 @@ impl<E: Edit, S: Slot> History<E, S> {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.head());
         let parent = At::new(root, self.record.index);
-        let was_saved = self.record.saved.filter(|&saved| saved > parent.index);
+        let rm_saved = self.record.saved.filter(|&saved| saved > parent.index);
         let tail = self.record.entries.split_off(parent.index);
         self.record.entries.append(&mut branch.entries);
         self.branches.insert(self.root, Branch::new(parent, tail));
-        self.set_root(parent, was_saved);
+        self.set_root(parent, rm_saved);
     }
 
-    fn set_root(&mut self, at: At, was_saved: Option<usize>) {
+    fn set_root(&mut self, at: At, rm_saved: Option<usize>) {
         let old = self.root;
         self.root = at.root;
         debug_assert_ne!(old, at.root);
@@ -235,38 +234,40 @@ impl<E: Edit, S: Slot> History<E, S> {
             .filter(|branch| branch.parent.root == old && branch.parent.index <= at.index)
             .for_each(|branch| branch.parent.root = at.root);
 
-        match (self.record.saved, was_saved, self.saved) {
+        match (self.record.saved, rm_saved, self.saved) {
             (Some(_), None, None) | (None, None, Some(_)) => {
                 self.swap_saved(at.root, old, at.index)
             }
             (None, Some(_), None) => {
-                self.record.saved = was_saved;
+                self.record.saved = rm_saved;
                 self.swap_saved(old, at.root, at.index);
             }
             _ => (),
         }
     }
 
-    fn swap_saved(&mut self, old: usize, new: usize, index: usize) {
-        debug_assert_ne!(old, new);
-        let saved_in_new_root = self.saved.filter(|at| at.root == new && at.index <= index);
+    fn swap_saved(&mut self, old_root: usize, new_root: usize, index: usize) {
+        debug_assert_ne!(old_root, new_root);
+        let saved_in_new_root = self
+            .saved
+            .filter(|at| at.root == new_root && at.index <= index);
         if let Some(saved) = saved_in_new_root {
             self.saved = None;
             self.record.saved = Some(saved.index);
             self.record.socket.emit(|| Event::Saved(true));
         } else if let Some(saved) = self.record.saved {
-            self.saved = Some(At::new(old, saved));
+            self.saved = Some(At::new(old_root, saved));
             self.record.saved = None;
             self.record.socket.emit(|| Event::Saved(false));
         }
     }
 
-    fn rm_child(&mut self, branch: usize, index: usize) {
+    fn rm_child_of(&mut self, at: At) {
         // We need to check if any of the branches had the removed node as root.
         let mut dead: Vec<_> = self
             .branches
             .iter()
-            .filter(|&(_, child)| child.parent == At::new(branch, index))
+            .filter(|&(_, child)| child.parent == at)
             .map(|(&id, _)| id)
             .collect();
         while let Some(parent) = dead.pop() {
@@ -317,13 +318,12 @@ impl<E: Edit, S: Slot> History<E, S> {
             // Apply the edits in the branch and move older edits into their own branch.
             for entry in branch.entries {
                 let index = self.record.index;
-                let was_saved = self.record.saved.filter(|&saved| saved > index);
-                let (_, _, entries) = self.record.redo_and_push(target, entry);
+                let (_, _, entries, rm_saved) = self.record.redo_and_push(target, entry);
                 if !entries.is_empty() {
                     let parent = At::new(new, index);
                     self.branches
                         .insert(self.root, Branch::new(parent, entries));
-                    self.set_root(parent, was_saved);
+                    self.set_root(parent, rm_saved);
                 }
             }
         }
@@ -365,12 +365,18 @@ impl<E, S> From<Record<E, S>> for History<E, S> {
     }
 }
 
+impl<E, F> From<History<E, F>> for Record<E, F> {
+    fn from(history: History<E, F>) -> Record<E, F> {
+        history.record
+    }
+}
+
 /// A branch in the history.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
 pub(crate) struct Branch<E> {
-    pub(crate) parent: At,
-    pub(crate) entries: VecDeque<Entry<E>>,
+    parent: At,
+    entries: VecDeque<Entry<E>>,
 }
 
 impl<E> Branch<E> {

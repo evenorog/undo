@@ -11,7 +11,7 @@ pub use display::Display;
 pub use queue::Queue;
 
 use crate::socket::{Slot, Socket};
-use crate::{Edit, Entry, Event, History, Merged};
+use crate::{Edit, Entry, Event, Merged};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -137,7 +137,9 @@ impl<E, S> Record<E, S> {
         self.saved == Some(self.index)
     }
 
-    /// Returns the current position in the record.
+    // TODO: Add saved method.
+
+    /// Returns the index of the current edit in the record.
     pub fn head(&self) -> usize {
         self.index
     }
@@ -163,17 +165,23 @@ impl<E, S> Record<E, S> {
     }
 
     /// Remove all elements after the index.
-    fn rm_tail(&mut self) -> VecDeque<Entry<E>> {
-        // Check if the saved edit will be removed.
-        self.saved = self.saved.filter(|&saved| saved <= self.index);
-        self.entries.split_off(self.index)
+    fn rm_tail(&mut self) -> (VecDeque<Entry<E>>, Option<usize>) {
+        // Remove the saved state if it will be split off.
+        let rm_saved = if self.saved > Some(self.index) {
+            self.saved.take()
+        } else {
+            None
+        };
+
+        let tail = self.entries.split_off(self.index);
+        (tail, rm_saved)
     }
 }
 
 impl<E: Edit, S: Slot> Record<E, S> {
     /// Pushes the edit on top of the record and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let (output, _, _) = self.edit_and_push(target, edit.into());
+        let (output, _, _, _) = self.edit_and_push(target, edit.into());
         output
     }
 
@@ -181,29 +189,29 @@ impl<E: Edit, S: Slot> Record<E, S> {
         &mut self,
         target: &mut E::Target,
         mut entry: Entry<E>,
-    ) -> (E::Output, bool, VecDeque<Entry<E>>) {
+    ) -> (E::Output, bool, VecDeque<Entry<E>>, Option<usize>) {
         let output = entry.edit(target);
-        let (merged_or_annulled, tail) = self.push(entry);
-        (output, merged_or_annulled, tail)
+        let (merged_or_annulled, tail, rm_saved) = self.push(entry);
+        (output, merged_or_annulled, tail, rm_saved)
     }
 
     pub(crate) fn redo_and_push(
         &mut self,
         target: &mut E::Target,
         mut entry: Entry<E>,
-    ) -> (E::Output, bool, VecDeque<Entry<E>>) {
+    ) -> (E::Output, bool, VecDeque<Entry<E>>, Option<usize>) {
         let output = entry.redo(target);
-        let (merged_or_annulled, tail) = self.push(entry);
-        (output, merged_or_annulled, tail)
+        let (merged_or_annulled, tail, rm_saved) = self.push(entry);
+        (output, merged_or_annulled, tail, rm_saved)
     }
 
-    fn push(&mut self, entry: Entry<E>) -> (bool, VecDeque<Entry<E>>) {
+    fn push(&mut self, entry: Entry<E>) -> (bool, VecDeque<Entry<E>>, Option<usize>) {
         let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
 
-        let tail = self.rm_tail();
+        let (tail, rm_saved) = self.rm_tail();
         // Try to merge unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
             Some(last) if !was_saved => last.merge(entry),
@@ -235,7 +243,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
         self.socket.emit_if(was_saved, || Event::Saved(false));
         self.socket
             .emit_if(old_index != self.index, || Event::Index(self.index));
-        (merged_or_annulled, tail)
+        (merged_or_annulled, tail, rm_saved)
     }
 
     /// Calls the [`Edit::undo`] method for the active edit and sets
@@ -371,11 +379,5 @@ impl<E: ToString, S> Record<E, S> {
 impl<E> Default for Record<E> {
     fn default() -> Record<E> {
         Record::new()
-    }
-}
-
-impl<E, F> From<History<E, F>> for Record<E, F> {
-    fn from(history: History<E, F>) -> Record<E, F> {
-        history.record
     }
 }
