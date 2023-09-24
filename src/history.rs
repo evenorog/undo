@@ -216,18 +216,19 @@ impl<E: Edit, S: Slot> History<E, S> {
     pub(crate) fn jump_to(&mut self, root: usize) {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.head());
+
         let parent = At::new(root, self.record.index);
-        let rm_saved = self.record.saved.filter(|&saved| saved > parent.index);
-        let tail = self.record.entries.split_off(parent.index);
+        let (tail, rm_saved) = self.record.rm_tail();
         self.record.entries.append(&mut branch.entries);
         self.branches.insert(self.root, Branch::new(parent, tail));
         self.set_root(parent, rm_saved);
     }
 
     fn set_root(&mut self, at: At, rm_saved: Option<usize>) {
+        debug_assert_ne!(self.root, at.root);
         let old = self.root;
         self.root = at.root;
-        debug_assert_ne!(old, at.root);
+
         // Handle the child branches.
         self.branches
             .values_mut()

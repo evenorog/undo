@@ -165,7 +165,7 @@ impl<E, S> Record<E, S> {
     }
 
     /// Remove all elements after the index.
-    fn rm_tail(&mut self) -> (VecDeque<Entry<E>>, Option<usize>) {
+    pub(crate) fn rm_tail(&mut self) -> (VecDeque<Entry<E>>, Option<usize>) {
         // Remove the saved state if it will be split off.
         let rm_saved = if self.saved > Some(self.index) {
             self.saved.take()
