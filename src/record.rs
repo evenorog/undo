@@ -28,7 +28,8 @@ use serde::{Deserialize, Serialize};
 /// changes by using the [`Builder`].
 ///
 /// When adding a new edit command to the record the previously undone commands
-/// will be discarded. If you want to keep all edits you can use [`History`] instead.
+/// will be discarded.
+/// If you want to keep all edits you can use [`History`](crate::History) instead.
 ///
 /// # Examples
 /// ```
@@ -59,7 +60,7 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Record<E, S = ()> {
-    pub(crate) limit: NonZeroUsize,
+    limit: NonZeroUsize,
     pub(crate) index: usize,
     pub(crate) saved: Option<usize>,
     pub(crate) socket: Socket<S>,

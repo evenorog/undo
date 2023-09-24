@@ -384,13 +384,23 @@ impl<E, F> From<History<E, F>> for Record<E, F> {
 /// A branch in the history.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
-pub(crate) struct Branch<E> {
+pub struct Branch<E> {
     parent: At,
     entries: VecDeque<Entry<E>>,
 }
 
 impl<E> Branch<E> {
-    fn new(parent: At, entries: VecDeque<Entry<E>>) -> Branch<E> {
+    const fn new(parent: At, entries: VecDeque<Entry<E>>) -> Branch<E> {
         Branch { parent, entries }
+    }
+
+    /// Returns the parent edit of the branch.
+    pub fn parent(&self) -> At {
+        self.parent
+    }
+
+    /// Returns an iterator over the edits in the branch.
+    pub fn edits(&self) -> impl Iterator<Item = &E> {
+        self.entries.iter().map(|e| &e.edit)
     }
 }
