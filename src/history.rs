@@ -226,25 +226,26 @@ impl<E: Edit, S: Slot> History<E, S> {
 
     fn set_root(&mut self, at: At, rm_saved: Option<usize>) {
         debug_assert_ne!(self.root, at.root);
-        let old = self.root;
-        self.root = at.root;
 
-        // Handle the child branches.
+        // Handle all children that are within the new head.
         self.branches
             .values_mut()
-            .filter(|branch| branch.parent.root == old && branch.parent.index <= at.index)
-            .for_each(|branch| branch.parent.root = at.root);
+            .filter(|child| child.parent.root == self.root && child.parent.index <= at.index)
+            .for_each(|child| child.parent.root = at.root);
 
+        // Handle the saved state.
         match (self.record.saved, rm_saved, self.saved) {
             (Some(_), None, None) | (None, None, Some(_)) => {
-                self.swap_saved(at.root, old, at.index)
+                self.swap_saved(at.root, self.root, at.index)
             }
             (None, Some(_), None) => {
                 self.record.saved = rm_saved;
-                self.swap_saved(old, at.root, at.index);
+                self.swap_saved(self.root, at.root, at.index);
             }
             _ => (),
         }
+
+        self.root = at.root;
     }
 
     fn swap_saved(&mut self, old_root: usize, new_root: usize, index: usize) {
