@@ -10,7 +10,7 @@ pub use checkpoint::Checkpoint;
 pub use display::Display;
 pub use queue::Queue;
 
-use crate::socket::{Event, Slot};
+use crate::socket::Slot;
 use crate::{At, Edit, Entry, Record};
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
@@ -188,44 +188,39 @@ impl<E, S: Slot> History<E, S> {
         self.branches.clear();
     }
 
-    fn set_root(&mut self, at: At, rm_saved: Option<usize>) {
-        debug_assert_ne!(self.root, at.root);
+    fn set_root(&mut self, new: At, rm_saved: Option<usize>) {
+        debug_assert_ne!(self.root, new.root);
 
-        // Handle all children that are within the new head.
+        // Update all branches that are now children of the new root.
+        //
+        // |           | <- The old root is now a child of the new root.
+        // | |         | | <- This branch is still a child of the old root.
+        // |/          |/
+        // |    ->    /
+        // o |       o | <- This branch is now a child of the new root.
+        // |/        |/
+        // |         |
+        //
+        // If we split at 'o' all branches that are children of 'o' or below should now
+        // be children of the new root. All branches that are above should still be
+        // children of the old root.
         self.branches
             .values_mut()
-            .filter(|child| child.parent.root == self.root && child.parent.index <= at.index)
-            .for_each(|child| child.parent.root = at.root);
+            .filter(|child| child.parent.root == self.root && child.parent.index <= new.index)
+            .for_each(|child| child.parent.root = new.root);
 
-        // Handle the saved state.
-        match (self.record.saved, rm_saved, self.saved) {
-            (Some(_), None, None) | (None, None, Some(_)) => {
-                self.swap_saved(at.root, self.root, at.index)
+        match (self.saved, rm_saved) {
+            (Some(saved), None) if saved.root == new.root => {
+                self.saved = None;
+                self.record.saved = Some(saved.index);
             }
-            (None, Some(_), None) => {
-                self.record.saved = rm_saved;
-                self.swap_saved(self.root, at.root, at.index);
+            (None, Some(saved)) => {
+                self.saved = Some(At::new(self.root, saved));
             }
             _ => (),
         }
 
-        self.root = at.root;
-    }
-
-    fn swap_saved(&mut self, old_root: usize, new_root: usize, index: usize) {
-        debug_assert_ne!(old_root, new_root);
-        let saved_in_new_root = self
-            .saved
-            .filter(|at| at.root == new_root && at.index <= index);
-        if let Some(saved) = saved_in_new_root {
-            self.saved = None;
-            self.record.saved = Some(saved.index);
-            self.record.socket.emit(|| Event::Saved(true));
-        } else if let Some(saved) = self.record.saved {
-            self.saved = Some(At::new(old_root, saved));
-            self.record.saved = None;
-            self.record.socket.emit(|| Event::Saved(false));
-        }
+        self.root = new.root;
     }
 
     fn rm_child_of(&mut self, at: At) {
@@ -289,8 +284,8 @@ impl<E: Edit, S: Slot> History<E, S> {
             self.rm_child_of(At::no_index(root));
             self.branches
                 .values_mut()
-                .filter(|branch| branch.parent.root == root)
-                .for_each(|branch| branch.parent.index -= 1);
+                .filter(|child| child.parent.root == root)
+                .for_each(|child| child.parent.index -= 1);
         }
 
         // Handle new branch.
