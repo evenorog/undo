@@ -26,6 +26,9 @@ impl<E, S> Checkpoint<'_, E, S> {
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.history.checkpoint()
     }
+
+    /// Commits the changes and consumes the checkpoint.
+    pub fn commit(self) {}
 }
 
 impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
@@ -47,9 +50,6 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
         self.entries.push(CheckpointEntry::Redo);
         self.history.redo(target)
     }
-
-    /// Commits the changes and consumes the checkpoint.
-    pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
     pub fn cancel(self, target: &mut E::Target) -> Vec<E::Output> {

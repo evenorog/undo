@@ -33,7 +33,6 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples
 /// ```
-/// # fn main() {
 /// # use undo::{Add, Record};
 /// let mut target = String::new();
 /// let mut record = Record::new();
@@ -55,7 +54,6 @@ use serde::{Deserialize, Serialize};
 /// // 'c' will be discarded.
 /// record.edit(&mut target, Add('d'));
 /// assert_eq!(target, "abd");
-/// # }
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]

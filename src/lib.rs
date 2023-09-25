@@ -20,6 +20,11 @@
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //! * Configurable display formatting using the display structures.
 //!
+//! # Examples
+//!
+//! All examples in the documentation uses the `Add`
+//! command found [here](https://github.com/evenorog/undo/blob/master/src/add.rs).
+//!
 //! # Cargo Feature Flags
 //!
 //! | Name    | Default | Enables | Description                                                     |

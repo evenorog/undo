@@ -28,7 +28,6 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples
 /// ```
-/// # fn main() {
 /// # use undo::{Add, History};
 /// let mut target = String::new();
 /// let mut history = History::new();
@@ -50,7 +49,6 @@ use serde::{Deserialize, Serialize};
 /// // We can now switch back to the original branch.
 /// history.go_to(&mut target, abc);
 /// assert_eq!(target, "abc");
-/// # }
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
@@ -319,7 +317,7 @@ impl<E: Edit, S: Slot> History<E, S> {
         self.record.redo(target)
     }
 
-    /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit in `branch` at `index` is reached.
+    /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `at` is reached.
     pub fn go_to(&mut self, target: &mut E::Target, at: At) -> Vec<E::Output> {
         let root = self.root;
         if root == at.root {

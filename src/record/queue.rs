@@ -13,7 +13,6 @@ enum QueueEntry<E> {
 ///
 /// # Examples
 /// ```
-/// # fn main() {
 /// # use undo::{Add, Record};
 /// let mut string = String::new();
 /// let mut record = Record::new();
@@ -26,7 +25,6 @@ enum QueueEntry<E> {
 ///
 /// queue.commit(&mut string);
 /// assert_eq!(string, "abc");
-/// # }
 /// ```
 #[derive(Debug)]
 pub struct Queue<'a, E, S> {
@@ -44,9 +42,7 @@ impl<E, S> Queue<'_, E, S> {
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.record.checkpoint()
     }
-}
 
-impl<E: Edit, S: Slot> Queue<'_, E, S> {
     /// Queues a [`Record::edit`] call.
     pub fn edit(&mut self, edit: E) {
         self.entries.push(QueueEntry::Edit(edit));
@@ -62,6 +58,11 @@ impl<E: Edit, S: Slot> Queue<'_, E, S> {
         self.entries.push(QueueEntry::Redo);
     }
 
+    /// Cancels the queued edits.
+    pub fn cancel(self) {}
+}
+
+impl<E: Edit, S: Slot> Queue<'_, E, S> {
     /// Applies the queued edits.
     pub fn commit(self, target: &mut E::Target) -> Vec<E::Output> {
         self.entries
@@ -73,9 +74,6 @@ impl<E: Edit, S: Slot> Queue<'_, E, S> {
             })
             .collect()
     }
-
-    /// Cancels the queued edits.
-    pub fn cancel(self) {}
 }
 
 impl<'a, E, S> From<&'a mut Record<E, S>> for Queue<'a, E, S> {

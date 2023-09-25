@@ -8,7 +8,6 @@ use core::num::NonZeroUsize;
 ///
 /// # Examples
 /// ```
-/// # fn main() {
 /// # use undo::{Add, Record};
 /// # let mut target = String::new();
 /// let mut record = Record::builder()
@@ -17,7 +16,6 @@ use core::num::NonZeroUsize;
 ///     .connect(|s| { dbg!(s); })
 ///     .build();
 /// # record.edit(&mut target, Add('a'));
-/// # }
 /// ```
 #[derive(Debug)]
 pub struct Builder<E, S = ()> {
