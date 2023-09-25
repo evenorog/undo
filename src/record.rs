@@ -182,6 +182,33 @@ impl<E, S> Record<E, S> {
     }
 }
 
+impl<E, S: Slot> Record<E, S> {
+    /// Marks the target as currently being in a saved or unsaved state.
+    pub fn set_saved(&mut self, saved: bool) {
+        let was_saved = self.is_saved();
+        if saved {
+            self.saved = Some(self.index);
+            self.socket.emit_if(!was_saved, || Event::Saved(true));
+        } else {
+            self.saved = None;
+            self.socket.emit_if(was_saved, || Event::Saved(false));
+        }
+    }
+
+    /// Removes all edits from the record without undoing them.
+    pub fn clear(&mut self) {
+        let old_index = self.index;
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        self.entries.clear();
+        self.saved = self.is_saved().then_some(0);
+        self.index = 0;
+        self.socket.emit_if(could_undo, || Event::Undo(false));
+        self.socket.emit_if(could_redo, || Event::Redo(false));
+        self.socket.emit_if(old_index != 0, || Event::Index(0));
+    }
+}
+
 impl<E: Edit, S: Slot> Record<E, S> {
     /// Pushes the edit on top of the record and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
@@ -286,31 +313,6 @@ impl<E: Edit, S: Slot> Record<E, S> {
             self.socket.emit(|| Event::Index(self.index));
             output
         })
-    }
-
-    /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
-        let was_saved = self.is_saved();
-        if saved {
-            self.saved = Some(self.index);
-            self.socket.emit_if(!was_saved, || Event::Saved(true));
-        } else {
-            self.saved = None;
-            self.socket.emit_if(was_saved, || Event::Saved(false));
-        }
-    }
-
-    /// Removes all edits from the record without undoing them.
-    pub fn clear(&mut self) {
-        let old_index = self.index;
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
-        self.entries.clear();
-        self.saved = self.is_saved().then_some(0);
-        self.index = 0;
-        self.socket.emit_if(could_undo, || Event::Undo(false));
-        self.socket.emit_if(could_redo, || Event::Redo(false));
-        self.socket.emit_if(old_index != 0, || Event::Index(0));
     }
 
     /// Revert the changes done to the target since the saved state.

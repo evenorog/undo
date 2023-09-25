@@ -151,9 +151,16 @@ impl<E, S> History<E, S> {
         Display::from(self)
     }
 
-    /// Returns an iterator over the edits in the current branch.
+    /// Returns an iterator over the edits in the current root branch.
     pub fn edits(&self) -> impl Iterator<Item = &E> {
         self.record.edits()
+    }
+
+    /// Returns an iterator over the branches in the history.
+    ///
+    /// This does not include the current root branch.
+    pub fn branches(&self) -> impl Iterator<Item = (&usize, &Branch<E>)> {
+        self.branches.iter()
     }
 
     /// Returns a queue.
@@ -167,45 +174,7 @@ impl<E, S> History<E, S> {
     }
 }
 
-impl<E: Edit, S: Slot> History<E, S> {
-    /// Pushes the [`Edit`] to the top of the history and executes its [`Edit::edit`] method.
-    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let head = self.head();
-        let (output, merged, tail, rm_saved) = self.record.edit_and_push(target, edit.into());
-
-        // Check if the limit has been reached.
-        if !merged && head.index == self.record.index {
-            let root = self.root;
-            self.rm_child_of(At::no_index(root));
-            self.branches
-                .values_mut()
-                .filter(|branch| branch.parent.root == root)
-                .for_each(|branch| branch.parent.index -= 1);
-        }
-
-        // Handle new branch.
-        if !tail.is_empty() {
-            let new = self.next;
-            self.next += 1;
-            let parent = At::new(new, head.index);
-            self.branches.insert(head.root, Branch::new(parent, tail));
-            self.set_root(parent, rm_saved);
-        }
-        output
-    }
-
-    /// Calls the [`Edit::undo`] method for the active edit
-    /// and sets the previous one as the new active one.
-    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
-        self.record.undo(target)
-    }
-
-    /// Calls the [`Edit::redo`] method for the active edit
-    /// and sets the next one as the new active one.
-    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
-        self.record.redo(target)
-    }
-
+impl<E, S: Slot> History<E, S> {
     /// Marks the target as currently being in a saved or unsaved state.
     pub fn set_saved(&mut self, saved: bool) {
         self.saved = None;
@@ -219,17 +188,6 @@ impl<E: Edit, S: Slot> History<E, S> {
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-    }
-
-    pub(crate) fn jump_to(&mut self, root: usize) {
-        let mut branch = self.branches.remove(&root).unwrap();
-        debug_assert_eq!(branch.parent, self.head());
-
-        let parent = At::new(root, self.record.index);
-        let (tail, rm_saved) = self.record.rm_tail();
-        self.record.entries.append(&mut branch.entries);
-        self.branches.insert(self.root, Branch::new(parent, tail));
-        self.set_root(parent, rm_saved);
     }
 
     fn set_root(&mut self, at: At, rm_saved: Option<usize>) {
@@ -309,6 +267,58 @@ impl<E: Edit, S: Slot> History<E, S> {
         Some(path.into_iter().rev())
     }
 
+    pub(crate) fn jump_to(&mut self, root: usize) {
+        let mut branch = self.branches.remove(&root).unwrap();
+        debug_assert_eq!(branch.parent, self.head());
+
+        let parent = At::new(root, self.record.index);
+        let (tail, rm_saved) = self.record.rm_tail();
+        self.record.entries.append(&mut branch.entries);
+        self.branches.insert(self.root, Branch::new(parent, tail));
+        self.set_root(parent, rm_saved);
+    }
+}
+
+impl<E: Edit, S: Slot> History<E, S> {
+    /// Pushes the [`Edit`] to the top of the history and executes its [`Edit::edit`] method.
+    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
+        let head = self.head();
+        let (output, merged, tail, rm_saved) = self.record.edit_and_push(target, edit.into());
+
+        // Check if the limit has been reached.
+        if !merged && head.index == self.record.index {
+            let root = self.root;
+            self.rm_child_of(At::no_index(root));
+            self.branches
+                .values_mut()
+                .filter(|branch| branch.parent.root == root)
+                .for_each(|branch| branch.parent.index -= 1);
+        }
+
+        // Handle new branch.
+        if !tail.is_empty() {
+            let new = self.next;
+            self.next += 1;
+            let parent = At::new(new, head.index);
+            self.branches.insert(head.root, Branch::new(parent, tail));
+            self.set_root(parent, rm_saved);
+        }
+
+        output
+    }
+
+    /// Calls the [`Edit::undo`] method for the active edit
+    /// and sets the previous one as the new active one.
+    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
+        self.record.undo(target)
+    }
+
+    /// Calls the [`Edit::redo`] method for the active edit
+    /// and sets the next one as the new active one.
+    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
+        self.record.redo(target)
+    }
+
     /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit in `branch` at `index` is reached.
     pub fn go_to(&mut self, target: &mut E::Target, at: At) -> Vec<E::Output> {
         let root = self.root;
@@ -337,6 +347,7 @@ impl<E: Edit, S: Slot> History<E, S> {
                 }
             }
         }
+
         let mut outs = self.record.go_to(target, at.index);
         outputs.append(&mut outs);
         outputs
