@@ -141,9 +141,7 @@ impl<E, S> Record<E, S> {
         self.saved
     }
 
-    /// Returns the current position in the record.
-    ///
-    /// This is the index of the next edit command that will be executed on [Record::redo].
+    /// Returns the current index in the record.
     pub fn head(&self) -> usize {
         self.index
     }

@@ -143,8 +143,4 @@ impl At {
     const fn no_root(index: usize) -> At {
         At::new(0, index)
     }
-
-    const fn no_index(root: usize) -> At {
-        At::new(root, 0)
-    }
 }

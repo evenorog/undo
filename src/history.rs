@@ -298,7 +298,7 @@ impl<E: Edit, S: Slot> History<E, S> {
         // Check if the limit has been reached.
         if !merged && head.index == self.record.index {
             let root = self.root;
-            self.rm_child_of(At::no_index(root));
+            self.rm_child_of(At::new(root, 0));
             self.branches
                 .values_mut()
                 .filter(|child| child.parent.root == root)
