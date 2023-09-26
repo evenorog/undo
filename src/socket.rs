@@ -58,6 +58,8 @@ pub enum Event {
     Redo(bool),
     /// Emitted when the saved state has changed.
     Saved(bool),
+    /// Emitted when the root has changed.
+    Root(usize),
     /// Emitted when the index has changed.
     Index(usize),
 }
