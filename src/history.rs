@@ -411,13 +411,20 @@ pub struct Branch<E> {
 }
 
 impl<E> Branch<E> {
-    const fn new(parent: At, entries: VecDeque<Entry<E>>) -> Branch<E> {
+    fn new(parent: At, entries: VecDeque<Entry<E>>) -> Branch<E> {
+        debug_assert!(!entries.is_empty());
         Branch { parent, entries }
     }
 
     /// Returns the parent edit of the branch.
     pub fn parent(&self) -> At {
         self.parent
+    }
+
+    /// Returns the number of edits in the branch.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.entries.len()
     }
 
     /// Returns the edit at the index.

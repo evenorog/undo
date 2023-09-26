@@ -326,11 +326,10 @@ impl<E: Edit, S: Slot> Record<E, S> {
 
     /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `index` is reached.
     pub fn go_to(&mut self, target: &mut E::Target, index: usize) -> Vec<E::Output> {
-        if index > self.len() {
+        if self.index == index || index > self.len() {
             return Vec::new();
         }
 
-        let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
@@ -360,8 +359,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
             .emit_if(could_redo != can_redo, || Event::Redo(can_redo));
         self.socket
             .emit_if(was_saved != is_saved, || Event::Saved(is_saved));
-        self.socket
-            .emit_if(old_index != self.index, || Event::Index(self.index));
+        self.socket.emit(|| Event::Index(self.index));
 
         outputs
     }
