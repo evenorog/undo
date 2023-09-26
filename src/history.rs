@@ -149,9 +149,21 @@ impl<E, S> History<E, S> {
         Display::from(self)
     }
 
+    /// Returns the edit at the index in the current root branch.
+    ///
+    /// Use [History::get_branch] if you want to get edits from other branches.
+    pub fn get_edit(&self, index: usize) -> Option<&E> {
+        self.record.get_edit(index)
+    }
+
     /// Returns an iterator over the edits in the current root branch.
     pub fn edits(&self) -> impl Iterator<Item = &E> {
         self.record.edits()
+    }
+
+    /// Returns the branch with the given id.
+    pub fn get_branch(&self, id: usize) -> Option<&Branch<E>> {
+        self.branches.get(&id)
     }
 
     /// Returns an iterator over the branches in the history.
@@ -169,23 +181,6 @@ impl<E, S> History<E, S> {
     /// Returns a checkpoint.
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         Checkpoint::from(self)
-    }
-}
-
-impl<E, S: Slot> History<E, S> {
-    /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
-        self.saved = None;
-        self.record.set_saved(saved);
-    }
-
-    /// Removes all edits from the history without undoing them.
-    pub fn clear(&mut self) {
-        self.root = 0;
-        self.next = 1;
-        self.saved = None;
-        self.record.clear();
-        self.branches.clear();
     }
 
     fn set_root(&mut self, new: At, rm_saved: Option<usize>) {
@@ -260,7 +255,7 @@ impl<E, S: Slot> History<E, S> {
         Some(path.into_iter().rev())
     }
 
-    pub(crate) fn jump_to(&mut self, root: usize) {
+    fn jump_to(&mut self, root: usize) {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.head());
 
@@ -269,6 +264,23 @@ impl<E, S: Slot> History<E, S> {
         self.record.entries.append(&mut branch.entries);
         self.branches.insert(self.root, Branch::new(parent, tail));
         self.set_root(parent, rm_saved);
+    }
+}
+
+impl<E, S: Slot> History<E, S> {
+    /// Marks the target as currently being in a saved or unsaved state.
+    pub fn set_saved(&mut self, saved: bool) {
+        self.saved = None;
+        self.record.set_saved(saved);
+    }
+
+    /// Removes all edits from the history without undoing them.
+    pub fn clear(&mut self) {
+        self.root = 0;
+        self.next = 1;
+        self.saved = None;
+        self.record.clear();
+        self.branches.clear();
     }
 }
 
@@ -401,6 +413,11 @@ impl<E> Branch<E> {
     /// Returns the parent edit of the branch.
     pub fn parent(&self) -> At {
         self.parent
+    }
+
+    /// Returns the edit at the index.
+    pub fn get_edit(&self, index: usize) -> Option<&E> {
+        self.entries.get(index).map(|e| &e.edit)
     }
 
     /// Returns an iterator over the edits in the branch.

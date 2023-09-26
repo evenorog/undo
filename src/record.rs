@@ -141,7 +141,9 @@ impl<E, S> Record<E, S> {
         self.saved
     }
 
-    /// Returns the index of the current edit in the record.
+    /// Returns the current position in the record.
+    ///
+    /// This is the index of the next edit command that will be executed on [Record::redo].
     pub fn head(&self) -> usize {
         self.index
     }
@@ -149,6 +151,11 @@ impl<E, S> Record<E, S> {
     /// Returns a structure for configurable formatting of the record.
     pub fn display(&self) -> Display<E, S> {
         Display::from(self)
+    }
+
+    /// Returns the edit at the index.
+    pub fn get_edit(&self, index: usize) -> Option<&E> {
+        self.entries.get(index).map(|e| &e.edit)
     }
 
     /// Returns an iterator over the edits.
