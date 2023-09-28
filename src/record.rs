@@ -15,6 +15,7 @@ use crate::{Edit, Entry, Event, Merged};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::fmt;
 use core::num::NonZeroUsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -152,13 +153,13 @@ impl<E, S> Record<E, S> {
     }
 
     /// Returns the edit at the index.
-    pub fn get_edit(&self, index: usize) -> Option<&E> {
-        self.entries.get(index).map(|e| &e.edit)
+    pub fn entry(&self, index: usize) -> Option<&Entry<E>> {
+        self.entries.get(index)
     }
 
     /// Returns an iterator over the edits.
-    pub fn edits(&self) -> impl Iterator<Item = &E> {
-        self.entries.iter().map(|e| &e.edit)
+    pub fn entries(&self) -> impl Iterator<Item = &Entry<E>> {
+        self.entries.iter()
     }
 
     /// Returns a queue.
@@ -365,7 +366,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
     }
 }
 
-impl<E: ToString, S> Record<E, S> {
+impl<E: fmt::Display, S> Record<E, S> {
     /// Returns the string of the edit which will be undone
     /// in the next call to [`Record::undo`].
     pub fn undo_string(&self) -> Option<String> {
@@ -379,7 +380,7 @@ impl<E: ToString, S> Record<E, S> {
     }
 
     fn string_at(&self, i: usize) -> Option<String> {
-        self.entries.get(i).map(|e| e.edit.to_string())
+        self.entries.get(i).map(|e| e.to_string())
     }
 }
 

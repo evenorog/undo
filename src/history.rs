@@ -13,8 +13,9 @@ pub use queue::Queue;
 use crate::socket::Slot;
 use crate::{At, Edit, Entry, Event, Record};
 use alloc::collections::{BTreeMap, VecDeque};
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
+use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -152,13 +153,13 @@ impl<E, S> History<E, S> {
     /// Returns the edit at the index in the current root branch.
     ///
     /// Use [History::get_branch] if you want to get edits from other branches.
-    pub fn get_edit(&self, index: usize) -> Option<&E> {
-        self.record.get_edit(index)
+    pub fn entry(&self, index: usize) -> Option<&Entry<E>> {
+        self.record.entry(index)
     }
 
     /// Returns an iterator over the edits in the current root branch.
-    pub fn edits(&self) -> impl Iterator<Item = &E> {
-        self.record.edits()
+    pub fn entries(&self) -> impl Iterator<Item = &Entry<E>> {
+        self.record.entries()
     }
 
     /// Returns the branch with the given id.
@@ -364,7 +365,7 @@ impl<E: Edit, S: Slot> History<E, S> {
     }
 }
 
-impl<E: ToString, S> History<E, S> {
+impl<E: fmt::Display, S> History<E, S> {
     /// Returns the string of the edit which will be undone
     /// in the next call to [`History::undo`].
     pub fn undo_string(&self) -> Option<String> {
@@ -428,12 +429,12 @@ impl<E> Branch<E> {
     }
 
     /// Returns the edit at the index.
-    pub fn get_edit(&self, index: usize) -> Option<&E> {
-        self.entries.get(index).map(|e| &e.edit)
+    pub fn get_entry(&self, index: usize) -> Option<&Entry<E>> {
+        self.entries.get(index)
     }
 
     /// Returns an iterator over the edits in the branch.
-    pub fn edits(&self) -> impl Iterator<Item = &E> {
-        self.entries.iter().map(|e| &e.edit)
+    pub fn entries(&self) -> impl Iterator<Item = &Entry<E>> {
+        self.entries.iter()
     }
 }

@@ -59,22 +59,22 @@ pub mod record;
 #[cfg(feature = "alloc")]
 mod socket;
 
-#[cfg(feature = "alloc")]
-use entry::Entry;
-#[cfg(feature = "alloc")]
-use format::Format;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 #[doc(hidden)]
 #[cfg(feature = "alloc")]
 pub use add::Add;
+#[cfg(feature = "alloc")]
+pub use entry::Entry;
 #[cfg(feature = "alloc")]
 pub use history::History;
 #[cfg(feature = "alloc")]
 pub use record::Record;
 #[cfg(feature = "alloc")]
 pub use socket::{Event, Slot};
+
+#[cfg(feature = "alloc")]
+use format::Format;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// Base functionality for all edit commands.
 pub trait Edit {
