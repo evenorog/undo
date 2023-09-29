@@ -145,6 +145,28 @@ impl<E, S> History<E, S> {
         At::new(self.root, self.record.index)
     }
 
+    /// Returns the head of the next branch in the history.
+    ///
+    /// This will be the first edit that was stored in the branch.
+    /// This can be used in combination with [`History::go_to`] to go to the next branch.
+    pub fn next_branch_head(&self) -> Option<At> {
+        self.branches
+            .range(self.root + 1..)
+            .next()
+            .map(|(&id, branch)| At::new(id, branch.parent.index + 1))
+    }
+
+    /// Returns the head of the previous branch in the history.
+    ///
+    /// This will be the first edit that was stored in the branch.
+    /// This can be used in combination with [`History::go_to`] to go to the previous branch.
+    pub fn prev_branch_head(&self) -> Option<At> {
+        self.branches
+            .range(..self.root)
+            .next_back()
+            .map(|(&id, branch)| At::new(id, branch.parent.index + 1))
+    }
+
     /// Returns the entry at the index in the current root branch.
     ///
     /// Use [History::get_branch] if you want to get entry from other branches.

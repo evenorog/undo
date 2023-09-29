@@ -121,3 +121,26 @@ fn checkpoint() {
     checkpoint.cancel(&mut target);
     assert_eq!(target, "");
 }
+
+#[test]
+fn next_and_prev() {
+    let mut target = String::new();
+    let mut history = History::new();
+    history.edit(&mut target, A);
+    history.edit(&mut target, B);
+    history.edit(&mut target, C);
+    assert_eq!(history.next_branch_head(), None);
+    assert_eq!(history.prev_branch_head(), None);
+
+    history.undo(&mut target).unwrap();
+    history.undo(&mut target).unwrap();
+    history.edit(&mut target, D);
+    history.edit(&mut target, E);
+    assert_eq!(history.next_branch_head(), None);
+    let prev_head = history.prev_branch_head().unwrap();
+    assert_eq!(prev_head, At::new(0, 2));
+
+    history.go_to(&mut target, prev_head);
+    assert_eq!(history.next_branch_head(), Some(At::new(1, 2)));
+    assert_eq!(history.prev_branch_head(), None);
+}
