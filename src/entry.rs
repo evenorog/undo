@@ -11,7 +11,7 @@ use std::time::SystemTime;
 pub struct Entry<E> {
     edit: E,
     #[cfg(feature = "std")]
-    edit_at: SystemTime,
+    st_edit: SystemTime,
 }
 
 impl<E> Entry<E> {
@@ -22,8 +22,8 @@ impl<E> Entry<E> {
 
     /// Returns the last time the edit was applied.
     #[cfg(feature = "std")]
-    pub(crate) fn edit_at(&self) -> SystemTime {
-        self.edit_at
+    pub(crate) fn st_edit(&self) -> SystemTime {
+        self.st_edit
     }
 }
 
@@ -31,7 +31,7 @@ impl<E: Edit> Entry<E> {
     pub(crate) fn edit(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
-            self.edit_at = SystemTime::now();
+            self.st_edit = SystemTime::now();
         }
         self.edit.edit(target)
     }
@@ -39,7 +39,7 @@ impl<E: Edit> Entry<E> {
     pub(crate) fn undo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
-            self.edit_at = SystemTime::now();
+            self.st_edit = SystemTime::now();
         }
         self.edit.undo(target)
     }
@@ -47,7 +47,7 @@ impl<E: Edit> Entry<E> {
     pub(crate) fn redo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
-            self.edit_at = SystemTime::now();
+            self.st_edit = SystemTime::now();
         }
         self.edit.redo(target)
     }
@@ -60,7 +60,7 @@ impl<E: Edit> Entry<E> {
             Merged::Yes => {
                 #[cfg(feature = "std")]
                 {
-                    self.edit_at = other.edit_at;
+                    self.st_edit = other.st_edit;
                 }
                 Merged::Yes
             }
@@ -75,7 +75,7 @@ impl<E> From<E> for Entry<E> {
         Entry {
             edit,
             #[cfg(feature = "std")]
-            edit_at: SystemTime::UNIX_EPOCH,
+            st_edit: SystemTime::UNIX_EPOCH,
         }
     }
 }

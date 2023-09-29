@@ -145,19 +145,14 @@ impl<E, S> History<E, S> {
         At::new(self.root, self.record.index)
     }
 
-    /// Returns a structure for configurable formatting of the history.
-    pub fn display(&self) -> Display<E, S> {
-        Display::from(self)
-    }
-
-    /// Returns the edit at the index in the current root branch.
+    /// Returns the entry at the index in the current root branch.
     ///
-    /// Use [History::get_branch] if you want to get edits from other branches.
-    pub fn entry(&self, index: usize) -> Option<&Entry<E>> {
-        self.record.entry(index)
+    /// Use [History::get_branch] if you want to get entry from other branches.
+    pub fn get_entry(&self, index: usize) -> Option<&Entry<E>> {
+        self.record.get_entry(index)
     }
 
-    /// Returns an iterator over the edits in the current root branch.
+    /// Returns an iterator over the entries in the current root branch.
     pub fn entries(&self) -> impl Iterator<Item = &Entry<E>> {
         self.record.entries()
     }
@@ -182,6 +177,11 @@ impl<E, S> History<E, S> {
     /// Returns a checkpoint.
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         Checkpoint::from(self)
+    }
+
+    /// Returns a structure for configurable formatting of the history.
+    pub fn display(&self) -> Display<E, S> {
+        Display::from(self)
     }
 
     fn rm_child_of(&mut self, at: At) {

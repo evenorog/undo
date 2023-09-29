@@ -147,17 +147,12 @@ impl<E, S> Record<E, S> {
         self.index
     }
 
-    /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<E, S> {
-        Display::from(self)
-    }
-
-    /// Returns the edit at the index.
-    pub fn entry(&self, index: usize) -> Option<&Entry<E>> {
+    /// Returns the entry at the index.
+    pub fn get_entry(&self, index: usize) -> Option<&Entry<E>> {
         self.entries.get(index)
     }
 
-    /// Returns an iterator over the edits.
+    /// Returns an iterator over the entries.
     pub fn entries(&self) -> impl Iterator<Item = &Entry<E>> {
         self.entries.iter()
     }
@@ -170,6 +165,11 @@ impl<E, S> Record<E, S> {
     /// Returns a checkpoint.
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         Checkpoint::from(self)
+    }
+
+    /// Returns a structure for configurable formatting of the record.
+    pub fn display(&self) -> Display<E, S> {
+        Display::from(self)
     }
 
     /// Remove all elements after the index.
