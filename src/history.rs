@@ -322,7 +322,7 @@ impl<E: Edit, S: Slot> History<E, S> {
     /// Pushes the [`Edit`] to the top of the history and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let head = self.head();
-        let (output, merged, tail, rm_saved) = self.record.edit_and_push(target, edit.into());
+        let (output, merged, tail, rm_saved) = self.record.edit_and_push(target, Entry::new(edit));
 
         // Check if the limit has been reached.
         if !merged && head.index == self.record.index {

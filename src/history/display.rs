@@ -69,7 +69,7 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         if let Some(entry) = entry {
             if self.format.detailed {
                 let st_fmt = self.st_fmt;
-                let string = st_fmt(now, entry.st_edit());
+                let string = st_fmt(now, entry.st_of_latest());
                 self.format.elapsed(f, string)?;
             }
         }

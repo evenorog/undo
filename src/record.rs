@@ -218,7 +218,7 @@ impl<E, S: Slot> Record<E, S> {
 impl<E: Edit, S: Slot> Record<E, S> {
     /// Pushes the edit on top of the record and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let (output, _, _, _) = self.edit_and_push(target, edit.into());
+        let (output, _, _, _) = self.edit_and_push(target, Entry::new(edit));
         output
     }
 

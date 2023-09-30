@@ -12,18 +12,56 @@ pub struct Entry<E> {
     edit: E,
     #[cfg(feature = "std")]
     st_edit: SystemTime,
+    #[cfg(feature = "std")]
+    st_undo: SystemTime,
+    #[cfg(feature = "std")]
+    st_redo: SystemTime,
 }
 
 impl<E> Entry<E> {
+    pub(crate) const fn new(edit: E) -> Self {
+        Entry {
+            edit,
+            #[cfg(feature = "std")]
+            st_edit: SystemTime::UNIX_EPOCH,
+            #[cfg(feature = "std")]
+            st_undo: SystemTime::UNIX_EPOCH,
+            #[cfg(feature = "std")]
+            st_redo: SystemTime::UNIX_EPOCH,
+        }
+    }
+
     /// Returns the edit command.
     pub fn get(&self) -> &E {
         &self.edit
     }
 
-    /// Returns the last time the edit was applied.
+    /// Returns the time the edit method was called.
     #[cfg(feature = "std")]
-    pub(crate) fn st_edit(&self) -> SystemTime {
+    pub fn st_of_edit(&self) -> SystemTime {
         self.st_edit
+    }
+
+    /// Returns the last time the undo method was called.
+    ///
+    /// Returns [`UNIX_EPOCH`](SystemTime::UNIX_EPOCH) if it has never been called.
+    #[cfg(feature = "std")]
+    pub fn st_of_undo(&self) -> SystemTime {
+        self.st_undo
+    }
+
+    /// Returns the last time the redo method was called.
+    ///
+    /// Returns [`UNIX_EPOCH`](SystemTime::UNIX_EPOCH) if it has never been called.
+    #[cfg(feature = "std")]
+    pub fn st_of_redo(&self) -> SystemTime {
+        self.st_redo
+    }
+
+    /// Returns the largest of the edit, undo, and redo times.
+    #[cfg(feature = "std")]
+    pub fn st_of_latest(&self) -> SystemTime {
+        self.st_edit.max(self.st_undo).max(self.st_redo)
     }
 }
 
@@ -39,7 +77,7 @@ impl<E: Edit> Entry<E> {
     pub(crate) fn undo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
-            self.st_edit = SystemTime::now();
+            self.st_undo = SystemTime::now();
         }
         self.edit.undo(target)
     }
@@ -47,7 +85,7 @@ impl<E: Edit> Entry<E> {
     pub(crate) fn redo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
-            self.st_edit = SystemTime::now();
+            self.st_redo = SystemTime::now();
         }
         self.edit.redo(target)
     }
@@ -61,21 +99,13 @@ impl<E: Edit> Entry<E> {
                 #[cfg(feature = "std")]
                 {
                     self.st_edit = other.st_edit;
+                    self.st_undo = other.st_undo;
+                    self.st_redo = other.st_redo;
                 }
                 Merged::Yes
             }
             Merged::No(edit) => Merged::No(Self { edit, ..other }),
             Merged::Annul => Merged::Annul,
-        }
-    }
-}
-
-impl<E> From<E> for Entry<E> {
-    fn from(edit: E) -> Self {
-        Entry {
-            edit,
-            #[cfg(feature = "std")]
-            st_edit: SystemTime::UNIX_EPOCH,
         }
     }
 }
