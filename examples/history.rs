@@ -15,7 +15,7 @@ fn main() -> io::Result<()> {
 
     loop {
         println!(
-            "Enter a string. Use '<' to undo, '>' to redo, '*' to save, and '! i-j' for goto: "
+            "Enter a string. Use '<' to undo, '>' to redo, '*' to save, '+' to switch to next branch, '-' to switch to previous branch, and '! i-j' for goto: "
         );
         let mut buf = String::new();
         let n = stdin.read_line(&mut buf)?;
@@ -28,25 +28,41 @@ fn main() -> io::Result<()> {
 
         let mut chars = buf.trim().chars();
         while let Some(c) = chars.next() {
-            if c == '!' {
-                let tail = chars.collect::<String>();
-                let mut at = tail
-                    .trim()
-                    .split('-')
-                    .filter_map(|n| n.parse::<usize>().ok());
+            match c {
+                '!' => {
+                    let tail = chars.collect::<String>();
+                    let mut at = tail
+                        .trim()
+                        .split('-')
+                        .filter_map(|n| n.parse::<usize>().ok());
 
-                let root = at.next().unwrap_or_default();
-                let index = at.next().unwrap_or_default();
-                history.go_to(&mut target, At::new(root, index));
-                break;
-            } else if c == '<' {
-                history.undo(&mut target);
-            } else if c == '>' {
-                history.redo(&mut target);
-            } else if c == '*' {
-                history.set_saved(true);
-            } else {
-                history.edit(&mut target, Add(c));
+                    let root = at.next().unwrap_or_default();
+                    let index = at.next().unwrap_or_default();
+                    history.go_to(&mut target, At::new(root, index));
+                    break;
+                }
+                '<' => {
+                    history.undo(&mut target);
+                }
+                '>' => {
+                    history.redo(&mut target);
+                }
+                '*' => {
+                    history.set_saved(true);
+                }
+                '+' => {
+                    if let Some(at) = history.next_branch_head() {
+                        history.go_to(&mut target, at);
+                    }
+                }
+                '-' => {
+                    if let Some(at) = history.prev_branch_head() {
+                        history.go_to(&mut target, at);
+                    }
+                }
+                _ => {
+                    history.edit(&mut target, Add(c));
+                }
             }
         }
 
