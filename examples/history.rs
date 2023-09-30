@@ -15,7 +15,7 @@ fn main() -> io::Result<()> {
 
     loop {
         println!(
-            "Enter a string. Use '<' to undo, '>' to redo, '*' to save, '+' to switch to next branch, '-' to switch to previous branch, and '! i-j' for goto: "
+            "Enter a string. Use '<' to undo, '>' to redo, '*' to save, '?' to revert to save, '+' to switch to next branch, '-' to switch to previous branch, and '! i-j' for goto: "
         );
         let mut buf = String::new();
         let n = stdin.read_line(&mut buf)?;
@@ -49,6 +49,9 @@ fn main() -> io::Result<()> {
                 }
                 '*' => {
                     history.set_saved(true);
+                }
+                '?' => {
+                    history.revert(&mut target);
                 }
                 '+' => {
                     if let Some(at) = history.next_branch_head() {

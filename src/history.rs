@@ -352,6 +352,14 @@ impl<E: Edit, S: Slot> History<E, S> {
         self.record.redo(target)
     }
 
+    /// Revert the changes done to the target since the saved state.
+    pub fn revert(&mut self, target: &mut E::Target) -> Vec<E::Output> {
+        let Some(saved) = self.saved() else {
+            return Vec::new();
+        };
+        self.go_to(target, saved)
+    }
+
     /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `at` is reached.
     pub fn go_to(&mut self, target: &mut E::Target, at: At) -> Vec<E::Output> {
         let root = self.root;
