@@ -99,8 +99,6 @@ impl<E: Edit> Entry<E> {
                 #[cfg(feature = "std")]
                 {
                     self.st_edit = other.st_edit;
-                    self.st_undo = other.st_undo;
-                    self.st_redo = other.st_redo;
                 }
                 Merged::Yes
             }
