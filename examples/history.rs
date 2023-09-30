@@ -48,7 +48,7 @@ fn main() -> io::Result<()> {
                     history.redo(&mut target);
                 }
                 '*' => {
-                    history.set_saved(true);
+                    history.set_saved();
                 }
                 '?' => {
                     history.revert(&mut target);

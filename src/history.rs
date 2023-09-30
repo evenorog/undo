@@ -246,9 +246,15 @@ impl<E, S> History<E, S> {
 
 impl<E, S: Slot> History<E, S> {
     /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
+    pub fn set_saved(&mut self) {
         self.saved = None;
-        self.record.set_saved(saved);
+        self.record.set_saved();
+    }
+
+    /// Clears the saved state of the target.
+    pub fn clear_saved(&mut self) {
+        self.saved = None;
+        self.record.clear_saved();
     }
 
     /// Removes all edits from the history without undoing them.

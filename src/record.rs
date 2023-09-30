@@ -187,16 +187,18 @@ impl<E, S> Record<E, S> {
 }
 
 impl<E, S: Slot> Record<E, S> {
-    /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
+    /// Marks the target as currently being in a saved.
+    pub fn set_saved(&mut self) {
         let was_saved = self.is_saved();
-        if saved {
-            self.saved = Some(self.index);
-            self.socket.emit_if(!was_saved, || Event::Saved(true));
-        } else {
-            self.saved = None;
-            self.socket.emit_if(was_saved, || Event::Saved(false));
-        }
+        self.saved = Some(self.index);
+        self.socket.emit_if(!was_saved, || Event::Saved(true));
+    }
+
+    /// Clears the saved state of the target.
+    pub fn clear_saved(&mut self) {
+        let was_saved = self.is_saved();
+        self.saved = None;
+        self.socket.emit_if(was_saved, || Event::Saved(false));
     }
 
     /// Removes all edits from the record without undoing them.

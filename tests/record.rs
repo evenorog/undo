@@ -109,7 +109,7 @@ fn checkpoint_saved() {
     record.edit(&mut target, A);
     record.edit(&mut target, B);
     record.edit(&mut target, C);
-    record.set_saved(true);
+    record.set_saved();
     record.undo(&mut target).unwrap();
     record.undo(&mut target).unwrap();
     record.undo(&mut target).unwrap();

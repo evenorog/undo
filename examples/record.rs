@@ -12,7 +12,7 @@ fn main() {
     record.edit(&mut target, Add('f'));
     assert_eq!(target, "abcdef");
 
-    record.set_saved(true);
+    record.set_saved();
 
     record.undo(&mut target);
     record.undo(&mut target);
