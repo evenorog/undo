@@ -10,11 +10,12 @@ pub use checkpoint::Checkpoint;
 pub use display::Display;
 pub use queue::Queue;
 
-use crate::socket::{Event, Slot};
-use crate::{At, Edit, Entry, Record};
+use crate::socket::Slot;
+use crate::{At, Edit, Entry, Event, Record};
 use alloc::collections::{BTreeMap, VecDeque};
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
+use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +29,6 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples
 /// ```
-/// # fn main() {
 /// # use undo::{Add, History};
 /// let mut target = String::new();
 /// let mut history = History::new();
@@ -50,7 +50,6 @@ use serde::{Deserialize, Serialize};
 /// // We can now switch back to the original branch.
 /// history.go_to(&mut target, abc);
 /// assert_eq!(target, "abc");
-/// # }
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
@@ -58,7 +57,7 @@ pub struct History<E, S = ()> {
     root: usize,
     next: usize,
     saved: Option<At>,
-    pub(crate) record: Record<E, S>,
+    record: Record<E, S>,
     branches: BTreeMap<usize, Branch<E>>,
 }
 
@@ -123,6 +122,14 @@ impl<E, S> History<E, S> {
         self.record.is_saved()
     }
 
+    /// Return the position of the saved state.
+    pub fn saved(&self) -> Option<At> {
+        self.record
+            .saved
+            .map(|index| At::new(self.root, index))
+            .or(self.saved)
+    }
+
     /// Returns `true` if the history can undo.
     pub fn can_undo(&self) -> bool {
         self.record.can_undo()
@@ -138,14 +145,50 @@ impl<E, S> History<E, S> {
         At::new(self.root, self.record.index)
     }
 
-    /// Returns a structure for configurable formatting of the history.
-    pub fn display(&self) -> Display<E, S> {
-        Display::from(self)
+    /// Returns the head of the next branch in the history.
+    ///
+    /// This will be the first edit that was stored in the branch.
+    /// This can be used in combination with [`History::go_to`] to go to the next branch.
+    pub fn next_branch_head(&self) -> Option<At> {
+        self.branches
+            .range(self.root + 1..)
+            .next()
+            .map(|(&id, branch)| At::new(id, branch.parent.index + 1))
     }
 
-    /// Returns an iterator over the edits in the current branch.
-    pub fn edits(&self) -> impl Iterator<Item = &E> {
-        self.record.edits()
+    /// Returns the head of the previous branch in the history.
+    ///
+    /// This will be the first edit that was stored in the branch.
+    /// This can be used in combination with [`History::go_to`] to go to the previous branch.
+    pub fn prev_branch_head(&self) -> Option<At> {
+        self.branches
+            .range(..self.root)
+            .next_back()
+            .map(|(&id, branch)| At::new(id, branch.parent.index + 1))
+    }
+
+    /// Returns the entry at the index in the current root branch.
+    ///
+    /// Use [History::get_branch] if you want to get entry from other branches.
+    pub fn get_entry(&self, index: usize) -> Option<&Entry<E>> {
+        self.record.get_entry(index)
+    }
+
+    /// Returns an iterator over the entries in the current root branch.
+    pub fn entries(&self) -> impl Iterator<Item = &Entry<E>> {
+        self.record.entries()
+    }
+
+    /// Returns the branch with the given id.
+    pub fn get_branch(&self, id: usize) -> Option<&Branch<E>> {
+        self.branches.get(&id)
+    }
+
+    /// Returns an iterator over the branches in the history.
+    ///
+    /// This does not include the current root branch.
+    pub fn branches(&self) -> impl Iterator<Item = (&usize, &Branch<E>)> {
+        self.branches.iter()
     }
 
     /// Returns a queue.
@@ -157,116 +200,18 @@ impl<E, S> History<E, S> {
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         Checkpoint::from(self)
     }
-}
 
-impl<E: Edit, S: Slot> History<E, S> {
-    /// Pushes the [`Edit`] to the top of the history and executes its [`Edit::edit`] method.
-    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let head = self.head();
-        let saved = self.record.saved.filter(|&saved| saved > head.index);
-        let (output, merged, tail) = self.record.edit_and_push(target, edit.into());
-
-        // Check if the limit has been reached.
-        if !merged && head.index == self.record.index {
-            let root = self.root;
-            self.rm_child(root, 0);
-            self.branches
-                .values_mut()
-                .filter(|branch| branch.parent.root == root)
-                .for_each(|branch| branch.parent.index -= 1);
-        }
-
-        // Handle new branch.
-        if !tail.is_empty() {
-            let new = self.next;
-            self.next += 1;
-            self.branches
-                .insert(head.root, Branch::new(new, head.index, tail));
-            self.set_root(new, head.index, saved);
-        }
-        output
+    /// Returns a structure for configurable formatting of the history.
+    pub fn display(&self) -> Display<E, S> {
+        Display::from(self)
     }
 
-    /// Calls the [`Edit::undo`] method for the active edit
-    /// and sets the previous one as the new active one.
-    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
-        self.record.undo(target)
-    }
-
-    /// Calls the [`Edit::redo`] method for the active edit
-    /// and sets the next one as the new active one.
-    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
-        self.record.redo(target)
-    }
-
-    /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
-        self.saved = None;
-        self.record.set_saved(saved);
-    }
-
-    /// Removes all edits from the history without undoing them.
-    pub fn clear(&mut self) {
-        self.root = 0;
-        self.next = 1;
-        self.saved = None;
-        self.record.clear();
-        self.branches.clear();
-    }
-
-    pub(crate) fn jump_to(&mut self, root: usize) {
-        let mut branch = self.branches.remove(&root).unwrap();
-        debug_assert_eq!(branch.parent, self.head());
-        let index = self.record.index;
-        let saved = self.record.saved.filter(|&saved| saved > index);
-        let tail = self.record.entries.split_off(index);
-        self.record.entries.append(&mut branch.entries);
-        self.branches
-            .insert(self.root, Branch::new(root, index, tail));
-        self.set_root(root, index, saved);
-    }
-
-    fn set_root(&mut self, root: usize, index: usize, saved: Option<usize>) {
-        let old = self.root;
-        self.root = root;
-        debug_assert_ne!(old, root);
-        // Handle the child branches.
-        self.branches
-            .values_mut()
-            .filter(|branch| branch.parent.root == old && branch.parent.index <= index)
-            .for_each(|branch| branch.parent.root = root);
-        match (self.record.saved, saved, self.saved) {
-            (Some(_), None, None) | (None, None, Some(_)) => self.swap_saved(root, old, index),
-            (None, Some(_), None) => {
-                self.record.saved = saved;
-                self.swap_saved(old, root, index);
-            }
-            (None, None, None) => (),
-            _ => unreachable!(),
-        }
-    }
-
-    fn swap_saved(&mut self, old: usize, new: usize, index: usize) {
-        debug_assert_ne!(old, new);
-        if let Some(At { index: saved, .. }) =
-            self.saved.filter(|at| at.root == new && at.index <= index)
-        {
-            self.saved = None;
-            self.record.saved = Some(saved);
-            self.record.socket.emit(|| Event::Saved(true));
-        } else if let Some(saved) = self.record.saved {
-            self.saved = Some(At::new(old, saved));
-            self.record.saved = None;
-            self.record.socket.emit(|| Event::Saved(false));
-        }
-    }
-
-    fn rm_child(&mut self, branch: usize, index: usize) {
+    fn rm_child_of(&mut self, at: At) {
         // We need to check if any of the branches had the removed node as root.
         let mut dead: Vec<_> = self
             .branches
             .iter()
-            .filter(|&(_, child)| child.parent == At::new(branch, index))
+            .filter(|&(_, child)| child.parent == at)
             .map(|(&id, _)| id)
             .collect();
         while let Some(parent) = dead.pop() {
@@ -297,8 +242,117 @@ impl<E: Edit, S: Slot> History<E, S> {
 
         Some(path.into_iter().rev())
     }
+}
 
-    /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit in `branch` at `index` is reached.
+impl<E, S: Slot> History<E, S> {
+    /// Marks the target as currently being in a saved or unsaved state.
+    pub fn set_saved(&mut self, saved: bool) {
+        self.saved = None;
+        self.record.set_saved(saved);
+    }
+
+    /// Removes all edits from the history without undoing them.
+    pub fn clear(&mut self) {
+        let old_root = self.root;
+        self.root = 0;
+        self.next = 1;
+        self.saved = None;
+        self.record.clear();
+        self.branches.clear();
+        self.record.socket.emit_if(old_root != 0, || Event::Root(0));
+    }
+
+    fn set_root(&mut self, new: At, rm_saved: Option<usize>) {
+        debug_assert_ne!(self.root, new.root);
+
+        // Update all branches that are now children of the new root.
+        //
+        // |           | <- The old root is now a child of the new root.
+        // | |         | | <- This branch is still a child of the old root.
+        // |/          |/
+        // |    ->    /
+        // o |       o | <- This branch is now a child of the new root.
+        // |/        |/
+        // |         |
+        //
+        // If we split at 'o' all branches that are children of 'o' or below should now
+        // be children of the new root. All branches that are above should still be
+        // children of the old root.
+        self.branches
+            .values_mut()
+            .filter(|child| child.parent.root == self.root && child.parent.index <= new.index)
+            .for_each(|child| child.parent.root = new.root);
+
+        match (self.saved, rm_saved) {
+            (Some(saved), None) if saved.root == new.root => {
+                self.saved = None;
+                self.record.saved = Some(saved.index);
+            }
+            (None, Some(saved)) => {
+                self.saved = Some(At::new(self.root, saved));
+            }
+            _ => (),
+        }
+
+        debug_assert_ne!(self.saved.map(|s| s.root), Some(new.root));
+
+        self.root = new.root;
+        self.record.socket.emit(|| Event::Root(new.root));
+    }
+
+    fn jump_to(&mut self, root: usize) {
+        let mut branch = self.branches.remove(&root).unwrap();
+        debug_assert_eq!(branch.parent, self.head());
+
+        let parent = At::new(root, self.record.index);
+        let (tail, rm_saved) = self.record.rm_tail();
+        self.record.entries.append(&mut branch.entries);
+        self.branches.insert(self.root, Branch::new(parent, tail));
+        self.set_root(parent, rm_saved);
+    }
+}
+
+impl<E: Edit, S: Slot> History<E, S> {
+    /// Pushes the [`Edit`] to the top of the history and executes its [`Edit::edit`] method.
+    pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
+        let head = self.head();
+        let (output, merged, tail, rm_saved) = self.record.edit_and_push(target, edit.into());
+
+        // Check if the limit has been reached.
+        if !merged && head.index == self.record.index {
+            let root = self.root;
+            self.rm_child_of(At::new(root, 0));
+            self.branches
+                .values_mut()
+                .filter(|child| child.parent.root == root)
+                .for_each(|child| child.parent.index -= 1);
+        }
+
+        // Handle new branch.
+        if !tail.is_empty() {
+            let new = self.next;
+            self.next += 1;
+            let parent = At::new(new, head.index);
+            self.branches.insert(head.root, Branch::new(parent, tail));
+            self.set_root(parent, rm_saved);
+        }
+
+        output
+    }
+
+    /// Calls the [`Edit::undo`] method for the active edit
+    /// and sets the previous one as the new active one.
+    pub fn undo(&mut self, target: &mut E::Target) -> Option<E::Output> {
+        self.record.undo(target)
+    }
+
+    /// Calls the [`Edit::redo`] method for the active edit
+    /// and sets the next one as the new active one.
+    pub fn redo(&mut self, target: &mut E::Target) -> Option<E::Output> {
+        self.record.redo(target)
+    }
+
+    /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `at` is reached.
     pub fn go_to(&mut self, target: &mut E::Target, at: At) -> Vec<E::Output> {
         let root = self.root;
         if root == at.root {
@@ -312,27 +366,28 @@ impl<E: Edit, S: Slot> History<E, S> {
         };
 
         for (new, branch) in path {
-            let o = self.record.go_to(target, branch.parent.index);
-            outputs.extend(o);
+            let mut outs = self.record.go_to(target, branch.parent.index);
+            outputs.append(&mut outs);
             // Apply the edits in the branch and move older edits into their own branch.
             for entry in branch.entries {
                 let index = self.record.index;
-                let saved = self.record.saved.filter(|&saved| saved > index);
-                let (_, _, entries) = self.record.redo_and_push(target, entry);
+                let (_, _, entries, rm_saved) = self.record.redo_and_push(target, entry);
                 if !entries.is_empty() {
+                    let parent = At::new(new, index);
                     self.branches
-                        .insert(self.root, Branch::new(new, index, entries));
-                    self.set_root(new, index, saved);
+                        .insert(self.root, Branch::new(parent, entries));
+                    self.set_root(parent, rm_saved);
                 }
             }
         }
-        let o = self.record.go_to(target, at.index);
-        outputs.extend(o);
+
+        let mut outs = self.record.go_to(target, at.index);
+        outputs.append(&mut outs);
         outputs
     }
 }
 
-impl<E: ToString, S> History<E, S> {
+impl<E: fmt::Display, S> History<E, S> {
     /// Returns the string of the edit which will be undone
     /// in the next call to [`History::undo`].
     pub fn undo_string(&self) -> Option<String> {
@@ -364,105 +419,44 @@ impl<E, S> From<Record<E, S>> for History<E, S> {
     }
 }
 
-/// A branch in the history.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub(crate) struct Branch<E> {
-    pub(crate) parent: At,
-    pub(crate) entries: VecDeque<Entry<E>>,
-}
-
-impl<E> Branch<E> {
-    fn new(branch: usize, index: usize, entries: VecDeque<Entry<E>>) -> Branch<E> {
-        Branch {
-            parent: At::new(branch, index),
-            entries,
-        }
+impl<E, F> From<History<E, F>> for Record<E, F> {
+    fn from(history: History<E, F>) -> Record<E, F> {
+        history.record
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::*;
+/// A branch in the history.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug)]
+pub struct Branch<E> {
+    parent: At,
+    entries: VecDeque<Entry<E>>,
+}
 
-    #[test]
-    fn go_to() {
-        //          m
-        //          |
-        //    j  k  l
-        //     \ | /
-        //       i
-        //       |
-        // e  g  h
-        // |  | /
-        // d  f  p - q *
-        // | /  /
-        // c  n - o
-        // | /
-        // b
-        // |
-        // a
-        let mut target = String::new();
-        let mut history = History::new();
-        history.edit(&mut target, Add('a'));
-        history.edit(&mut target, Add('b'));
-        history.edit(&mut target, Add('c'));
-        history.edit(&mut target, Add('d'));
-        history.edit(&mut target, Add('e'));
-        assert_eq!(target, "abcde");
-        history.undo(&mut target).unwrap();
-        history.undo(&mut target).unwrap();
-        assert_eq!(target, "abc");
-        let abc = history.head();
+impl<E> Branch<E> {
+    fn new(parent: At, entries: VecDeque<Entry<E>>) -> Branch<E> {
+        debug_assert!(!entries.is_empty());
+        Branch { parent, entries }
+    }
 
-        history.edit(&mut target, Add('f'));
-        history.edit(&mut target, Add('g'));
-        assert_eq!(target, "abcfg");
-        let abcfg = history.head();
+    /// Returns the parent edit of the branch.
+    pub fn parent(&self) -> At {
+        self.parent
+    }
 
-        history.undo(&mut target).unwrap();
-        history.edit(&mut target, Add('h'));
-        history.edit(&mut target, Add('i'));
-        history.edit(&mut target, Add('j'));
-        assert_eq!(target, "abcfhij");
-        let abcfhij = history.head();
+    /// Returns the number of edits in the branch.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
 
-        history.undo(&mut target).unwrap();
-        history.edit(&mut target, Add('k'));
-        assert_eq!(target, "abcfhik");
-        let abcfhik = history.head();
+    /// Returns the edit at the index.
+    pub fn get_entry(&self, index: usize) -> Option<&Entry<E>> {
+        self.entries.get(index)
+    }
 
-        history.undo(&mut target).unwrap();
-        history.edit(&mut target, Add('l'));
-        assert_eq!(target, "abcfhil");
-        history.edit(&mut target, Add('m'));
-        assert_eq!(target, "abcfhilm");
-        let abcfhilm = history.head();
-        history.go_to(&mut target, At::new(abc.root, 2));
-        history.edit(&mut target, Add('n'));
-        history.edit(&mut target, Add('o'));
-        assert_eq!(target, "abno");
-        let abno = history.head();
-
-        history.undo(&mut target).unwrap();
-        history.edit(&mut target, Add('p'));
-        history.edit(&mut target, Add('q'));
-        assert_eq!(target, "abnpq");
-
-        let abnpq = history.head();
-        history.go_to(&mut target, abc);
-        assert_eq!(target, "abc");
-        history.go_to(&mut target, abcfg);
-        assert_eq!(target, "abcfg");
-        history.go_to(&mut target, abcfhij);
-        assert_eq!(target, "abcfhij");
-        history.go_to(&mut target, abcfhik);
-        assert_eq!(target, "abcfhik");
-        history.go_to(&mut target, abcfhilm);
-        assert_eq!(target, "abcfhilm");
-        history.go_to(&mut target, abno);
-        assert_eq!(target, "abno");
-        history.go_to(&mut target, abnpq);
-        assert_eq!(target, "abnpq");
+    /// Returns an iterator over the edits in the branch.
+    pub fn entries(&self) -> impl Iterator<Item = &Entry<E>> {
+        self.entries.iter()
     }
 }

@@ -27,13 +27,16 @@ impl<E, S> Checkpoint<'_, E, S> {
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.record.checkpoint()
     }
+
+    /// Commits the changes and consumes the checkpoint.
+    pub fn commit(self) {}
 }
 
 impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
     /// Calls the `apply` method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
         let saved = self.record.saved;
-        let (output, _, tail) = self.record.edit_and_push(target, edit.into());
+        let (output, _, tail, _) = self.record.edit_and_push(target, edit.into());
         self.entries.push(CheckpointEntry::Edit(saved, tail));
         output
     }
@@ -51,9 +54,6 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
         self.entries.push(CheckpointEntry::Redo);
         Some(output)
     }
-
-    /// Commits the changes and consumes the checkpoint.
-    pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
     pub fn cancel(self, target: &mut E::Target) -> Vec<E::Output> {
@@ -81,95 +81,5 @@ impl<'a, E, S> From<&'a mut Record<E, S>> for Checkpoint<'a, E, S> {
             record,
             entries: Vec::new(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{add::Add, Record};
-
-    const A: Add = Add('a');
-    const B: Add = Add('b');
-    const C: Add = Add('c');
-    const D: Add = Add('d');
-    const E: Add = Add('e');
-    const F: Add = Add('f');
-    const G: Add = Add('g');
-    const H: Add = Add('h');
-    const I: Add = Add('i');
-
-    #[test]
-    fn checkpoint_commit() {
-        let mut target = String::new();
-        let mut record = Record::new();
-        let mut cp1 = record.checkpoint();
-        cp1.edit(&mut target, A);
-        cp1.edit(&mut target, B);
-        cp1.edit(&mut target, C);
-        assert_eq!(target, "abc");
-        let mut cp2 = cp1.checkpoint();
-        cp2.edit(&mut target, D);
-        cp2.edit(&mut target, E);
-        cp2.edit(&mut target, F);
-        assert_eq!(target, "abcdef");
-        let mut cp3 = cp2.checkpoint();
-        cp3.edit(&mut target, G);
-        cp3.edit(&mut target, H);
-        cp3.edit(&mut target, I);
-        assert_eq!(target, "abcdefghi");
-        cp3.commit();
-        cp2.commit();
-        cp1.commit();
-        assert_eq!(target, "abcdefghi");
-    }
-
-    #[test]
-    fn checkpoint_cancel() {
-        let mut target = String::new();
-        let mut record = Record::new();
-        let mut cp1 = record.checkpoint();
-        cp1.edit(&mut target, A);
-        cp1.edit(&mut target, B);
-        cp1.edit(&mut target, C);
-        let mut cp2 = cp1.checkpoint();
-        cp2.edit(&mut target, D);
-        cp2.edit(&mut target, E);
-        cp2.edit(&mut target, F);
-        let mut cp3 = cp2.checkpoint();
-        cp3.edit(&mut target, G);
-        cp3.edit(&mut target, H);
-        cp3.edit(&mut target, I);
-        assert_eq!(target, "abcdefghi");
-        cp3.cancel(&mut target);
-        assert_eq!(target, "abcdef");
-        cp2.cancel(&mut target);
-        assert_eq!(target, "abc");
-        cp1.cancel(&mut target);
-        assert_eq!(target, "");
-    }
-
-    #[test]
-    fn checkpoint_saved() {
-        let mut target = String::new();
-        let mut record = Record::new();
-        record.edit(&mut target, A);
-        record.edit(&mut target, B);
-        record.edit(&mut target, C);
-        record.set_saved(true);
-        record.undo(&mut target).unwrap();
-        record.undo(&mut target).unwrap();
-        record.undo(&mut target).unwrap();
-        let mut cp = record.checkpoint();
-        cp.edit(&mut target, D);
-        cp.edit(&mut target, E);
-        cp.edit(&mut target, F);
-        assert_eq!(target, "def");
-        cp.cancel(&mut target);
-        assert_eq!(target, "");
-        record.redo(&mut target).unwrap();
-        record.redo(&mut target).unwrap();
-        record.redo(&mut target).unwrap();
-        assert!(record.is_saved());
-        assert_eq!(target, "abc");
     }
 }

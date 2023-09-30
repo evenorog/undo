@@ -7,39 +7,52 @@ use std::time::SystemTime;
 
 /// Wrapper around an [`Edit`] command that contains additional metadata.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub(crate) struct Entry<E> {
-    pub edit: E,
+#[derive(Clone, Debug)]
+pub struct Entry<E> {
+    edit: E,
     #[cfg(feature = "std")]
-    pub edit_at: SystemTime,
+    st_edit: SystemTime,
+}
+
+impl<E> Entry<E> {
+    /// Returns the edit command.
+    pub fn get(&self) -> &E {
+        &self.edit
+    }
+
+    /// Returns the last time the edit was applied.
+    #[cfg(feature = "std")]
+    pub(crate) fn st_edit(&self) -> SystemTime {
+        self.st_edit
+    }
 }
 
 impl<E: Edit> Entry<E> {
-    pub fn edit(&mut self, target: &mut E::Target) -> E::Output {
+    pub(crate) fn edit(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
-            self.edit_at = SystemTime::now();
+            self.st_edit = SystemTime::now();
         }
         self.edit.edit(target)
     }
 
-    pub fn undo(&mut self, target: &mut E::Target) -> E::Output {
+    pub(crate) fn undo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
-            self.edit_at = SystemTime::now();
+            self.st_edit = SystemTime::now();
         }
         self.edit.undo(target)
     }
 
-    pub fn redo(&mut self, target: &mut E::Target) -> E::Output {
+    pub(crate) fn redo(&mut self, target: &mut E::Target) -> E::Output {
         #[cfg(feature = "std")]
         {
-            self.edit_at = SystemTime::now();
+            self.st_edit = SystemTime::now();
         }
         self.edit.redo(target)
     }
 
-    pub fn merge(&mut self, other: Self) -> Merged<Self>
+    pub(crate) fn merge(&mut self, other: Self) -> Merged<Self>
     where
         Self: Sized,
     {
@@ -47,7 +60,7 @@ impl<E: Edit> Entry<E> {
             Merged::Yes => {
                 #[cfg(feature = "std")]
                 {
-                    self.edit_at = other.edit_at;
+                    self.st_edit = other.st_edit;
                 }
                 Merged::Yes
             }
@@ -62,7 +75,7 @@ impl<E> From<E> for Entry<E> {
         Entry {
             edit,
             #[cfg(feature = "std")]
-            edit_at: SystemTime::UNIX_EPOCH,
+            st_edit: SystemTime::UNIX_EPOCH,
         }
     }
 }

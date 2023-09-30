@@ -58,6 +58,8 @@ pub enum Event {
     Redo(bool),
     /// Emitted when the saved state has changed.
     Saved(bool),
+    /// Emitted when the root has changed.
+    Root(usize),
     /// Emitted when the index has changed.
     Index(usize),
 }
@@ -68,7 +70,6 @@ pub enum Event {
 /// ```
 /// # use std::sync::mpsc;
 /// # use undo::{Add, Record, Event};
-/// # fn main() {
 /// let (sender, receiver) = mpsc::channel();
 /// let mut iter = receiver.try_iter();
 ///
@@ -89,7 +90,6 @@ pub enum Event {
 /// assert_eq!(iter.next(), Some(Event::Saved(true)));
 /// assert_eq!(iter.next(), Some(Event::Index(0)));
 /// assert_eq!(iter.next(), None);
-/// # }
 /// ```
 pub trait Slot {
     /// Receives an event that describes the state change done to the structures.

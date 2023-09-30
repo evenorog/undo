@@ -20,6 +20,11 @@
 //! * The amount of changes being tracked can be configured by the user so only the `N` most recent changes are stored.
 //! * Configurable display formatting using the display structures.
 //!
+//! # Examples
+//!
+//! All examples in the documentation uses the `Add`
+//! command found [here](https://github.com/evenorog/undo/blob/master/src/add.rs).
+//!
 //! # Cargo Feature Flags
 //!
 //! | Name    | Default | Enables | Description                                                     |
@@ -54,22 +59,22 @@ pub mod record;
 #[cfg(feature = "alloc")]
 mod socket;
 
-#[cfg(feature = "alloc")]
-use entry::Entry;
-#[cfg(feature = "alloc")]
-use format::Format;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 #[doc(hidden)]
 #[cfg(feature = "alloc")]
 pub use add::Add;
+#[cfg(feature = "alloc")]
+pub use entry::Entry;
 #[cfg(feature = "alloc")]
 pub use history::History;
 #[cfg(feature = "alloc")]
 pub use record::Record;
 #[cfg(feature = "alloc")]
 pub use socket::{Event, Slot};
+
+#[cfg(feature = "alloc")]
+use format::Format;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// Base functionality for all edit commands.
 pub trait Edit {
@@ -101,8 +106,7 @@ pub trait Edit {
 }
 
 /// Says if the [`Edit`] command have been merged with another command.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub enum Merged<E> {
     /// The edits have been merged.
     ///
@@ -121,7 +125,7 @@ pub enum Merged<E> {
 /// A position in a history tree.
 #[cfg(feature = "alloc")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Copy, Clone, Debug, Default, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct At {
     /// The root branch.
     pub root: usize,
@@ -136,7 +140,6 @@ impl At {
         At { root, index }
     }
 
-    /// Used for records to create a rootless `At`.
     const fn no_root(index: usize) -> At {
         At::new(0, index)
     }

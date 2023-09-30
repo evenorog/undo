@@ -11,10 +11,11 @@ pub use display::Display;
 pub use queue::Queue;
 
 use crate::socket::{Slot, Socket};
-use crate::{Edit, Entry, Event, History, Merged};
+use crate::{Edit, Entry, Event, Merged};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::fmt;
 use core::num::NonZeroUsize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -28,11 +29,11 @@ use serde::{Deserialize, Serialize};
 /// changes by using the [`Builder`].
 ///
 /// When adding a new edit command to the record the previously undone commands
-/// will be discarded. If you want to keep all edits you can use [`History`] instead.
+/// will be discarded.
+/// If you want to keep all edits you can use [`History`](crate::History) instead.
 ///
 /// # Examples
 /// ```
-/// # fn main() {
 /// # use undo::{Add, Record};
 /// let mut target = String::new();
 /// let mut record = Record::new();
@@ -54,12 +55,11 @@ use serde::{Deserialize, Serialize};
 /// // 'c' will be discarded.
 /// record.edit(&mut target, Add('d'));
 /// assert_eq!(target, "abd");
-/// # }
 /// ```
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Record<E, S = ()> {
-    pub(crate) limit: NonZeroUsize,
+    limit: NonZeroUsize,
     pub(crate) index: usize,
     pub(crate) saved: Option<usize>,
     pub(crate) socket: Socket<S>,
@@ -137,19 +137,24 @@ impl<E, S> Record<E, S> {
         self.saved == Some(self.index)
     }
 
-    /// Returns the index of the next edit.
-    pub fn index(&self) -> usize {
+    /// Returns the index of the saved state.
+    pub fn saved(&self) -> Option<usize> {
+        self.saved
+    }
+
+    /// Returns the current index in the record.
+    pub fn head(&self) -> usize {
         self.index
     }
 
-    /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<E, S> {
-        Display::from(self)
+    /// Returns the entry at the index.
+    pub fn get_entry(&self, index: usize) -> Option<&Entry<E>> {
+        self.entries.get(index)
     }
 
-    /// Returns an iterator over the edits.
-    pub fn edits(&self) -> impl Iterator<Item = &E> {
-        self.entries.iter().map(|e| &e.edit)
+    /// Returns an iterator over the entries.
+    pub fn entries(&self) -> impl Iterator<Item = &Entry<E>> {
+        self.entries.iter()
     }
 
     /// Returns a queue.
@@ -162,18 +167,56 @@ impl<E, S> Record<E, S> {
         Checkpoint::from(self)
     }
 
+    /// Returns a structure for configurable formatting of the record.
+    pub fn display(&self) -> Display<E, S> {
+        Display::from(self)
+    }
+
     /// Remove all elements after the index.
-    fn rm_tail(&mut self) -> VecDeque<Entry<E>> {
-        // Check if the saved edit will be removed.
-        self.saved = self.saved.filter(|&saved| saved <= self.index);
-        self.entries.split_off(self.index)
+    pub(crate) fn rm_tail(&mut self) -> (VecDeque<Entry<E>>, Option<usize>) {
+        // Remove the saved state if it will be split off.
+        let rm_saved = if self.saved > Some(self.index) {
+            self.saved.take()
+        } else {
+            None
+        };
+
+        let tail = self.entries.split_off(self.index);
+        (tail, rm_saved)
+    }
+}
+
+impl<E, S: Slot> Record<E, S> {
+    /// Marks the target as currently being in a saved or unsaved state.
+    pub fn set_saved(&mut self, saved: bool) {
+        let was_saved = self.is_saved();
+        if saved {
+            self.saved = Some(self.index);
+            self.socket.emit_if(!was_saved, || Event::Saved(true));
+        } else {
+            self.saved = None;
+            self.socket.emit_if(was_saved, || Event::Saved(false));
+        }
+    }
+
+    /// Removes all edits from the record without undoing them.
+    pub fn clear(&mut self) {
+        let old_index = self.index;
+        let could_undo = self.can_undo();
+        let could_redo = self.can_redo();
+        self.entries.clear();
+        self.saved = self.is_saved().then_some(0);
+        self.index = 0;
+        self.socket.emit_if(could_undo, || Event::Undo(false));
+        self.socket.emit_if(could_redo, || Event::Redo(false));
+        self.socket.emit_if(old_index != 0, || Event::Index(0));
     }
 }
 
 impl<E: Edit, S: Slot> Record<E, S> {
     /// Pushes the edit on top of the record and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let (output, _, _) = self.edit_and_push(target, edit.into());
+        let (output, _, _, _) = self.edit_and_push(target, edit.into());
         output
     }
 
@@ -181,29 +224,29 @@ impl<E: Edit, S: Slot> Record<E, S> {
         &mut self,
         target: &mut E::Target,
         mut entry: Entry<E>,
-    ) -> (E::Output, bool, VecDeque<Entry<E>>) {
+    ) -> (E::Output, bool, VecDeque<Entry<E>>, Option<usize>) {
         let output = entry.edit(target);
-        let (merged_or_annulled, tail) = self.push(entry);
-        (output, merged_or_annulled, tail)
+        let (merged_or_annulled, tail, rm_saved) = self.push(entry);
+        (output, merged_or_annulled, tail, rm_saved)
     }
 
     pub(crate) fn redo_and_push(
         &mut self,
         target: &mut E::Target,
         mut entry: Entry<E>,
-    ) -> (E::Output, bool, VecDeque<Entry<E>>) {
+    ) -> (E::Output, bool, VecDeque<Entry<E>>, Option<usize>) {
         let output = entry.redo(target);
-        let (merged_or_annulled, tail) = self.push(entry);
-        (output, merged_or_annulled, tail)
+        let (merged_or_annulled, tail, rm_saved) = self.push(entry);
+        (output, merged_or_annulled, tail, rm_saved)
     }
 
-    fn push(&mut self, entry: Entry<E>) -> (bool, VecDeque<Entry<E>>) {
+    fn push(&mut self, entry: Entry<E>) -> (bool, VecDeque<Entry<E>>, Option<usize>) {
         let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
 
-        let tail = self.rm_tail();
+        let (tail, rm_saved) = self.rm_tail();
         // Try to merge unless the target is in a saved state.
         let merged = match self.entries.back_mut() {
             Some(last) if !was_saved => last.merge(entry),
@@ -235,7 +278,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
         self.socket.emit_if(was_saved, || Event::Saved(false));
         self.socket
             .emit_if(old_index != self.index, || Event::Index(self.index));
-        (merged_or_annulled, tail)
+        (merged_or_annulled, tail, rm_saved)
     }
 
     /// Calls the [`Edit::undo`] method for the active edit and sets
@@ -276,31 +319,6 @@ impl<E: Edit, S: Slot> Record<E, S> {
         })
     }
 
-    /// Marks the target as currently being in a saved or unsaved state.
-    pub fn set_saved(&mut self, saved: bool) {
-        let was_saved = self.is_saved();
-        if saved {
-            self.saved = Some(self.index);
-            self.socket.emit_if(!was_saved, || Event::Saved(true));
-        } else {
-            self.saved = None;
-            self.socket.emit_if(was_saved, || Event::Saved(false));
-        }
-    }
-
-    /// Removes all edits from the record without undoing them.
-    pub fn clear(&mut self) {
-        let old_index = self.index;
-        let could_undo = self.can_undo();
-        let could_redo = self.can_redo();
-        self.entries.clear();
-        self.saved = self.is_saved().then_some(0);
-        self.index = 0;
-        self.socket.emit_if(could_undo, || Event::Undo(false));
-        self.socket.emit_if(could_redo, || Event::Redo(false));
-        self.socket.emit_if(old_index != 0, || Event::Index(0));
-    }
-
     /// Revert the changes done to the target since the saved state.
     pub fn revert(&mut self, target: &mut E::Target) -> Vec<E::Output> {
         self.saved
@@ -309,11 +327,10 @@ impl<E: Edit, S: Slot> Record<E, S> {
 
     /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `index` is reached.
     pub fn go_to(&mut self, target: &mut E::Target, index: usize) -> Vec<E::Output> {
-        if index > self.len() {
+        if self.index == index || index > self.len() {
             return Vec::new();
         }
 
-        let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
@@ -343,14 +360,13 @@ impl<E: Edit, S: Slot> Record<E, S> {
             .emit_if(could_redo != can_redo, || Event::Redo(can_redo));
         self.socket
             .emit_if(was_saved != is_saved, || Event::Saved(is_saved));
-        self.socket
-            .emit_if(old_index != self.index, || Event::Index(self.index));
+        self.socket.emit(|| Event::Index(self.index));
 
         outputs
     }
 }
 
-impl<E: ToString, S> Record<E, S> {
+impl<E: fmt::Display, S> Record<E, S> {
     /// Returns the string of the edit which will be undone
     /// in the next call to [`Record::undo`].
     pub fn undo_string(&self) -> Option<String> {
@@ -364,67 +380,12 @@ impl<E: ToString, S> Record<E, S> {
     }
 
     fn string_at(&self, i: usize) -> Option<String> {
-        self.entries.get(i).map(|e| e.edit.to_string())
+        self.entries.get(i).map(|e| e.to_string())
     }
 }
 
 impl<E> Default for Record<E> {
     fn default() -> Record<E> {
         Record::new()
-    }
-}
-
-impl<E, F> From<History<E, F>> for Record<E, F> {
-    fn from(history: History<E, F>) -> Record<E, F> {
-        history.record
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::*;
-    use alloc::string::String;
-    use alloc::vec::Vec;
-
-    #[test]
-    fn go_to() {
-        let mut target = String::new();
-        let mut record = Record::new();
-        record.edit(&mut target, Add('a'));
-        record.edit(&mut target, Add('b'));
-        record.edit(&mut target, Add('c'));
-        record.edit(&mut target, Add('d'));
-        record.edit(&mut target, Add('e'));
-
-        record.go_to(&mut target, 0);
-        assert_eq!(record.index(), 0);
-        assert_eq!(target, "");
-        record.go_to(&mut target, 5);
-        assert_eq!(record.index(), 5);
-        assert_eq!(target, "abcde");
-        record.go_to(&mut target, 1);
-        assert_eq!(record.index(), 1);
-        assert_eq!(target, "a");
-        record.go_to(&mut target, 4);
-        assert_eq!(record.index(), 4);
-        assert_eq!(target, "abcd");
-        record.go_to(&mut target, 2);
-        assert_eq!(record.index(), 2);
-        assert_eq!(target, "ab");
-        record.go_to(&mut target, 3);
-        assert_eq!(record.index(), 3);
-        assert_eq!(target, "abc");
-        assert!(record.go_to(&mut target, 6).is_empty());
-        assert_eq!(record.index(), 3);
-    }
-
-    #[test]
-    fn edits() {
-        let mut target = String::new();
-        let mut record = Record::new();
-        record.edit(&mut target, Add('a'));
-        record.edit(&mut target, Add('b'));
-        let collected = record.edits().collect::<Vec<_>>();
-        assert_eq!(&collected[..], &[&Add('a'), &Add('b')][..]);
     }
 }

@@ -26,6 +26,9 @@ impl<E, S> Checkpoint<'_, E, S> {
     pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
         self.history.checkpoint()
     }
+
+    /// Commits the changes and consumes the checkpoint.
+    pub fn commit(self) {}
 }
 
 impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
@@ -47,9 +50,6 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
         self.entries.push(CheckpointEntry::Redo);
         self.history.redo(target)
     }
-
-    /// Commits the changes and consumes the checkpoint.
-    pub fn commit(self) {}
 
     /// Cancels the changes and consumes the checkpoint.
     pub fn cancel(self, target: &mut E::Target) -> Vec<E::Output> {
@@ -81,39 +81,5 @@ impl<'a, E, S> From<&'a mut History<E, S>> for Checkpoint<'a, E, S> {
             history,
             entries: Vec::new(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::*;
-
-    const A: Add = Add('a');
-    const B: Add = Add('b');
-    const C: Add = Add('c');
-    const D: Add = Add('d');
-    const E: Add = Add('e');
-
-    #[test]
-    fn checkpoint() {
-        let mut target = String::new();
-        let mut history = History::new();
-        let mut checkpoint = history.checkpoint();
-
-        checkpoint.edit(&mut target, A);
-        checkpoint.edit(&mut target, B);
-        checkpoint.edit(&mut target, C);
-        assert_eq!(target, "abc");
-
-        checkpoint.undo(&mut target);
-        checkpoint.undo(&mut target);
-        assert_eq!(target, "a");
-
-        checkpoint.edit(&mut target, D);
-        checkpoint.edit(&mut target, E);
-        assert_eq!(target, "ade");
-
-        checkpoint.cancel(&mut target);
-        assert_eq!(target, "");
     }
 }

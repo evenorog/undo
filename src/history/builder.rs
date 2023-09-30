@@ -5,7 +5,6 @@ use crate::History;
 ///
 /// # Examples
 /// ```
-/// # fn main() {
 /// # use undo::{Add, History};
 /// # let mut target = String::new();
 /// let mut history = History::builder()
@@ -14,7 +13,6 @@ use crate::History;
 ///     .connect(|s| { dbg!(s); })
 ///     .build();
 /// # history.edit(&mut target, Add('a'));
-/// # }
 /// ```
 #[derive(Debug)]
 pub struct Builder<E, S = ()>(RecordBuilder<E, S>);

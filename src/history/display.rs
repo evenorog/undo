@@ -69,21 +69,13 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         if let Some(entry) = entry {
             if self.format.detailed {
                 let st_fmt = self.st_fmt;
-                let string = st_fmt(now, entry.edit_at);
+                let string = st_fmt(now, entry.st_edit());
                 self.format.elapsed(f, string)?;
             }
         }
 
-        self.format.labels(
-            f,
-            at,
-            self.history.head(),
-            self.history
-                .record
-                .saved
-                .map(|saved| At::new(self.history.root, saved))
-                .or(self.history.saved),
-        )?;
+        self.format
+            .labels(f, at, self.history.head(), self.history.saved())?;
 
         if let Some(entry) = entry {
             if self.format.detailed {
