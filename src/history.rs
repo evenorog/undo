@@ -142,7 +142,7 @@ impl<E, S> History<E, S> {
 
     /// Returns the current position in the history.
     pub fn head(&self) -> At {
-        At::new(self.root, self.record.index)
+        At::new(self.root, self.record.head())
     }
 
     /// Returns the head of the next branch in the history.
@@ -310,7 +310,7 @@ impl<E, S: Slot> History<E, S> {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.head());
 
-        let parent = At::new(root, self.record.index);
+        let parent = At::new(root, self.record.head());
         let (tail, rm_saved) = self.record.rm_tail();
         self.record.entries.append(&mut branch.entries);
         self.branches.insert(self.root, Branch::new(parent, tail));
@@ -325,7 +325,7 @@ impl<E: Edit, S: Slot> History<E, S> {
         let (output, merged, tail, rm_saved) = self.record.edit_and_push(target, Entry::new(edit));
 
         // Check if the limit has been reached.
-        if !merged && head.index == self.record.index {
+        if !merged && head.index == self.record.head() {
             let root = self.root;
             self.rm_child_of(At::new(root, 0));
             self.branches
@@ -384,7 +384,7 @@ impl<E: Edit, S: Slot> History<E, S> {
             outputs.append(&mut outs);
             // Apply the edits in the branch and move older edits into their own branch.
             for entry in branch.entries {
-                let index = self.record.index;
+                let index = self.record.head();
                 let (_, _, entries, rm_saved) = self.record.redo_and_push(target, entry);
                 if !entries.is_empty() {
                     let parent = At::new(id, index);

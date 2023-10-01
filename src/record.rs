@@ -60,7 +60,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug)]
 pub struct Record<E, S = ()> {
     limit: NonZeroUsize,
-    pub(crate) index: usize,
+    index: usize,
     pub(crate) saved: Option<usize>,
     pub(crate) socket: Socket<S>,
     pub(crate) entries: VecDeque<Entry<E>>,
