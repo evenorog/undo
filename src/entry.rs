@@ -98,6 +98,8 @@ impl<E: Edit> Entry<E> {
             Merged::Yes => {
                 #[cfg(feature = "std")]
                 {
+                    // st_undo and st_redo is always UNIX_EPOCH
+                    // when merging, so we don't store them.
                     self.st_edit = other.st_edit;
                 }
                 Merged::Yes

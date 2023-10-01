@@ -63,7 +63,7 @@ fn main() -> io::Result<()> {
                         history.go_to(&mut target, at);
                     }
                 }
-                _ => {
+                c => {
                     history.edit(&mut target, Add(c));
                 }
             }

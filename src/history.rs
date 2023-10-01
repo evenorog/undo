@@ -368,18 +368,18 @@ impl<E: Edit, S: Slot> History<E, S> {
 
     /// Repeatedly calls [`Edit::undo`] or [`Edit::redo`] until the edit at `at` is reached.
     pub fn go_to(&mut self, target: &mut E::Target, at: At) -> Vec<E::Output> {
-        let root = self.root;
-        if root == at.root {
+        if self.root == at.root {
             return self.record.go_to(target, at.index);
         }
 
-        // Walk the path from `root` to `branch`.
-        let mut outputs = Vec::new();
+        // Get the path from `root` to `branch`.
         let Some(path) = self.mk_path(at.root) else {
             return Vec::new();
         };
 
-        for (new, branch) in path {
+        let mut outputs = Vec::new();
+        for (id, branch) in path {
+            // Move to the parent of the branch so we can apply the edits in the branch on top of it.
             let mut outs = self.record.go_to(target, branch.parent.index);
             outputs.append(&mut outs);
             // Apply the edits in the branch and move older edits into their own branch.
@@ -387,7 +387,7 @@ impl<E: Edit, S: Slot> History<E, S> {
                 let index = self.record.index;
                 let (_, _, entries, rm_saved) = self.record.redo_and_push(target, entry);
                 if !entries.is_empty() {
-                    let parent = At::new(new, index);
+                    let parent = At::new(id, index);
                     self.branches
                         .insert(self.root, Branch::new(parent, entries));
                     self.set_root(parent, rm_saved);
