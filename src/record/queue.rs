@@ -1,4 +1,3 @@
-use super::Checkpoint;
 use crate::{Edit, Record, Slot};
 use alloc::vec::Vec;
 
@@ -33,14 +32,12 @@ pub struct Queue<'a, E, S> {
 }
 
 impl<E, S> Queue<'_, E, S> {
-    /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<E, S> {
-        self.record.queue()
-    }
-
-    /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
-        self.record.checkpoint()
+    /// Reserves capacity for at least `additional` more entries in the queue.
+    ///
+    /// # Panics
+    /// Panics if the new capacity exceeds `isize::MAX` bytes.
+    pub fn reserve(&mut self, additional: usize) {
+        self.entries.reserve(additional);
     }
 
     /// Queues a [`Record::edit`] call.

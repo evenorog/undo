@@ -77,7 +77,7 @@ impl<E, S> History<E, S> {
     /// Reserves capacity for at least `additional` more edits.
     ///
     /// # Panics
-    /// Panics if the new capacity overflows usize.
+    /// Panics if the new capacity exceeds `isize::MAX` bytes.
     pub fn reserve(&mut self, additional: usize) {
         self.record.reserve(additional);
     }
