@@ -48,7 +48,7 @@ fn edits() {
     let mut record = Record::new();
     record.edit(&mut target, A);
     record.edit(&mut target, B);
-    let collected = record.entries().map(|e| e.get()).collect::<Vec<_>>();
+    let collected = record.entries().map(AsRef::as_ref).collect::<Vec<_>>();
     assert_eq!(&collected[..], &[&A, &B][..]);
 }
 

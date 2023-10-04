@@ -18,6 +18,12 @@ pub struct Entry<E> {
     st_redo: SystemTime,
 }
 
+impl<E> AsRef<E> for Entry<E> {
+    fn as_ref(&self) -> &E {
+        &self.edit
+    }
+}
+
 impl<E> Entry<E> {
     pub(crate) const fn new(edit: E) -> Self {
         Entry {
@@ -29,11 +35,6 @@ impl<E> Entry<E> {
             #[cfg(feature = "std")]
             st_redo: SystemTime::UNIX_EPOCH,
         }
-    }
-
-    /// Returns the edit command.
-    pub fn get(&self) -> &E {
-        &self.edit
     }
 
     /// Returns the time the edit method was called.
