@@ -187,8 +187,8 @@ impl<E, S> History<E, S> {
     /// Returns an iterator over the branches in the history.
     ///
     /// This does not include the current root branch.
-    pub fn branches(&self) -> impl Iterator<Item = (&usize, &Branch<E>)> {
-        self.branches.iter()
+    pub fn branches(&self) -> impl Iterator<Item = (usize, &Branch<E>)> {
+        self.branches.iter().map(|(&k, v)| (k, v))
     }
 
     /// Returns a queue.
@@ -209,10 +209,9 @@ impl<E, S> History<E, S> {
     fn rm_child_of(&mut self, at: At) {
         // We need to check if any of the branches had the removed node as root.
         let mut dead: Vec<_> = self
-            .branches
-            .iter()
+            .branches()
             .filter(|&(_, child)| child.parent == at)
-            .map(|(&id, _)| id)
+            .map(|(id, _)| id)
             .collect();
         while let Some(parent) = dead.pop() {
             // Remove the dead branch.
@@ -220,10 +219,9 @@ impl<E, S> History<E, S> {
             self.saved = self.saved.filter(|saved| saved.root != parent);
             // Add the children of the dead branch so they are removed too.
             dead.extend(
-                self.branches
-                    .iter()
+                self.branches()
                     .filter(|&(_, child)| child.parent.root == parent)
-                    .map(|(&id, _)| id),
+                    .map(|(id, _)| id),
             )
         }
     }
@@ -310,11 +308,11 @@ impl<E, S: Slot> History<E, S> {
         let mut branch = self.branches.remove(&root).unwrap();
         debug_assert_eq!(branch.parent, self.head());
 
-        let parent = At::new(root, self.record.head());
+        let new = At::new(root, self.record.head());
         let (tail, rm_saved) = self.record.rm_tail();
         self.record.entries.append(&mut branch.entries);
-        self.branches.insert(self.root, Branch::new(parent, tail));
-        self.set_root(parent, rm_saved);
+        self.branches.insert(self.root, Branch::new(new, tail));
+        self.set_root(new, rm_saved);
     }
 }
 
@@ -336,11 +334,11 @@ impl<E: Edit, S: Slot> History<E, S> {
 
         // Handle new branch.
         if !tail.is_empty() {
-            let new = self.next;
+            let new_root = self.next;
             self.next += 1;
-            let parent = At::new(new, head.index);
-            self.branches.insert(head.root, Branch::new(parent, tail));
-            self.set_root(parent, rm_saved);
+            let new = At::new(new_root, head.index);
+            self.branches.insert(head.root, Branch::new(new, tail));
+            self.set_root(new, rm_saved);
         }
 
         output
@@ -387,10 +385,9 @@ impl<E: Edit, S: Slot> History<E, S> {
                 let index = self.record.head();
                 let (_, _, entries, rm_saved) = self.record.redo_and_push(target, entry);
                 if !entries.is_empty() {
-                    let parent = At::new(id, index);
-                    self.branches
-                        .insert(self.root, Branch::new(parent, entries));
-                    self.set_root(parent, rm_saved);
+                    let new = At::new(id, index);
+                    self.branches.insert(self.root, Branch::new(new, entries));
+                    self.set_root(new, rm_saved);
                 }
             }
         }
