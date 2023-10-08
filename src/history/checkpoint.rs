@@ -60,8 +60,7 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
                     if root == branch {
                         self.history.record.entries.pop_back();
                     } else {
-                        self.history.jump_to(branch);
-                        self.history.branches.remove(&root).unwrap();
+                        self.history.jump_to_and_discard(branch);
                     }
                     Some(output)
                 }
