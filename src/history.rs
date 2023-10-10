@@ -186,8 +186,6 @@ impl<E, S> History<E, S> {
     }
 
     /// Returns an iterator over the branches in the history.
-    ///
-    /// This does not include the current root branch.
     pub fn branches(&self) -> impl Iterator<Item = (usize, &Branch<E>)> {
         self.branches.iter()
     }
@@ -311,16 +309,6 @@ impl<E, S: Slot> History<E, S> {
 
         self.root = new.root;
         self.record.socket.emit(|| Event::Root(new.root));
-    }
-
-    fn jump_to_and_discard(&mut self, root: usize) {
-        let mut branch = self.branches.remove(root);
-        debug_assert_eq!(branch.parent, self.head());
-
-        let new = At::new(root, self.record.head());
-        let (_, rm_saved) = self.record.rm_tail();
-        self.record.entries.append(&mut branch.entries);
-        self.set_root(new, rm_saved);
     }
 }
 

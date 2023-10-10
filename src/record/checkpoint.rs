@@ -4,7 +4,10 @@ use alloc::vec::Vec;
 
 #[derive(Debug)]
 enum CheckpointEntry<E> {
-    Edit(Option<usize>, VecDeque<Entry<E>>),
+    Edit {
+        saved: Option<usize>,
+        tail: VecDeque<Entry<E>>,
+    },
     Undo,
     Redo,
 }
@@ -32,9 +35,8 @@ impl<E, S> Checkpoint<'_, E, S> {
 impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
     /// Calls the `apply` method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let saved = self.record.saved;
-        let (output, _, tail, _) = self.record.edit_and_push(target, Entry::new(edit));
-        self.entries.push(CheckpointEntry::Edit(saved, tail));
+        let (output, _, tail, saved) = self.record.edit_and_push(target, Entry::new(edit));
+        self.entries.push(CheckpointEntry::Edit { saved, tail });
         output
     }
 
@@ -58,11 +60,11 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
             .into_iter()
             .rev()
             .filter_map(|entry| match entry {
-                CheckpointEntry::Edit(saved, mut entries) => {
+                CheckpointEntry::Edit { saved, mut tail } => {
                     let output = self.record.undo(target)?;
                     self.record.entries.pop_back();
-                    self.record.entries.append(&mut entries);
-                    self.record.saved = saved;
+                    self.record.entries.append(&mut tail);
+                    self.record.saved = self.record.saved.or(saved);
                     Some(output)
                 }
                 CheckpointEntry::Undo => self.record.redo(target),
