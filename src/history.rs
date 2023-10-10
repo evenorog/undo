@@ -12,12 +12,14 @@ pub use queue::Queue;
 
 use crate::socket::Slot;
 use crate::{At, Edit, Entry, Event, Record};
-use alloc::collections::{BTreeMap, VecDeque};
+use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
+use core::mem;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use slab::Slab;
 
 /// A history tree of [`Edit`] commands.
 ///
@@ -55,10 +57,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug)]
 pub struct History<E, S = ()> {
     root: usize,
-    next: usize,
     saved: Option<At>,
     record: Record<E, S>,
-    branches: BTreeMap<usize, Branch<E>>,
+    branches: Slab<Branch<E>>,
 }
 
 impl<E> History<E> {
@@ -151,9 +152,9 @@ impl<E, S> History<E, S> {
     /// This can be used in combination with [`History::go_to`] to go to the next branch.
     pub fn next_branch_head(&self) -> Option<At> {
         self.branches
-            .range(self.root + 1..)
-            .next()
-            .map(|(&id, branch)| At::new(id, branch.parent.index + 1))
+            .iter()
+            .find(|&(id, _)| id > self.root)
+            .map(|(id, branch)| At::new(id, branch.parent.index + 1))
     }
 
     /// Returns the head of the previous branch in the history.
@@ -162,9 +163,9 @@ impl<E, S> History<E, S> {
     /// This can be used in combination with [`History::go_to`] to go to the previous branch.
     pub fn prev_branch_head(&self) -> Option<At> {
         self.branches
-            .range(..self.root)
-            .next_back()
-            .map(|(&id, branch)| At::new(id, branch.parent.index + 1))
+            .iter()
+            .rfind(|&(id, _)| id < self.root)
+            .map(|(id, branch)| At::new(id, branch.parent.index + 1))
     }
 
     /// Returns the entry at the index in the current root branch.
@@ -181,14 +182,12 @@ impl<E, S> History<E, S> {
 
     /// Returns the branch with the given id.
     pub fn get_branch(&self, id: usize) -> Option<&Branch<E>> {
-        self.branches.get(&id)
+        self.branches.get(id)
     }
 
     /// Returns an iterator over the branches in the history.
-    ///
-    /// This does not include the current root branch.
     pub fn branches(&self) -> impl Iterator<Item = (usize, &Branch<E>)> {
-        self.branches.iter().map(|(&k, v)| (k, v))
+        self.branches.iter()
     }
 
     /// Returns a queue.
@@ -213,14 +212,14 @@ impl<E, S> History<E, S> {
             .filter(|&(_, child)| child.parent == at)
             .map(|(id, _)| id)
             .collect();
-        while let Some(parent) = dead.pop() {
+        while let Some(id) = dead.pop() {
             // Remove the dead branch.
-            self.branches.remove(&parent).unwrap();
-            self.saved = self.saved.filter(|saved| saved.root != parent);
+            self.branches.remove(id);
+            self.saved = self.saved.filter(|s| s.root != id);
             // Add the children of the dead branch so they are removed too.
             dead.extend(
                 self.branches()
-                    .filter(|&(_, child)| child.parent.root == parent)
+                    .filter(|&(_, child)| child.parent.root == id)
                     .map(|(id, _)| id),
             )
         }
@@ -228,17 +227,24 @@ impl<E, S> History<E, S> {
 
     fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<E>)>> {
         debug_assert_ne!(self.root, to);
-        let mut dest = self.branches.remove(&to)?;
+        let mut dest = self.nil_replace(to)?;
+
         let mut i = dest.parent.root;
         let mut path = alloc::vec![(to, dest)];
         while i != self.root {
-            dest = self.branches.remove(&i).unwrap();
+            dest = self.nil_replace(i).unwrap();
             to = i;
             i = dest.parent.root;
             path.push((to, dest));
         }
 
         Some(path.into_iter().rev())
+    }
+
+    fn nil_replace(&mut self, id: usize) -> Option<Branch<E>> {
+        let dest = self.branches.get_mut(id)?;
+        let dest = mem::replace(dest, Branch::NIL);
+        Some(dest)
     }
 }
 
@@ -258,12 +264,13 @@ impl<E, S: Slot> History<E, S> {
     /// Removes all edits from the history without undoing them.
     pub fn clear(&mut self) {
         let old_root = self.root;
-        self.root = 0;
-        self.next = 1;
         self.saved = None;
         self.record.clear();
         self.branches.clear();
-        self.record.socket.emit_if(old_root != 0, || Event::Root(0));
+        self.root = self.branches.insert(Branch::NIL);
+        self.record
+            .socket
+            .emit_if(old_root != self.root, || Event::Root(self.root));
     }
 
     fn set_root(&mut self, new: At, rm_saved: Option<usize>) {
@@ -283,9 +290,9 @@ impl<E, S: Slot> History<E, S> {
         // be children of the new root. All branches that are above should still be
         // children of the old root.
         self.branches
-            .values_mut()
-            .filter(|child| child.parent.root == self.root && child.parent.index <= new.index)
-            .for_each(|child| child.parent.root = new.root);
+            .iter_mut()
+            .filter(|(_, child)| child.parent.root == self.root && child.parent.index <= new.index)
+            .for_each(|(_, child)| child.parent.root = new.root);
 
         match (self.saved, rm_saved) {
             (Some(saved), None) if saved.root == new.root => {
@@ -303,17 +310,6 @@ impl<E, S: Slot> History<E, S> {
         self.root = new.root;
         self.record.socket.emit(|| Event::Root(new.root));
     }
-
-    fn jump_to(&mut self, root: usize) {
-        let mut branch = self.branches.remove(&root).unwrap();
-        debug_assert_eq!(branch.parent, self.head());
-
-        let new = At::new(root, self.record.head());
-        let (tail, rm_saved) = self.record.rm_tail();
-        self.record.entries.append(&mut branch.entries);
-        self.branches.insert(self.root, Branch::new(new, tail));
-        self.set_root(new, rm_saved);
-    }
 }
 
 impl<E: Edit, S: Slot> History<E, S> {
@@ -327,17 +323,20 @@ impl<E: Edit, S: Slot> History<E, S> {
             let root = self.root;
             self.rm_child_of(At::new(root, 0));
             self.branches
-                .values_mut()
-                .filter(|child| child.parent.root == root)
-                .for_each(|child| child.parent.index -= 1);
+                .iter_mut()
+                .filter(|(_, child)| child.parent.root == root)
+                .for_each(|(_, child)| child.parent.index -= 1);
         }
 
-        // Handle new branch.
+        // Handle new branch by putting the tail into the empty root branch
+        // before we swap the root with the new branch.
         if !tail.is_empty() {
-            let new_root = self.next;
-            self.next += 1;
-            let new = At::new(new_root, head.index);
-            self.branches.insert(head.root, Branch::new(new, tail));
+            let next = self.branches.insert(Branch::NIL);
+            let new = At::new(next, head.index);
+            let root = self.branches.get_mut(head.root).unwrap();
+            debug_assert!(root.entries.is_empty());
+            root.parent = new;
+            root.entries = tail;
             self.set_root(new, rm_saved);
         }
 
@@ -386,7 +385,10 @@ impl<E: Edit, S: Slot> History<E, S> {
                 let (_, _, entries, rm_saved) = self.record.redo_and_push(target, entry);
                 if !entries.is_empty() {
                     let new = At::new(id, index);
-                    self.branches.insert(self.root, Branch::new(new, entries));
+                    let root = self.branches.get_mut(self.root).unwrap();
+                    debug_assert!(root.entries.is_empty());
+                    root.parent = new;
+                    root.entries = entries;
                     self.set_root(new, rm_saved);
                 }
             }
@@ -420,12 +422,13 @@ impl<E> Default for History<E> {
 
 impl<E, S> From<Record<E, S>> for History<E, S> {
     fn from(record: Record<E, S>) -> Self {
+        let mut branches = Slab::new();
+        let root = branches.insert(Branch::NIL);
         History {
-            root: 0,
-            next: 1,
+            root,
             saved: None,
             record,
-            branches: BTreeMap::new(),
+            branches,
         }
     }
 }
@@ -445,10 +448,10 @@ pub struct Branch<E> {
 }
 
 impl<E> Branch<E> {
-    fn new(parent: At, entries: VecDeque<Entry<E>>) -> Branch<E> {
-        debug_assert!(!entries.is_empty());
-        Branch { parent, entries }
-    }
+    const NIL: Branch<E> = Branch {
+        parent: At::NIL,
+        entries: VecDeque::new(),
+    };
 
     /// Returns the parent edit of the branch.
     pub fn parent(&self) -> At {
@@ -456,9 +459,13 @@ impl<E> Branch<E> {
     }
 
     /// Returns the number of edits in the branch.
-    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    /// Returns `true` if the branch is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 
     /// Returns the edit at the index.

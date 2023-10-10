@@ -1,4 +1,4 @@
-use crate::{Edit, History, Slot};
+use crate::{At, Edit, History, Slot};
 use alloc::vec::Vec;
 
 #[derive(Debug)]
@@ -31,8 +31,7 @@ impl<E, S> Checkpoint<'_, E, S> {
 impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
     /// Calls the [`History::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let root = self.history.root;
-        self.entries.push(CheckpointEntry::Edit(root));
+        self.entries.push(CheckpointEntry::Edit(self.history.root));
         self.history.edit(target, edit)
     }
 
@@ -54,14 +53,20 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
             .into_iter()
             .rev()
             .filter_map(|entry| match entry {
-                CheckpointEntry::Edit(branch) => {
+                CheckpointEntry::Edit(root) => {
                     let output = self.history.undo(target)?;
-                    let root = self.history.root;
-                    if root == branch {
+                    if self.history.root == root {
                         self.history.record.entries.pop_back();
                     } else {
-                        self.history.jump_to(branch);
-                        self.history.branches.remove(&root).unwrap();
+                        // If a new root was created when we edited earlier,
+                        // we remove it and append the entries to the previous root.
+                        let mut branch = self.history.branches.remove(root);
+                        debug_assert_eq!(branch.parent, self.history.head());
+
+                        let new = At::new(root, self.history.record.head());
+                        let (_, rm_saved) = self.history.record.rm_tail();
+                        self.history.record.entries.append(&mut branch.entries);
+                        self.history.set_root(new, rm_saved);
                     }
                     Some(output)
                 }

@@ -98,10 +98,9 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         level: usize,
         #[cfg(feature = "std")] now: SystemTime,
     ) -> fmt::Result {
-        for (&i, branch) in self
+        for (i, branch) in self
             .history
-            .branches
-            .iter()
+            .branches()
             .filter(|(_, branch)| branch.parent == at)
         {
             for (j, entry) in branch.entries.iter().enumerate().rev() {

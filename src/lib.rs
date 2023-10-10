@@ -135,6 +135,8 @@ pub struct At {
 
 #[cfg(feature = "alloc")]
 impl At {
+    const NIL: At = At::new(0, 0);
+
     /// Creates a new `At` with the provided root and index.
     pub const fn new(root: usize, index: usize) -> At {
         At { root, index }
