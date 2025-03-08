@@ -225,7 +225,7 @@ impl<E, S> History<E, S> {
         }
     }
 
-    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<E>)>> {
+    fn mk_path(&mut self, mut to: usize) -> Option<impl Iterator<Item = (usize, Branch<E>)> + use<E, S>> {
         debug_assert_ne!(self.root, to);
         let mut dest = self.nil_replace(to)?;
 

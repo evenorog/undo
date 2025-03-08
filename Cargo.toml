@@ -1,6 +1,6 @@
 [package]
 name = "undo"
-version = "0.51.0"
+version = "0.52.0"
 authors = ["evenorog <evenorog@gmail.com>"]
 description = "An undo-redo library."
 documentation = "https://docs.rs/undo"
@@ -9,10 +9,10 @@ readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["undo", "redo"]
 categories = ["data-structures"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-colored = { version = "2", optional = true }
+colored = { version = "3", optional = true }
 serde = { version = "1", optional = true, default-features = false, features = ["derive"] }
 slab = { version = "0.4", default-features = false }
 
