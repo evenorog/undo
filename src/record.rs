@@ -158,17 +158,17 @@ impl<E, S> Record<E, S> {
     }
 
     /// Returns a queue.
-    pub fn queue(&mut self) -> Queue<E, S> {
+    pub fn queue(&mut self) -> Queue<'_, E, S> {
         Queue::from(self)
     }
 
     /// Returns a checkpoint.
-    pub fn checkpoint(&mut self) -> Checkpoint<E, S> {
+    pub fn checkpoint(&mut self) -> Checkpoint<'_, E, S> {
         Checkpoint::from(self)
     }
 
     /// Returns a structure for configurable formatting of the record.
-    pub fn display(&self) -> Display<E, S> {
+    pub fn display(&self) -> Display<'_, E, S> {
         Display::from(self)
     }
 

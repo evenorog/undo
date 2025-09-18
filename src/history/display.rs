@@ -66,12 +66,12 @@ impl<E: fmt::Display, S> Display<'_, E, S> {
         self.format.at(f, at)?;
 
         #[cfg(feature = "std")]
-        if let Some(entry) = entry {
-            if self.format.detailed {
-                let st_fmt = self.st_fmt;
-                let string = st_fmt(now, entry.st_of_latest());
-                self.format.elapsed(f, string)?;
-            }
+        if let Some(entry) = entry
+            && self.format.detailed
+        {
+            let st_fmt = self.st_fmt;
+            let string = st_fmt(now, entry.st_of_latest());
+            self.format.elapsed(f, string)?;
         }
 
         self.format
