@@ -91,6 +91,10 @@ impl<E: Edit> Entry<E> {
         self.edit.redo(target)
     }
 
+    pub(crate) fn drop(&mut self, target: &mut E::Target) {
+        self.edit.drop(target);
+    }
+
     pub(crate) fn merge(&mut self, other: Self) -> Merged<Self>
     where
         Self: Sized,

@@ -58,7 +58,9 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
                     if self.history.root == root {
                         // Same branch: the edit didn't create a fork, so pop it
                         // directly without touching the branch tree.
-                        self.history.record.entries.pop_back();
+                        if let Some(mut entry) = self.history.record.entries.pop_back() {
+                            entry.drop(target);
+                        }
                     } else {
                         // The edit forked into a new branch. Undo already rewound
                         // the target state; now remove the fork and splice its tail
@@ -67,7 +69,11 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
                         debug_assert_eq!(branch.parent, self.history.head());
 
                         let new = At::new(root, self.history.record.head());
-                        let (_, rm_saved) = self.history.record.rm_tail();
+                        let (tail, rm_saved) = self.history.record.rm_tail();
+                        // The tail is the checkpoint edit that was just undone; notify it.
+                        for mut e in tail {
+                            e.drop(target);
+                        }
                         self.history.record.entries.append(&mut branch.entries);
                         self.history.set_root(new, rm_saved);
                     }

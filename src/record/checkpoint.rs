@@ -62,7 +62,10 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
             .filter_map(|entry| match entry {
                 CheckpointEntry::Edit { saved, mut tail } => {
                     let output = self.record.undo(target)?;
-                    self.record.entries.pop_back();
+                    // The checkpoint edit is undone and permanently removed; notify it.
+                    if let Some(mut entry) = self.record.entries.pop_back() {
+                        entry.drop(target);
+                    }
                     self.record.entries.append(&mut tail);
                     self.record.saved = self.record.saved.or(saved);
                     Some(output)

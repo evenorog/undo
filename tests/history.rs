@@ -1,4 +1,6 @@
-use undo::{Add, At, History};
+use std::cell::Cell;
+use std::rc::Rc;
+use undo::{Add, At, Edit, History};
 
 const A: Add = Add('a');
 const B: Add = Add('b');
@@ -143,4 +145,190 @@ fn next_and_prev() {
     history.go_to(&mut target, prev_head);
     assert_eq!(history.next_branch_head(), Some(At::new(1, 2)));
     assert_eq!(history.prev_branch_head(), None);
+}
+
+#[derive(Clone)]
+struct CountDrop {
+    char: char,
+    drops: Rc<Cell<u32>>,
+}
+
+impl CountDrop {
+    fn new(char: char, drops: &Rc<Cell<u32>>) -> Self {
+        CountDrop {
+            char,
+            drops: drops.clone(),
+        }
+    }
+}
+
+impl Edit for CountDrop {
+    type Target = String;
+    type Output = ();
+
+    fn edit(&mut self, target: &mut String) {
+        target.push(self.char);
+    }
+
+    fn undo(&mut self, target: &mut String) {
+        target.pop();
+    }
+
+    fn drop(&mut self, _target: &mut String) {
+        self.drops.set(self.drops.get() + 1);
+    }
+}
+
+#[test]
+fn drop_not_called_on_branch() {
+    // Unlike Record, History never discards edits when branching — undone edits
+    // are preserved in a branch and remain accessible via go_to, so drop() is
+    // not called on them.
+    let drops = Rc::new(Cell::new(0u32));
+    let mut history = History::new();
+    let mut target = String::new();
+
+    history.edit(&mut target, CountDrop::new('a', &drops));
+    history.edit(&mut target, CountDrop::new('b', &drops));
+    history.edit(&mut target, CountDrop::new('c', &drops));
+
+    history.undo(&mut target);
+    history.undo(&mut target);
+    assert_eq!(drops.get(), 0);
+
+    // Editing after undoing creates a branch for b and c — they are NOT dropped.
+    history.edit(&mut target, CountDrop::new('d', &drops));
+    assert_eq!(drops.get(), 0); // b and c are in a branch, not gone
+}
+
+#[test]
+fn drop_on_limit() {
+    let drops = Rc::new(Cell::new(0u32));
+    let mut history: History<CountDrop> = History::builder().limit(3).build();
+    let mut target = String::new();
+
+    history.edit(&mut target, CountDrop::new('a', &drops));
+    history.edit(&mut target, CountDrop::new('b', &drops));
+    history.edit(&mut target, CountDrop::new('c', &drops));
+    assert_eq!(drops.get(), 0);
+
+    // 'a' is evicted when the limit is exceeded.
+    history.edit(&mut target, CountDrop::new('d', &drops));
+    assert_eq!(drops.get(), 1);
+}
+
+#[test]
+fn drop_on_branch_evicted_by_limit() {
+    // When the oldest edit is evicted by the limit, any branches parented at
+    // that position are removed and their entries have drop() called.
+    let drops = Rc::new(Cell::new(0u32));
+    let mut history: History<CountDrop> = History::builder().limit(2).build();
+    let mut target = String::new();
+
+    history.edit(&mut target, CountDrop::new('a', &drops));
+    history.edit(&mut target, CountDrop::new('b', &drops));
+
+    // Undo all and branch from the origin — the [a, b] branch is parented at
+    // index 0 (the origin), so it will be removed the moment any eviction
+    // reaches index 0.
+    history.undo(&mut target);
+    history.undo(&mut target);
+    history.edit(&mut target, CountDrop::new('c', &drops)); // branch for [a, b]
+    history.edit(&mut target, CountDrop::new('d', &drops)); // record = [c, d]
+    assert_eq!(drops.get(), 0);
+
+    // Pushing 'e' evicts 'c' (limit=2) and calls rm_child_of on index 0,
+    // which removes the [a, b] branch since it was parented at the origin.
+    history.edit(&mut target, CountDrop::new('e', &drops));
+    assert_eq!(drops.get(), 3); // c evicted + a and b from the pruned branch
+}
+
+#[test]
+fn drop_on_checkpoint_cancel() {
+    let drops = Rc::new(Cell::new(0u32));
+    let mut history = History::new();
+    let mut target = String::new();
+
+    history.edit(&mut target, CountDrop::new('a', &drops));
+    let mut cp = history.checkpoint();
+    cp.edit(&mut target, CountDrop::new('b', &drops));
+    cp.edit(&mut target, CountDrop::new('c', &drops));
+    assert_eq!(target, "abc");
+    assert_eq!(drops.get(), 0);
+
+    cp.cancel(&mut target);
+    // b and c are cancelled and dropped.
+    assert_eq!(drops.get(), 2);
+    assert_eq!(target, "a");
+}
+
+#[test]
+fn drop_not_called_when_navigating_branches() {
+    let drops = Rc::new(Cell::new(0u32));
+    let mut history = History::new();
+    let mut target = String::new();
+
+    history.edit(&mut target, CountDrop::new('a', &drops));
+    history.edit(&mut target, CountDrop::new('b', &drops));
+    history.edit(&mut target, CountDrop::new('c', &drops));
+    let abc = history.head();
+
+    history.undo(&mut target);
+    history.undo(&mut target);
+    history.edit(&mut target, CountDrop::new('d', &drops));
+    let ad = history.head();
+
+    history.go_to(&mut target, abc);
+    assert_eq!(target, "abc");
+    history.go_to(&mut target, ad);
+    assert_eq!(target, "ad");
+    assert_eq!(drops.get(), 0);
+}
+
+#[test]
+fn drop_on_checkpoint_cancel_after_fork_restores_branch() {
+    let drops = Rc::new(Cell::new(0u32));
+    let mut history = History::new();
+    let mut target = String::new();
+
+    history.edit(&mut target, CountDrop::new('a', &drops));
+    history.edit(&mut target, CountDrop::new('b', &drops));
+    history.edit(&mut target, CountDrop::new('c', &drops));
+    history.undo(&mut target);
+    history.undo(&mut target);
+
+    let mut cp = history.checkpoint();
+    cp.edit(&mut target, CountDrop::new('d', &drops));
+    assert_eq!(target, "ad");
+    assert_eq!(drops.get(), 0);
+
+    cp.cancel(&mut target);
+    // The checkpoint fork is removed, but the original b/c branch is restored.
+    assert_eq!(drops.get(), 1);
+    assert_eq!(target, "a");
+
+    history.redo(&mut target);
+    history.redo(&mut target);
+    assert_eq!(target, "abc");
+    assert_eq!(drops.get(), 1);
+}
+
+#[test]
+fn drop_not_called_on_clear_or_checkpoint_commit() {
+    let drops = Rc::new(Cell::new(0u32));
+    let mut history = History::new();
+    let mut target = String::new();
+
+    history.edit(&mut target, CountDrop::new('a', &drops));
+    {
+        let mut cp = history.checkpoint();
+        cp.edit(&mut target, CountDrop::new('b', &drops));
+        cp.commit();
+    }
+    assert_eq!(drops.get(), 0);
+
+    history.clear();
+    assert_eq!(drops.get(), 0);
+    assert!(history.is_empty());
+    assert_eq!(target, "ab");
 }

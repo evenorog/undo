@@ -141,6 +141,20 @@ pub trait Edit {
         self.edit(target)
     }
 
+    /// Called when the edit is permanently removed from the [`Record`] or [`History`].
+    ///
+    /// This is invoked when edits are discarded — for example, when a new edit is
+    /// applied after undoing (removing the now-unreachable future edits), or when
+    /// the oldest edit is evicted because the stack's
+    /// [`limit`](record::Builder::limit) was reached.
+    ///
+    /// The default implementation does nothing.
+    ///
+    /// Note: `Edit::drop` is not called by [`Record::clear`] or
+    /// [`record::Checkpoint::commit`] because those operations do not have access
+    /// to the target. Use Rust's [`Drop`] trait for target-independent cleanup.
+    fn drop(&mut self, _target: &mut Self::Target) {}
+
     /// Attempts to merge `other` into `self`, combining two consecutive edits into one.
     ///
     /// Implement this to collapse small incremental changes (e.g. individual keystrokes)

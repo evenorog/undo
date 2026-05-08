@@ -222,7 +222,10 @@ impl<E, S: Slot> Record<E, S> {
 impl<E: Edit, S: Slot> Record<E, S> {
     /// Pushes the edit on top of the record and executes its [`Edit::edit`] method.
     pub fn edit(&mut self, target: &mut E::Target, edit: E) -> E::Output {
-        let (output, _, _, _) = self.edit_and_push(target, Entry::new(edit));
+        let (output, _, tail, _) = self.edit_and_push(target, Entry::new(edit));
+        for mut entry in tail {
+            entry.drop(target);
+        }
         output
     }
 
@@ -232,7 +235,10 @@ impl<E: Edit, S: Slot> Record<E, S> {
         mut entry: Entry<E>,
     ) -> (E::Output, bool, VecDeque<Entry<E>>, Option<usize>) {
         let output = entry.edit(target);
-        let (merged_or_annulled, tail, rm_saved) = self.push(entry);
+        let (merged_or_annulled, tail, rm_saved, dropped) = self.push(entry);
+        if let Some(mut e) = dropped {
+            e.drop(target);
+        }
         (output, merged_or_annulled, tail, rm_saved)
     }
 
@@ -242,11 +248,21 @@ impl<E: Edit, S: Slot> Record<E, S> {
         mut entry: Entry<E>,
     ) -> (E::Output, bool, VecDeque<Entry<E>>, Option<usize>) {
         let output = entry.redo(target);
-        let (merged_or_annulled, tail, rm_saved) = self.push(entry);
+        let (merged_or_annulled, tail, rm_saved, dropped) = self.push(entry);
+        if let Some(mut e) = dropped {
+            e.drop(target);
+        }
         (output, merged_or_annulled, tail, rm_saved)
     }
 
-    fn push(&mut self, entry: Entry<E>) -> (bool, VecDeque<Entry<E>>, Option<usize>) {
+    // Returns (merged_or_annulled, tail, rm_saved, dropped).
+    // `dropped` is the single entry that was synchronously evicted from the record
+    // (either the oldest entry popped due to the limit, or the previous entry that
+    // was annulled). The caller is responsible for calling `Edit::drop` on it.
+    fn push(
+        &mut self,
+        entry: Entry<E>,
+    ) -> (bool, VecDeque<Entry<E>>, Option<usize>, Option<Entry<E>>) {
         let old_index = self.index;
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
@@ -260,25 +276,29 @@ impl<E: Edit, S: Slot> Record<E, S> {
             _ => Merged::No(entry),
         };
 
-        let merged_or_annulled = match merged {
-            Merged::Yes => true,
+        let (merged_or_annulled, dropped) = match merged {
+            Merged::Yes => (true, None),
             Merged::Annul => {
-                self.entries.pop_back();
+                // Pop the previous entry; it and the incoming entry cancel out.
+                // The caller will invoke Edit::drop on the popped entry.
+                let dropped = self.entries.pop_back();
                 self.index -= 1;
-                true
+                (true, dropped)
             }
             Merged::No(entry) => {
                 // If limit is reached, drop the oldest edit. If `saved` pointed at it
                 // (saved == 0), checked_sub returns None, correctly clearing the saved
                 // marker because that edit no longer exists in the record.
-                if self.limit() == self.index {
-                    self.entries.pop_front();
+                let dropped = if self.limit() == self.index {
+                    let evicted = self.entries.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
+                    evicted
                 } else {
                     self.index += 1;
-                }
+                    None
+                };
                 self.entries.push_back(entry);
-                false
+                (false, dropped)
             }
         };
 
@@ -287,7 +307,7 @@ impl<E: Edit, S: Slot> Record<E, S> {
         self.socket.emit_if(was_saved, || Event::Saved(false));
         self.socket
             .emit_if(old_index != self.index, || Event::Index(self.index));
-        (merged_or_annulled, tail, rm_saved)
+        (merged_or_annulled, tail, rm_saved, dropped)
     }
 
     /// Calls the [`Edit::undo`] method for the active edit and sets

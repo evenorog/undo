@@ -205,24 +205,30 @@ impl<E, S> History<E, S> {
         Display::from(self)
     }
 
-    fn rm_child_of(&mut self, at: At) {
+    // Returns all entries from removed branches so the caller can invoke Edit::drop.
+    fn rm_child_of(&mut self, at: At) -> Vec<Entry<E>> {
         // We need to check if any of the branches had the removed node as root.
+        // The active root slot (self.root) is a NIL placeholder and must never
+        // be treated as a dead branch, even if its parent happens to match `at`.
         let mut dead: Vec<_> = self
             .branches()
-            .filter(|&(_, child)| child.parent == at)
-            .map(|(id, _)| id)
+            .filter(|&(branch_id, child)| branch_id != self.root && child.parent == at)
+            .map(|(branch_id, _)| branch_id)
             .collect();
+        let mut dropped = Vec::new();
         while let Some(id) = dead.pop() {
-            // Remove the dead branch.
-            self.branches.remove(id);
+            // Remove the dead branch and collect its entries for drop notification.
+            let branch = self.branches.remove(id);
             self.saved = self.saved.filter(|s| s.root != id);
+            dropped.extend(branch.entries);
             // Add the children of the dead branch so they are removed too.
             dead.extend(
                 self.branches()
-                    .filter(|&(_, child)| child.parent.root == id)
-                    .map(|(id, _)| id),
+                    .filter(|&(branch_id, child)| branch_id != self.root && child.parent.root == id)
+                    .map(|(branch_id, _)| branch_id),
             )
         }
+        dropped
     }
 
     fn mk_path(
@@ -326,10 +332,13 @@ impl<E: Edit, S: Slot> History<E, S> {
         // from the front — update branch parent indices to compensate.
         if !merged && head.index == self.record.head() {
             let root = self.root;
-            self.rm_child_of(At::new(root, 0));
+            let dropped = self.rm_child_of(At::new(root, 0));
+            for mut entry in dropped {
+                entry.drop(target);
+            }
             self.branches
                 .iter_mut()
-                .filter(|(_, child)| child.parent.root == root)
+                .filter(|(branch_id, child)| *branch_id != root && child.parent.root == root)
                 .for_each(|(_, child)| child.parent.index -= 1);
         }
 
