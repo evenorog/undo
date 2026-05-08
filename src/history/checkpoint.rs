@@ -56,10 +56,13 @@ impl<E: Edit, S: Slot> Checkpoint<'_, E, S> {
                 CheckpointEntry::Edit(root) => {
                     let output = self.history.undo(target)?;
                     if self.history.root == root {
+                        // Same branch: the edit didn't create a fork, so pop it
+                        // directly without touching the branch tree.
                         self.history.record.entries.pop_back();
                     } else {
-                        // If a new root was created when we edited earlier,
-                        // we remove it and append the entries to the previous root.
+                        // The edit forked into a new branch. Undo already rewound
+                        // the target state; now remove the fork and splice its tail
+                        // back onto the parent branch to restore the tree structure.
                         let mut branch = self.history.branches.remove(root);
                         debug_assert_eq!(branch.parent, self.history.head());
 

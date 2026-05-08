@@ -187,7 +187,11 @@ impl<E, S> Record<E, S> {
 }
 
 impl<E, S: Slot> Record<E, S> {
-    /// Marks the target as currently being in a saved.
+    /// Marks the target as currently being in a saved state.
+    ///
+    /// Note: if the record's [`limit`](Record::limit) is reached, the oldest
+    /// edit is discarded. If the saved marker pointed to that edit it is
+    /// automatically cleared, since the saved state no longer exists.
     pub fn set_saved(&mut self) {
         let was_saved = self.is_saved();
         self.saved = Some(self.index);
@@ -249,7 +253,8 @@ impl<E: Edit, S: Slot> Record<E, S> {
         let was_saved = self.is_saved();
 
         let (tail, rm_saved) = self.rm_tail();
-        // Try to merge unless the target is in a saved state.
+        // Merging is skipped when in a saved state to preserve the save boundary,
+        // ensuring the target can always be reverted to the exact saved position.
         let merged = match self.entries.back_mut() {
             Some(last) if !was_saved => last.merge(entry),
             _ => Merged::No(entry),
@@ -263,7 +268,9 @@ impl<E: Edit, S: Slot> Record<E, S> {
                 true
             }
             Merged::No(entry) => {
-                // If limit is reached, pop off the first edit command.
+                // If limit is reached, drop the oldest edit. If `saved` pointed at it
+                // (saved == 0), checked_sub returns None, correctly clearing the saved
+                // marker because that edit no longer exists in the record.
                 if self.limit() == self.index {
                     self.entries.pop_front();
                     self.saved = self.saved.and_then(|saved| saved.checked_sub(1));
@@ -336,7 +343,9 @@ impl<E: Edit, S: Slot> Record<E, S> {
         let could_undo = self.can_undo();
         let could_redo = self.can_redo();
         let was_saved = self.is_saved();
-        // Temporarily remove slot so they are not called each iteration.
+        // Disconnect the slot for the duration of the loop so that events are
+        // batched: one consolidated set is emitted after the loop completes
+        // rather than a separate event for every intermediate step.
         let slot = self.socket.disconnect();
         // Decide if we need to undo or redo to reach index.
         let undo_or_redo = if index > self.index {

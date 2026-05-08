@@ -321,7 +321,9 @@ impl<E: Edit, S: Slot> History<E, S> {
         let head = self.head();
         let (output, merged, tail, rm_saved) = self.record.edit_and_push(target, Entry::new(edit));
 
-        // Check if the limit has been reached.
+        // If a new edit was not merged and the head index did not advance, the
+        // record's limit was reached and the oldest edit was silently dropped
+        // from the front — update branch parent indices to compensate.
         if !merged && head.index == self.record.head() {
             let root = self.root;
             self.rm_child_of(At::new(root, 0));
